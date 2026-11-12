@@ -1,0 +1,68 @@
+{
+  "currentCycle": 0,
+  "cycleDurationMs": 100,
+  "networkLatency": 2,
+  "computers": [
+    {
+      "name": "Memoria",
+      "ramSize": 128,
+      "policy": "FCFS",
+      "quantum": 2
+    },
+    {
+      "name": "Testigo",
+      "ramSize": 128,
+      "policy": "FCFS",
+      "quantum": 2
+    }
+  ],
+  "buffers": [],
+  "processes": [
+    {
+      "id": 1,
+      "name": "Ocupa-80",
+      "computerId": 1,
+      "type": "CPU_BOUND",
+      "totalInstructions": 4,
+      "remainingTime": 4,
+      "assignedMemory": 80,
+      "priority": 1,
+      "deadline": 500,
+      "remainingDeadline": 500,
+      "state": "LISTO",
+      "blockReason": "NONE",
+      "programCounter": 0,
+      "memoryAddressRegister": 0,
+      "ioInterval": 0,
+      "ioDuration": 0,
+      "ioCycleCountdown": 0,
+      "targetBufferId": null,
+      "cyclesPerOperation": 1,
+      "requiredElements": 0,
+      "processedElements": 0
+    },
+    {
+      "id": 2,
+      "name": "Espera-64",
+      "computerId": 1,
+      "type": "CPU_BOUND",
+      "totalInstructions": 3,
+      "remainingTime": 3,
+      "assignedMemory": 64,
+      "priority": 1,
+      "deadline": 500,
+      "remainingDeadline": 500,
+      "state": "NUEVO",
+      "blockReason": "NONE",
+      "programCounter": 0,
+      "memoryAddressRegister": 0,
+      "ioInterval": 0,
+      "ioDuration": 0,
+      "ioCycleCountdown": 0,
+      "targetBufferId": null,
+      "cyclesPerOperation": 1,
+      "requiredElements": 0,
+      "processedElements": 0
+    }
+  ]
+}
