@@ -5,7 +5,7 @@ import com.avilaos.core.model.*;
 import com.avilaos.core.structures.MyLinkedList;
 import com.avilaos.hardware.Computer;
 import com.avilaos.simulation.SimulationController;
-import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
 import java.io.File;
 
 /** Guarda y carga configuraciones sin depender de una vista Swing. */
@@ -27,7 +27,8 @@ final class ConfiguracionSimulacion {
             try {
                 root.addProperty("currentCycle", 0);
                 root.addProperty("cycleDurationMs", controller.getCycleDurationMs());
-                root.addProperty("networkLatency", controller.getNetworkLatency());
+                // [P2-LEGACY] root.addProperty("networkLatency", controller.getNetworkLatency());
+                root.addProperty("networkLatency", 0); // [P2] sin red/buffers
                 MyLinkedList<Computer> cs = controller.getComputers();
                 int[] libre = new int[cs.size()];
                 for (int i = 0; i < cs.size(); i++) {
@@ -40,18 +41,18 @@ final class ConfiguracionSimulacion {
                     libre[i] = c.getMemoryManager().getTotalMemory();
                     computers.add(o);
                 }
-                MyLinkedList<Buffer> bs = controller.getBuffers();
-                for (int i = 0; i < bs.size(); i++) {
-                    Buffer b = bs.get(i);
-                    com.google.gson.JsonObject o = new com.google.gson.JsonObject();
-                    o.addProperty("id", b.getId());
-                    o.addProperty("hostComputerId", b.getIdComp());
-                    o.addProperty("storage", b.getStorage());
-                    o.addProperty("sizeInMemory", b.getSizeInMemory());
-                    o.addProperty("latency", b.getLatency());
-                    libre[b.getIdComp() - 1] -= b.getStorage();
-                    buffers.add(o);
-                }
+// [P2-LEGACY]                 MyLinkedList<Buffer> bs = controller.getBuffers();
+// [P2-LEGACY]                 for (int i = 0; i < bs.size(); i++) {
+// [P2-LEGACY]                     Buffer b = bs.get(i);
+// [P2-LEGACY]                     com.google.gson.JsonObject o = new com.google.gson.JsonObject();
+// [P2-LEGACY]                     o.addProperty("id", b.getId());
+// [P2-LEGACY]                     o.addProperty("hostComputerId", b.getIdComp());
+// [P2-LEGACY]                     o.addProperty("storage", b.getStorage());
+// [P2-LEGACY]                     o.addProperty("sizeInMemory", b.getSizeInMemory());
+// [P2-LEGACY]                     o.addProperty("latency", b.getLatency());
+// [P2-LEGACY]                     libre[b.getIdComp() - 1] -= b.getStorage();
+// [P2-LEGACY]                     buffers.add(o);
+// [P2-LEGACY]                 }
                 MyLinkedList<ProcessControlBlock> ps = controller.getAllProcesses();
                 for (int i = 0; i < ps.size(); i++) {
                     ProcessControlBlock p = ps.get(i);
@@ -117,19 +118,19 @@ final class ConfiguracionSimulacion {
             com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
             controller.reset();
             controller.setCycleDurationMs(root.get("cycleDurationMs").getAsInt());
-            controller.setNetworkLatency(root.get("networkLatency").getAsInt());
+// [P2-LEGACY]             controller.setNetworkLatency(root.get("networkLatency").getAsInt());
             controller.setCurrentCycle(root.get("currentCycle").getAsInt());
             for (com.google.gson.JsonElement e : root.getAsJsonArray("computers")) {
                 com.google.gson.JsonObject c = e.getAsJsonObject();
                 controller.createComputer(c.get("name").getAsString(), c.get("ramSize").getAsInt(),
                         SchedulingPolicyType.valueOf(c.get("policy").getAsString()), c.get("quantum").getAsInt());
             }
-            for (com.google.gson.JsonElement e : root.getAsJsonArray("buffers")) {
-                com.google.gson.JsonObject b = e.getAsJsonObject();
-                int lat = b.has("latency") ? b.get("latency").getAsInt() : controller.getNetworkLatency();
-                if (controller.createBuffer(b.get("hostComputerId").getAsInt(), b.get("storage").getAsInt(), lat) == null)
-                    throw new IllegalStateException("No se pudo crear el buffer");
-            }
+// [P2-LEGACY]             for (com.google.gson.JsonElement e : root.getAsJsonArray("buffers")) {
+// [P2-LEGACY]                 com.google.gson.JsonObject b = e.getAsJsonObject();
+// [P2-LEGACY]                 int lat = b.has("latency") ? b.get("latency").getAsInt() : controller.getNetworkLatency();
+// [P2-LEGACY]                 if (controller.createBuffer(b.get("hostComputerId").getAsInt(), b.get("storage").getAsInt(), lat) == null)
+// [P2-LEGACY]                     throw new IllegalStateException("No se pudo crear el buffer");
+// [P2-LEGACY]             }
             int maxId = 0;
             for (com.google.gson.JsonElement e : root.getAsJsonArray("processes")) {
                 com.google.gson.JsonObject p = e.getAsJsonObject();

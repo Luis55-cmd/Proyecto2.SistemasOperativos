@@ -15,7 +15,7 @@ public class ProcessCreationValidationTest {
         testRejectMemoryExceedingTotalRam();
         testRejectInvalidParameters();
         testRejectInvalidProducerConsumer();
-        testSenderInitiatedLoadBalancing();
+        // [P2-LEGACY] testSenderInitiatedLoadBalancing(); // requiere 2 computadores
         System.out.println(">>> TODAS LAS PRUEBAS DE ProcessCreationValidationTest PASARON EXITOSAMENTE. <<<");
     }
 
