@@ -25,7 +25,8 @@ import static com.avilaos.gui.PanelPrincipal.*;
 public class EditorProceso extends JPanel {
     private final JTextField campoNombre = new JTextField();
     private final JComboBox<DestinoComputador> destino = new JComboBox<>();
-    private final JComboBox<ProcessType> comboTipoProceso = new JComboBox<>(ProcessType.values());
+    // [P2-LEGACY] private final JComboBox<ProcessType> comboTipoProceso = new JComboBox<>(ProcessType.values());
+    private final JComboBox<ProcessType> comboTipoProceso = new JComboBox<>(new ProcessType[] { ProcessType.CPU_BOUND, ProcessType.IO_BOUND }); // [P2] sin PRODUCER/CONSUMER
     private final JSpinner spinnerPrioridad = numero(1, 1, 10);
     private final JSpinner spinnerDeadline = numero(20, 1, 100000);
     private final JTextField memoriaCalculada = new JTextField();
@@ -102,13 +103,13 @@ public class EditorProceso extends JPanel {
         panelIO.add(campo("Ciclos de CPU entre operaciones de E/S", spinnerIoInterval));
         panelIO.add(campo("Duración del bloqueo de E/S (ticks)", spinnerIoDuration));
         formulario.add(panelIO);
-        panelSync.setOpaque(false);
-        panelSync.setAlignmentX(LEFT_ALIGNMENT);
-        panelSync.setMaximumSize(new Dimension(900, 62));
-        panelSync.add(campo("Buffer", comboBufferId));
-        panelSync.add(campo("Ciclos por operación", spinnerCiclosOperacion));
-        panelSync.add(campo("Elementos para terminar", spinnerElementos));
-        formulario.add(panelSync);
+// [P2-LEGACY]         panelSync.setOpaque(false);
+// [P2-LEGACY]         panelSync.setAlignmentX(LEFT_ALIGNMENT);
+// [P2-LEGACY]         panelSync.setMaximumSize(new Dimension(900, 62));
+// [P2-LEGACY]         panelSync.add(campo("Buffer", comboBufferId));
+// [P2-LEGACY]         panelSync.add(campo("Ciclos por operación", spinnerCiclosOperacion));
+// [P2-LEGACY]         panelSync.add(campo("Elementos para terminar", spinnerElementos));
+// [P2-LEGACY]         formulario.add(panelSync);
         formulario.add(Box.createVerticalStrut(24));
 
         crearComputador.addActionListener(e -> irAComputadores.run());
@@ -216,13 +217,13 @@ public class EditorProceso extends JPanel {
 
         actualizarProcesos(view);
 
-        String bufferSeleccionado = (String) comboBufferId.getSelectedItem();
-        comboBufferId.removeAllItems();
-        for (int i = 0; i < view.buffers.size(); i++) {
-            String id = String.valueOf(view.buffers.get(i).getId());
-            comboBufferId.addItem(id);
-            if (id.equals(bufferSeleccionado)) comboBufferId.setSelectedItem(id);
-        }
+// [P2-LEGACY]         String bufferSeleccionado = (String) comboBufferId.getSelectedItem();
+// [P2-LEGACY]         comboBufferId.removeAllItems();
+// [P2-LEGACY]         for (int i = 0; i < view.buffers.size(); i++) {
+// [P2-LEGACY]             String id = String.valueOf(view.buffers.get(i).getId());
+// [P2-LEGACY]             comboBufferId.addItem(id);
+// [P2-LEGACY]             if (id.equals(bufferSeleccionado)) comboBufferId.setSelectedItem(id);
+// [P2-LEGACY]         }
     }
 
     private void actualizarProcesos(com.avilaos.simulation.SimulationSnapshot view) {

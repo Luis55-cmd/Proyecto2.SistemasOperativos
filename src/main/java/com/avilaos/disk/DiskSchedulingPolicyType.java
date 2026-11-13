@@ -1,9 +1,11 @@
 package com.avilaos.disk;
 
 /** Políticas de planificación de disco disponibles (patrón Strategy). */
-public enum DiskPolicyType {
+public enum DiskSchedulingPolicyType {
     FIFO,
     SSTF,
     SCAN,
-    CSCAN
+    C_SCAN,
+    LOOK,   // opcional
+    C_LOOK  // opcional
 }

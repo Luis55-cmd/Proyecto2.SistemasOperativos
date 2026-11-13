@@ -207,6 +207,7 @@ public final class SimulationSnapshot {
                 copiedProcesses[processIndex++] = new ProcessRow(computer.getId(), computer.getName(), process.getState(), toProcessView(process));
             }
         }
+        // [P2-LEGACY] computers=new Values<>(copiedNodes); buffers=new Values<>(copiedBuffers); processes=new Values<>(copiedProcesses);
         computers=new Values<>(copiedNodes); buffers=new Values<>(new Object[0]); /* [P2] sin buffers */ processes=new Values<>(copiedProcesses);
         // Mantener muestras aunque el EDT omita refrescos. Ventana acotada a 2000 ciclos.
         Object[] usages=new Object[computers.size()];

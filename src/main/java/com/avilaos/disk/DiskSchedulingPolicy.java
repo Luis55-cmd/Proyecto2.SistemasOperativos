@@ -6,7 +6,7 @@ import com.avilaos.core.structures.MyLinkedList;
  * Estrategia de planificación de disco (patrón Strategy).
  * Atiende una única cola de E/S: una solicitud a la vez.
  */
-public interface IDiskScheduler {
+public interface DiskSchedulingPolicy {
 
     /**
      * Elige la próxima solicitud a atender SIN retirarla de la cola
@@ -20,7 +20,7 @@ public interface IDiskScheduler {
     DiskRequest selectNext(MyLinkedList<DiskRequest> pending, int head, int totalBlocks);
 
     /** Política que implementa esta estrategia. */
-    DiskPolicyType getPolicyType();
+    DiskSchedulingPolicyType getPolicyType();
 
     /** Reinicia el estado interno (p. ej. la dirección en SCAN/C-SCAN). */
     void reset();

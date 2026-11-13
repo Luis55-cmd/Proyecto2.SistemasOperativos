@@ -83,6 +83,7 @@ final class ValidarCarga {
                 if(mem==0 || (long)usada[host-1]+mem>ram[host-1]) throw error("Procesos activos exceden la RAM del computador " + host);
                 usada[host-1]+=mem;
             }
+            if(type==ProcessType.PRODUCER || type==ProcessType.CONSUMER) throw error("Tipo de proceso no soportado en Proyecto 2: " + type); // [P2]
             if(type==ProcessType.PRODUCER || type==ProcessType.CONSUMER) {
                 String target=texto(p,"targetBufferId");
                 try { int b=Integer.parseInt(target); if(b<1 || b>bs.size()) throw error("Buffer inexistente"); }

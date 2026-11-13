@@ -27,7 +27,8 @@ final class ConfiguracionSimulacion {
             try {
                 root.addProperty("currentCycle", 0);
                 root.addProperty("cycleDurationMs", controller.getCycleDurationMs());
-                root.addProperty("networkLatency", 0); // [P2] sin red/buffers (antes: controller.getNetworkLatency())
+                // [P2-LEGACY] root.addProperty("networkLatency", controller.getNetworkLatency());
+                root.addProperty("networkLatency", 0); // [P2] sin red/buffers
                 MyLinkedList<Computer> cs = controller.getComputers();
                 int[] libre = new int[cs.size()];
                 for (int i = 0; i < cs.size(); i++) {

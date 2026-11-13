@@ -90,18 +90,18 @@ public final class MonitorSimulacion extends JPanel {
 
     private final JPanel panelDetalleColas = new JPanel();
 
-    // --- Componentes para visualizar los Buffers Globales ---
-    private final DefaultTableModel modeloBuffers = new DefaultTableModel(
-            new Object[]{"Buffer", "Host", "Latencia (ticks)", "Elementos", "Capacidad", "Mutex", "Llenos", "Vac\u00edos", "Procesos Bloqueados"}, 0) {
-        @Override public boolean isCellEditable(int row, int column) { return false; }
-    };
-    private final JTable tablaBuffers = new JTable(modeloBuffers);
-    private final JScrollPane scrollBuffers = new JScrollPane(tablaBuffers);
-    private final JPanel panelDetalleBuffers = new JPanel(new BorderLayout(0, 8));
-    private final JComboBox<String> comboBuffersLatencia = new JComboBox<>();
-    private final JSpinner spinnerNuevaLatencia = new JSpinner(new SpinnerNumberModel(2, 0, 1000, 1));
-    private final JButton btnActualizarLatencia = accion("Actualizar Latencia", false);
-    private boolean actualizandoComboBuffers = false;
+// [P2-LEGACY]     // --- Componentes para visualizar los Buffers Globales ---
+// [P2-LEGACY]     private final DefaultTableModel modeloBuffers = new DefaultTableModel(
+// [P2-LEGACY]             new Object[]{"Buffer", "Host", "Latencia (ticks)", "Elementos", "Capacidad", "Mutex", "Llenos", "Vac\u00edos", "Procesos Bloqueados"}, 0) {
+// [P2-LEGACY]         @Override public boolean isCellEditable(int row, int column) { return false; }
+// [P2-LEGACY]     };
+// [P2-LEGACY]     private final JTable tablaBuffers = new JTable(modeloBuffers);
+// [P2-LEGACY]     private final JScrollPane scrollBuffers = new JScrollPane(tablaBuffers);
+// [P2-LEGACY]     private final JPanel panelDetalleBuffers = new JPanel(new BorderLayout(0, 8));
+// [P2-LEGACY]     private final JComboBox<String> comboBuffersLatencia = new JComboBox<>();
+// [P2-LEGACY]     private final JSpinner spinnerNuevaLatencia = new JSpinner(new SpinnerNumberModel(2, 0, 1000, 1));
+// [P2-LEGACY]     private final JButton btnActualizarLatencia = accion("Actualizar Latencia", false);
+// [P2-LEGACY]     private boolean actualizandoComboBuffers = false;
 
     private final JTextArea areaLog = new JTextArea();
     private final JScrollPane scrollLog = new JScrollPane(areaLog);
@@ -153,88 +153,88 @@ public final class MonitorSimulacion extends JPanel {
         panelDetalleColas.add(crearSeccionCola(tituloTerminados, scrollTerminados, tablaTerminados));
         panelDetalleColas.setVisible(false);
         
-        // --- Configuración gráfica de la tabla de Buffers ---
-        tablaBuffers.setFillsViewportHeight(true);
-        tablaBuffers.getTableHeader().setReorderingAllowed(false);
-        tablaBuffers.setRowHeight(24);
-        scrollBuffers.setPreferredSize(new Dimension(Integer.MAX_VALUE, 120));
-        scrollBuffers.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
-        
-        panelDetalleBuffers.setOpaque(false);
-        panelDetalleBuffers.setAlignmentX(LEFT_ALIGNMENT);
-        JLabel tituloBuffers = texto("ESTADO DE LOS BUFFERS GLOBALES", 12, TINTA, true);
-        panelDetalleBuffers.add(tituloBuffers, BorderLayout.NORTH);
-        panelDetalleBuffers.add(scrollBuffers, BorderLayout.CENTER);
-        JPanel panelModificarLatencia = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
-        panelModificarLatencia.setOpaque(false);
-        panelModificarLatencia.setAlignmentX(LEFT_ALIGNMENT);
-        panelModificarLatencia.add(texto("Modificar latencia en simulación:", 12, TINTA, true));
-        comboBuffersLatencia.setPreferredSize(new Dimension(190, 28));
-        panelModificarLatencia.add(comboBuffersLatencia);
-        panelModificarLatencia.add(texto("Latencia (ticks):", 12, GRIS, false));
-        spinnerNuevaLatencia.setPreferredSize(new Dimension(75, 28));
-        ((javax.swing.text.DefaultFormatter) ((JSpinner.DefaultEditor) spinnerNuevaLatencia.getEditor())
-                .getTextField().getFormatter()).setCommitsOnValidEdit(true);
-        panelModificarLatencia.add(spinnerNuevaLatencia);
-        btnActualizarLatencia.setPreferredSize(new Dimension(150, 28));
-        btnActualizarLatencia.setEnabled(false);
-        panelModificarLatencia.add(btnActualizarLatencia);
-
-        comboBuffersLatencia.addActionListener(e -> {
-            if (!actualizandoComboBuffers) {
-                String sel = (String) comboBuffersLatencia.getSelectedItem();
-                if (sel != null && view != null) {
-                    for (int i = 0; i < view.buffers.size(); i++) {
-                        var b = view.buffers.get(i);
-                        if (sel.startsWith("Buffer " + b.getId() + " ")) {
-                            spinnerNuevaLatencia.setValue(b.getLatency());
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-
-        tablaBuffers.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting() && view != null) {
-                int row = tablaBuffers.getSelectedRow();
-                if (row >= 0 && row < view.buffers.size()) {
-                    var b = view.buffers.get(row);
-                    for (int i = 0; i < comboBuffersLatencia.getItemCount(); i++) {
-                        String item = comboBuffersLatencia.getItemAt(i);
-                        if (item.startsWith("Buffer " + b.getId() + " ")) {
-                            comboBuffersLatencia.setSelectedIndex(i);
-                            spinnerNuevaLatencia.setValue(b.getLatency());
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-
-        btnActualizarLatencia.addActionListener(e -> {
-            String sel = (String) comboBuffersLatencia.getSelectedItem();
-            if (sel != null && sel.startsWith("Buffer ")) {
-                try {
-                    spinnerNuevaLatencia.commitEdit();
-                    int endIdx = sel.indexOf(" (");
-                    if (endIdx == -1) endIdx = sel.length();
-                    int bufId = Integer.parseInt(sel.substring("Buffer ".length(), endIdx).trim());
-                    int nuevaLat = (Integer) spinnerNuevaLatencia.getValue();
-                    GuiRequest.control(controller, () -> {
+// [P2-LEGACY]         // --- Configuración gráfica de la tabla de Buffers ---
+// [P2-LEGACY]         tablaBuffers.setFillsViewportHeight(true);
+// [P2-LEGACY]         tablaBuffers.getTableHeader().setReorderingAllowed(false);
+// [P2-LEGACY]         tablaBuffers.setRowHeight(24);
+// [P2-LEGACY]         scrollBuffers.setPreferredSize(new Dimension(Integer.MAX_VALUE, 120));
+// [P2-LEGACY]         scrollBuffers.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
+// [P2-LEGACY]         
+// [P2-LEGACY]         panelDetalleBuffers.setOpaque(false);
+// [P2-LEGACY]         panelDetalleBuffers.setAlignmentX(LEFT_ALIGNMENT);
+// [P2-LEGACY]         JLabel tituloBuffers = texto("ESTADO DE LOS BUFFERS GLOBALES", 12, TINTA, true);
+// [P2-LEGACY]         panelDetalleBuffers.add(tituloBuffers, BorderLayout.NORTH);
+// [P2-LEGACY]         panelDetalleBuffers.add(scrollBuffers, BorderLayout.CENTER);
+// [P2-LEGACY]         JPanel panelModificarLatencia = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
+// [P2-LEGACY]         panelModificarLatencia.setOpaque(false);
+// [P2-LEGACY]         panelModificarLatencia.setAlignmentX(LEFT_ALIGNMENT);
+// [P2-LEGACY]         panelModificarLatencia.add(texto("Modificar latencia en simulación:", 12, TINTA, true));
+// [P2-LEGACY]         comboBuffersLatencia.setPreferredSize(new Dimension(190, 28));
+// [P2-LEGACY]         panelModificarLatencia.add(comboBuffersLatencia);
+// [P2-LEGACY]         panelModificarLatencia.add(texto("Latencia (ticks):", 12, GRIS, false));
+// [P2-LEGACY]         spinnerNuevaLatencia.setPreferredSize(new Dimension(75, 28));
+// [P2-LEGACY]         ((javax.swing.text.DefaultFormatter) ((JSpinner.DefaultEditor) spinnerNuevaLatencia.getEditor())
+// [P2-LEGACY]                 .getTextField().getFormatter()).setCommitsOnValidEdit(true);
+// [P2-LEGACY]         panelModificarLatencia.add(spinnerNuevaLatencia);
+// [P2-LEGACY]         btnActualizarLatencia.setPreferredSize(new Dimension(150, 28));
+// [P2-LEGACY]         btnActualizarLatencia.setEnabled(false);
+// [P2-LEGACY]         panelModificarLatencia.add(btnActualizarLatencia);
+// [P2-LEGACY] 
+// [P2-LEGACY]         comboBuffersLatencia.addActionListener(e -> {
+// [P2-LEGACY]             if (!actualizandoComboBuffers) {
+// [P2-LEGACY]                 String sel = (String) comboBuffersLatencia.getSelectedItem();
+// [P2-LEGACY]                 if (sel != null && view != null) {
+// [P2-LEGACY]                     for (int i = 0; i < view.buffers.size(); i++) {
+// [P2-LEGACY]                         var b = view.buffers.get(i);
+// [P2-LEGACY]                         if (sel.startsWith("Buffer " + b.getId() + " ")) {
+// [P2-LEGACY]                             spinnerNuevaLatencia.setValue(b.getLatency());
+// [P2-LEGACY]                             break;
+// [P2-LEGACY]                         }
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]         });
+// [P2-LEGACY] 
+// [P2-LEGACY]         tablaBuffers.getSelectionModel().addListSelectionListener(e -> {
+// [P2-LEGACY]             if (!e.getValueIsAdjusting() && view != null) {
+// [P2-LEGACY]                 int row = tablaBuffers.getSelectedRow();
+// [P2-LEGACY]                 if (row >= 0 && row < view.buffers.size()) {
+// [P2-LEGACY]                     var b = view.buffers.get(row);
+// [P2-LEGACY]                     for (int i = 0; i < comboBuffersLatencia.getItemCount(); i++) {
+// [P2-LEGACY]                         String item = comboBuffersLatencia.getItemAt(i);
+// [P2-LEGACY]                         if (item.startsWith("Buffer " + b.getId() + " ")) {
+// [P2-LEGACY]                             comboBuffersLatencia.setSelectedIndex(i);
+// [P2-LEGACY]                             spinnerNuevaLatencia.setValue(b.getLatency());
+// [P2-LEGACY]                             break;
+// [P2-LEGACY]                         }
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]         });
+// [P2-LEGACY] 
+// [P2-LEGACY]         btnActualizarLatencia.addActionListener(e -> {
+// [P2-LEGACY]             String sel = (String) comboBuffersLatencia.getSelectedItem();
+// [P2-LEGACY]             if (sel != null && sel.startsWith("Buffer ")) {
+// [P2-LEGACY]                 try {
+// [P2-LEGACY]                     spinnerNuevaLatencia.commitEdit();
+// [P2-LEGACY]                     int endIdx = sel.indexOf(" (");
+// [P2-LEGACY]                     if (endIdx == -1) endIdx = sel.length();
+// [P2-LEGACY]                     int bufId = Integer.parseInt(sel.substring("Buffer ".length(), endIdx).trim());
+// [P2-LEGACY]                     int nuevaLat = (Integer) spinnerNuevaLatencia.getValue();
+// [P2-LEGACY]                     GuiRequest.control(controller, () -> {
 // [P2-LEGACY]                         controller.setBufferLatency(bufId, nuevaLat);
-                    });
-                } catch (Exception ex) {
-                    // ignore
-                }
-            }
-        });
-
-        panelDetalleBuffers.add(panelModificarLatencia, BorderLayout.SOUTH);
+// [P2-LEGACY]                     });
+// [P2-LEGACY]                 } catch (Exception ex) {
+// [P2-LEGACY]                     // ignore
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]         });
+// [P2-LEGACY] 
+// [P2-LEGACY]         panelDetalleBuffers.add(panelModificarLatencia, BorderLayout.SOUTH);
 
         cabecera.add(panelDetalleColas);
-        cabecera.add(Box.createVerticalStrut(16));
-        cabecera.add(panelDetalleBuffers);
+// [P2-LEGACY]         cabecera.add(Box.createVerticalStrut(16));
+// [P2-LEGACY]         cabecera.add(panelDetalleBuffers);
         contenedorPrincipal.add(cabecera, BorderLayout.NORTH);
         
         tarjetas.setOpaque(false);
@@ -520,7 +520,7 @@ public final class MonitorSimulacion extends JPanel {
             reloj.setText("Reloj global · ciclo " + ciclo);
             estado.setText(marcha + "  ·  " + cantidad + " computadores");
             actualizarDetalleColasGlobal();
-            actualizarDetalleBuffersGlobal();
+// [P2-LEGACY]             actualizarDetalleBuffersGlobal();
 
             if (panelMetricas != null) {
                 panelMetricas.actualizarMetricas();
@@ -528,80 +528,80 @@ public final class MonitorSimulacion extends JPanel {
         }
     }
 
-    private void actualizarDetalleBuffersGlobal() {
-        modeloBuffers.setRowCount(0);
-        var buffers = view.buffers;
-        for (int i = 0; i < buffers.size(); i++) {
-            var b = buffers.get(i);
-            String nombre = "Buffer " + b.getId();
-            int elementos = b.getDatos().size();
-            int capacidad = b.getStorage();
-            int hostId = b.getIdComp();
-            
-            String hostNombre = "Host " + hostId;
-            if (view.computers != null) {
-                for (int cIdx = 0; cIdx < view.computers.size(); cIdx++) {
-                    var comp = view.computers.get(cIdx);
-                    if (comp.getId() == hostId) {
-                        hostNombre = comp.getName() + " (" + hostId + ")";
-                        break;
-                    }
-                }
-            }
-            
-            int m = b.getMutex().availablePermits();
-            int l = b.getLlenos().availablePermits();
-            int v = b.getVacios().availablePermits();
-            String bloqueados = b.getBlockedProcessesAsString();
-            int latencia = b.getLatency();
-            modeloBuffers.addRow(new Object[]{nombre, hostNombre, latencia + " ticks", elementos, capacidad, m, l, v, bloqueados});
-        }
-
-        // Actualizar combo de buffers para modificar latencia en simulaciÃ³n
-        actualizandoComboBuffers = true;
-        String seleccionPrevia = (String) comboBuffersLatencia.getSelectedItem();
-        comboBuffersLatencia.removeAllItems();
-        int indiceSeleccion = -1;
-        for (int i = 0; i < buffers.size(); i++) {
-            var b = buffers.get(i);
-            int hostId = b.getIdComp();
-            String hostNombre = "Host " + hostId;
-            if (view.computers != null) {
-                for (int cIdx = 0; cIdx < view.computers.size(); cIdx++) {
-                    var comp = view.computers.get(cIdx);
-                    if (comp.getId() == hostId) {
-                        hostNombre = comp.getName() + " (" + hostId + ")";
-                        break;
-                    }
-                }
-            }
-            String item = "Buffer " + b.getId() + " (" + hostNombre + ")";
-            comboBuffersLatencia.addItem(item);
-            if (seleccionPrevia != null && seleccionPrevia.startsWith("Buffer " + b.getId() + " ")) {
-                indiceSeleccion = i;
-            }
-        }
-        if (indiceSeleccion >= 0) {
-            comboBuffersLatencia.setSelectedIndex(indiceSeleccion);
-        } else if (buffers.size() > 0) {
-            comboBuffersLatencia.setSelectedIndex(0);
-        }
-        btnActualizarLatencia.setEnabled(buffers.size() > 0);
-        actualizandoComboBuffers = false;
-
-        String actual = (String) comboBuffersLatencia.getSelectedItem();
-        if (actual != null) {
-            for (int i = 0; i < buffers.size(); i++) {
-                var b = buffers.get(i);
-                if (actual.startsWith("Buffer " + b.getId() + " ")) {
-                    if (!spinnerNuevaLatencia.hasFocus()) {
-                        spinnerNuevaLatencia.setValue(b.getLatency());
-                    }
-                    break;
-                }
-            }
-        }
-    }
+// [P2-LEGACY]     private void actualizarDetalleBuffersGlobal() {
+// [P2-LEGACY]         modeloBuffers.setRowCount(0);
+// [P2-LEGACY]         var buffers = view.buffers;
+// [P2-LEGACY]         for (int i = 0; i < buffers.size(); i++) {
+// [P2-LEGACY]             var b = buffers.get(i);
+// [P2-LEGACY]             String nombre = "Buffer " + b.getId();
+// [P2-LEGACY]             int elementos = b.getDatos().size();
+// [P2-LEGACY]             int capacidad = b.getStorage();
+// [P2-LEGACY]             int hostId = b.getIdComp();
+// [P2-LEGACY]             
+// [P2-LEGACY]             String hostNombre = "Host " + hostId;
+// [P2-LEGACY]             if (view.computers != null) {
+// [P2-LEGACY]                 for (int cIdx = 0; cIdx < view.computers.size(); cIdx++) {
+// [P2-LEGACY]                     var comp = view.computers.get(cIdx);
+// [P2-LEGACY]                     if (comp.getId() == hostId) {
+// [P2-LEGACY]                         hostNombre = comp.getName() + " (" + hostId + ")";
+// [P2-LEGACY]                         break;
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]             
+// [P2-LEGACY]             int m = b.getMutex().availablePermits();
+// [P2-LEGACY]             int l = b.getLlenos().availablePermits();
+// [P2-LEGACY]             int v = b.getVacios().availablePermits();
+// [P2-LEGACY]             String bloqueados = b.getBlockedProcessesAsString();
+// [P2-LEGACY]             int latencia = b.getLatency();
+// [P2-LEGACY]             modeloBuffers.addRow(new Object[]{nombre, hostNombre, latencia + " ticks", elementos, capacidad, m, l, v, bloqueados});
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         // Actualizar combo de buffers para modificar latencia en simulaciÃ³n
+// [P2-LEGACY]         actualizandoComboBuffers = true;
+// [P2-LEGACY]         String seleccionPrevia = (String) comboBuffersLatencia.getSelectedItem();
+// [P2-LEGACY]         comboBuffersLatencia.removeAllItems();
+// [P2-LEGACY]         int indiceSeleccion = -1;
+// [P2-LEGACY]         for (int i = 0; i < buffers.size(); i++) {
+// [P2-LEGACY]             var b = buffers.get(i);
+// [P2-LEGACY]             int hostId = b.getIdComp();
+// [P2-LEGACY]             String hostNombre = "Host " + hostId;
+// [P2-LEGACY]             if (view.computers != null) {
+// [P2-LEGACY]                 for (int cIdx = 0; cIdx < view.computers.size(); cIdx++) {
+// [P2-LEGACY]                     var comp = view.computers.get(cIdx);
+// [P2-LEGACY]                     if (comp.getId() == hostId) {
+// [P2-LEGACY]                         hostNombre = comp.getName() + " (" + hostId + ")";
+// [P2-LEGACY]                         break;
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]             String item = "Buffer " + b.getId() + " (" + hostNombre + ")";
+// [P2-LEGACY]             comboBuffersLatencia.addItem(item);
+// [P2-LEGACY]             if (seleccionPrevia != null && seleccionPrevia.startsWith("Buffer " + b.getId() + " ")) {
+// [P2-LEGACY]                 indiceSeleccion = i;
+// [P2-LEGACY]             }
+// [P2-LEGACY]         }
+// [P2-LEGACY]         if (indiceSeleccion >= 0) {
+// [P2-LEGACY]             comboBuffersLatencia.setSelectedIndex(indiceSeleccion);
+// [P2-LEGACY]         } else if (buffers.size() > 0) {
+// [P2-LEGACY]             comboBuffersLatencia.setSelectedIndex(0);
+// [P2-LEGACY]         }
+// [P2-LEGACY]         btnActualizarLatencia.setEnabled(buffers.size() > 0);
+// [P2-LEGACY]         actualizandoComboBuffers = false;
+// [P2-LEGACY] 
+// [P2-LEGACY]         String actual = (String) comboBuffersLatencia.getSelectedItem();
+// [P2-LEGACY]         if (actual != null) {
+// [P2-LEGACY]             for (int i = 0; i < buffers.size(); i++) {
+// [P2-LEGACY]                 var b = buffers.get(i);
+// [P2-LEGACY]                 if (actual.startsWith("Buffer " + b.getId() + " ")) {
+// [P2-LEGACY]                     if (!spinnerNuevaLatencia.hasFocus()) {
+// [P2-LEGACY]                         spinnerNuevaLatencia.setValue(b.getLatency());
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                     break;
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]         }
+// [P2-LEGACY]     }
     
     private void actualizarDetalleColasGlobal() {
         int seleccion = pestanas.getSelectedIndex();

@@ -58,6 +58,7 @@ public class SimulationController implements IClockTickable {
     }
     private void publishSnapshot() {
         snapshot = new SimulationSnapshot(session, clock.getCycleCounter(), clock.isRunning(), clock.isPaused(),
+                // [P2-LEGACY] clock.getCycleDurationMs(), computers, buffers, snapshot);
                 clock.getCycleDurationMs(), computers, snapshot); // [P2] sin buffers
         synchronized (guiListeners) {
             if (refreshPending) return;
@@ -189,6 +190,10 @@ public class SimulationController implements IClockTickable {
     public Computer createComputer(int ramSize, SchedulingPolicyType policy, int quantum) {
         StateAccess.enter();
         try {
+        // [P2] Una sola instancia de computador.
+        if (computers.size() >= 1) {
+            throw new IllegalArgumentException("Proyecto 2: solo se admite un computador");
+        }
         int id = nextComputerId++;
         RAM ram = new RAM(ramSize, 0, new int[ramSize]);
         CPU cpu = new CPU(0, 0, 0, null, ExecutionMode.USER);
@@ -309,6 +314,11 @@ public class SimulationController implements IClockTickable {
         try {
         if (name == null || name.trim().isEmpty()) {
             logEvent("Error: El nombre del proceso no puede estar vacío");
+            return null;
+        }
+        // [P2] Los tipos PRODUCER/CONSUMER dejan de existir en la práctica.
+        if (type == ProcessType.PRODUCER || type == ProcessType.CONSUMER) {
+            logEvent("Error: tipo de proceso no soportado en Proyecto 2 (" + type + ")");
             return null;
         }
 
@@ -620,6 +630,7 @@ public class SimulationController implements IClockTickable {
         for (int i = 0; i < this.computers.size(); i++) {
             Computer comp = this.computers.get(i);
             if (comp != null && comp.getKernel() != null) {
+                // [P2-LEGACY] comp.getKernel().executeCycle(comp, currentCycle, this.syncDriver, this.buffers);
                 comp.getKernel().executeCycle(comp, currentCycle); // [P2] sin syncDriver/buffers
 
                 // Construcción del reporte de log por cada CPU

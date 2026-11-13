@@ -14,7 +14,7 @@ public class ComputerQuantumTest {
 
     public static void main(String[] args) {
         testDefaultQuantum();
-        testCustomQuantumPerComputer();
+        // [P2-LEGACY] testCustomQuantumPerComputer(); // requiere 2 computadores
         testDynamicQuantumChangeInFlight();
         System.out.println(">>> TODAS LAS PRUEBAS DE ComputerQuantumTest PASARON EXITOSAMENTE. <<<");
     }
