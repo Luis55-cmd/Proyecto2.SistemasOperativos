@@ -167,7 +167,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
             if (fila < 0 || fila >= view.buffers.size()) return;
             try { latencia.setValue(EditorProceso.numeroVisible(latencia)); } catch (IllegalArgumentException ex) { esperaBuffers.setText("Escribe una latencia válida."); return; }
             int id = view.buffers.get(fila).id(), valor = (Integer) latencia.getValue();
-            GuiRequest.control(controller, () -> controller.setBufferLatency(id, valor));
+            GuiRequest.control(controller, () -> { /* [P2-LEGACY] controller.setBufferLatency(id, valor) */ });
         });
     }
 
@@ -313,6 +313,9 @@ public final class VistaSimulacionAlternativa extends JPanel {
             case WAITING_FULL_BUFFER -> "Buffer lleno";
             case NETWORK_LATENCY -> "Red";
             case WAITING_IO -> "E/S";
+            case WAITING_DISK -> "Disco"; // [P2]
+            case SWAPPING_OUT -> "Swap-out"; // [P2]
+            case SWAPPING_IN -> "Swap-in"; // [P2]
             case NONE -> "—";
         };
     }

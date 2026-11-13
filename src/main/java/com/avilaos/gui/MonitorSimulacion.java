@@ -12,7 +12,7 @@ import com.avilaos.core.model.ProcessType;
 import com.avilaos.core.model.SchedulingPolicyType;
 import com.avilaos.core.structures.MyLinkedList;
 import com.avilaos.simulation.SimulationController;
-import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
 import java.awt.*;
 import java.io.File;
 import javax.swing.*;
@@ -222,7 +222,7 @@ public final class MonitorSimulacion extends JPanel {
                     int bufId = Integer.parseInt(sel.substring("Buffer ".length(), endIdx).trim());
                     int nuevaLat = (Integer) spinnerNuevaLatencia.getValue();
                     GuiRequest.control(controller, () -> {
-                        controller.setBufferLatency(bufId, nuevaLat);
+// [P2-LEGACY]                         controller.setBufferLatency(bufId, nuevaLat);
                     });
                 } catch (Exception ex) {
                     // ignore
@@ -329,6 +329,7 @@ public final class MonitorSimulacion extends JPanel {
             case IO_BOUND -> "E/S";
             case PRODUCER -> "Productor";
             case CONSUMER -> "Consumidor";
+                    case FILE_IO -> "E/S archivo"; // [P2]
         };
     }
 
@@ -340,6 +341,9 @@ public final class MonitorSimulacion extends JPanel {
             case WAITING_FULL_BUFFER -> "Buffer Lleno";
             case NETWORK_LATENCY -> "Latencia Red";
             case WAITING_IO -> "Espera E/S";
+            case WAITING_DISK -> "Esperando disco"; // [P2]
+            case SWAPPING_OUT -> "Suspendiendo (swap-out)"; // [P2]
+            case SWAPPING_IN -> "Reactivando (swap-in)"; // [P2]
             case NONE -> "Ninguno";
         };
     }
@@ -897,6 +901,7 @@ public final class MonitorSimulacion extends JPanel {
                     case IO_BOUND -> "E/S";
                     case PRODUCER -> "Productor";
                     case CONSUMER -> "Consumidor";
+                    case FILE_IO -> "E/S archivo"; // [P2]
                 };
                 proceso.setText("<html>" + nombreSeguro + " · ID " + p.id() + " · " + tipo
                         + "<br>PC: " + c.getCpu().getPC() + " · MAR: " + (p.getProgramCounter() == 0 ? "—" : p.getMemoryAddressRegister()) + " · Prioridad: " + p.getPriority()

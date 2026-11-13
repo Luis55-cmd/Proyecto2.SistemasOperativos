@@ -42,12 +42,12 @@ public class SchedulerPoliciesTest {
         if (same != p1) throw new AssertionError("FCFS no debe desalojar a P1");
 
         // P1 termina
-        running.setState(ProcessState.SALIENTE);
+        running.setState(ProcessState.TERMINADO);
         ProcessControlBlock next = scheduler.scheduleNext(null, running);
         if (next != p2) throw new AssertionError("FCFS debio despachar P2 tras terminar P1");
 
         // P2 termina
-        next.setState(ProcessState.SALIENTE);
+        next.setState(ProcessState.TERMINADO);
         ProcessControlBlock none = scheduler.scheduleNext(null, next);
         if (none != null) throw new AssertionError("Cola vacia debe retornar null");
     }
@@ -135,7 +135,7 @@ public class SchedulerPoliciesTest {
         if (stillHigh != pHigh) throw new AssertionError("pHigh no debe ser desalojado por prioridad menor");
 
         // pHigh termina -> debe seleccionar pMedium antes que pLow
-        pHigh.setState(ProcessState.SALIENTE);
+        pHigh.setState(ProcessState.TERMINADO);
         ProcessControlBlock afterHigh = scheduler.scheduleNext(null, pHigh);
         if (afterHigh != pMedium) throw new AssertionError("Tras pHigh debio seleccionar pMedium (prioridad 5)");
     }
