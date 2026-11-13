@@ -190,7 +190,7 @@ public class ComputerKernel {
             case BLOQUEADO:
                 this.blockedQueue.enqueue(p);
                 break;
-            case SALIENTE:
+            case TERMINADO:
                 this.endedQueue.enqueue(p);
                 break;
             case NUEVO:
@@ -361,7 +361,7 @@ public class ComputerKernel {
                     this.newQueue.removeElement(proceso);
                 }
 
-                proceso.setState(ProcessState.SALIENTE);
+                proceso.setState(ProcessState.TERMINADO);
                 this.endedQueue.enqueue(proceso);
 
                 this.processList.deletePos(i);
@@ -385,7 +385,7 @@ public class ComputerKernel {
             com.registrarTerminacion(p, clock != null ? clock.getCycleCounter() : Math.max(0, p.getCompletionCycle()));
         }
         p.setTerminated(true);
-        p.setState(ProcessState.SALIENTE);
+        p.setState(ProcessState.TERMINADO);
         p.setBlockReason(BlockReason.NONE);
 
         this.blockedQueue.removeElement(p);
@@ -421,7 +421,7 @@ public class ComputerKernel {
      * Versión sin Computer: usada internamente por ProducerConsumerDriver.
      */
     public void blockProcess(ProcessControlBlock p) {
-        if (p == null || p.getState() == ProcessState.SALIENTE) {
+        if (p == null || p.getState() == ProcessState.TERMINADO) {
             return;
         }
         p.setState(ProcessState.BLOQUEADO);
@@ -452,7 +452,7 @@ public class ComputerKernel {
      * Acepta procesos en estado BLOQUEADO o LISTO (cuando wakeUpProcess ya actualizó el estado).
      */
     public void blockedToReady(ProcessControlBlock p) {
-        if (p == null || p.getState() == ProcessState.SALIENTE) {
+        if (p == null || p.getState() == ProcessState.TERMINADO) {
             return;
         }
         boolean estabaBloqueado = p.getState() == ProcessState.BLOQUEADO;
@@ -628,7 +628,7 @@ public class ComputerKernel {
             }
 
             // Verificar terminación natural
-            if (currentRunning.getState() == ProcessState.SALIENTE
+            if (currentRunning.getState() == ProcessState.TERMINADO
                     || (currentRunning.getRemainingTime() <= 0)) {
 // [P2-LEGACY] || (currentRunning.getType() != ProcessType.PRODUCER
 // [P2-LEGACY] && currentRunning.getType() != ProcessType.CONSUMER
@@ -658,7 +658,7 @@ public class ComputerKernel {
         for (int i = 0; i < this.processList.size(); i++) {
             ProcessControlBlock p = this.processList.get(i);
             if (p != null
-                    && p.getState() != ProcessState.SALIENTE
+                    && p.getState() != ProcessState.TERMINADO
                     && p.getState() != ProcessState.NUEVO) {
                 p.updateDeadlineOnTick(currentCycle);
                 if (p.getRemainingDeadline() <= 0) {
@@ -681,7 +681,7 @@ public class ComputerKernel {
 // [P2-LEGACY]                     && p.getBlockReason() == BlockReason.NETWORK_LATENCY) {
 // [P2-LEGACY]                 boolean completed = syncDriver.stepNetworkDelay(p);
 // [P2-LEGACY]                 // Notificar y desbloquear al completarse, sin reactivar si fue cancelado por deadline
-// [P2-LEGACY]                 if (completed && p.getState() != ProcessState.SALIENTE) {
+// [P2-LEGACY]                 if (completed && p.getState() != ProcessState.TERMINADO) {
 // [P2-LEGACY]                     blockedToReady(p);
 // [P2-LEGACY]                 }
 // [P2-LEGACY]             }
@@ -701,7 +701,7 @@ public class ComputerKernel {
                     && p.getBlockReason() == BlockReason.WAITING_IO) {
                 int countdown = p.getIoCycleCountdown() - 1;
                 p.setIoCycleCountdown(countdown);
-                if (countdown <= 0 && p.getState() != ProcessState.SALIENTE) {
+                if (countdown <= 0 && p.getState() != ProcessState.TERMINADO) {
                     // Desbloquear: volver a READY y preparar countdown para el próximo IO
                     p.setIoCycleCountdown(p.getIoInterval());
                     blockedToReady(p);

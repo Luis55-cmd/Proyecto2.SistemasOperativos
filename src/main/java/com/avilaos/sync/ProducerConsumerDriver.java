@@ -71,7 +71,7 @@
 //                 if (pcb.getOperationWorkDone() >= pcb.getCyclesPerOperation()) {
 //                     pcb.setOperationWorkDone(0);
 //                     if (!producer) completeElement(pcb);
-//                     if (pcb.getState() != ProcessState.SALIENTE)
+//                     if (pcb.getState() != ProcessState.TERMINADO)
 //                         pcb.setSyncPhase(ProcessControlBlock.SyncPhase.WAIT_SLOT);
 //                 }
 //                 updateRemaining(pcb);
@@ -133,13 +133,13 @@
 //     private void completeElement(ProcessControlBlock pcb) {
 //         pcb.incrementProcessedElements();
 //         if (pcb.getProcessedElements() >= pcb.getRequiredElements()) {
-//             pcb.setState(ProcessState.SALIENTE);
+//             pcb.setState(ProcessState.TERMINADO);
 //             pcb.setBlockReason(BlockReason.NONE);
 //         }
 //     }
 // 
 //     public static void wakeUpProcess(ProcessControlBlock pcb) {
-//         if (pcb == null || pcb.getState() == ProcessState.SALIENTE) {
+//         if (pcb == null || pcb.getState() == ProcessState.TERMINADO) {
 //             return;
 //         }
 //         // Marca el proceso como LISTO y limpia la razón de bloqueo.

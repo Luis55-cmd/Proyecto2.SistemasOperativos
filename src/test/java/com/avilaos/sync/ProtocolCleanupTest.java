@@ -18,7 +18,7 @@
 //                 var driver = new ProducerConsumerDriver(0);
 //                 for (int tick=0; tick<stop; tick++) driver.executeCycle(p,b);
 //                 int pc = p.getProgramCounter();
-//                 p.setState(ProcessState.SALIENTE);
+//                 p.setState(ProcessState.TERMINADO);
 //                 b.cleanupPermits(p); b.cleanupPermits(p);
 //                 check(b.getMutex().availablePermits()==1, "MUTEX: liberación exacta");
 //                 check(b.getLlenos().availablePermits()==b.getDatos().size(), "LLENOS: refleja operación real");

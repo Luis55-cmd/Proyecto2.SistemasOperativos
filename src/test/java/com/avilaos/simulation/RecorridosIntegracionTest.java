@@ -37,7 +37,7 @@
 //         return encontrados;
 //     }
 //     private static void terminadoUnaVez(Computer pc, ProcessControlBlock p) {
-//         check(p.getState() == ProcessState.SALIENTE, "Proceso no termino: " + p.getName());
+//         check(p.getState() == ProcessState.TERMINADO, "Proceso no termino: " + p.getName());
 //         check(ocurrencias(pc.getKernel().getEndedQueue(), p) == 1, "Terminado ausente o duplicado");
 //         check(ocurrencias(pc.getKernel().getReadyQueue(), p) == 0, "Terminado sigue listo");
 //         check(ocurrencias(pc.getKernel().getBlockedQueue(), p) == 0, "Terminado sigue bloqueado");

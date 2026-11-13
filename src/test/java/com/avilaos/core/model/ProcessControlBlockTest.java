@@ -51,7 +51,7 @@ public class ProcessControlBlockTest {
         // Ciclo 3 (termina instrucciones)
         pcb.executeOneCycle(3);
         if (pcb.getRemainingTime() != 0) throw new AssertionError("remainingTime debe ser 0");
-        if (pcb.getState() != ProcessState.SALIENTE) throw new AssertionError("Estado debe ser TERMINATED");
+        if (pcb.getState() != ProcessState.TERMINADO) throw new AssertionError("Estado debe ser TERMINATED");
         if (pcb.getCompletionCycle() != 3) throw new AssertionError("completionCycle debe ser 3");
     }
 
@@ -67,7 +67,7 @@ public class ProcessControlBlockTest {
         // Ciclo 2: remainingDeadline llega a 0 -> transición inmediata a TERMINATED
         pcb.updateDeadlineOnTick(2);
         if (pcb.getRemainingDeadline() != 0) throw new AssertionError("remainingDeadline debe ser 0");
-        if (pcb.getState() != ProcessState.SALIENTE) throw new AssertionError("Debe transicionar a TERMINATED");
+        if (pcb.getState() != ProcessState.TERMINADO) throw new AssertionError("Debe transicionar a TERMINATED");
         if (pcb.getCompletionCycle() != 2) throw new AssertionError("completionCycle debe ser 2");
     }
 
@@ -80,9 +80,9 @@ public class ProcessControlBlockTest {
 
         producer.registerElementProcessed(1);
         producer.registerElementProcessed(2);
-        if (producer.getState() == ProcessState.SALIENTE) throw new AssertionError("Aun no debe terminar");
+        if (producer.getState() == ProcessState.TERMINADO) throw new AssertionError("Aun no debe terminar");
 
         producer.registerElementProcessed(3);
-        if (producer.getState() != ProcessState.SALIENTE) throw new AssertionError("Debe terminar al cumplir cuota");
+        if (producer.getState() != ProcessState.TERMINADO) throw new AssertionError("Debe terminar al cumplir cuota");
     }
 }

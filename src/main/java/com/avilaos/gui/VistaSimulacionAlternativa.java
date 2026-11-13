@@ -313,6 +313,9 @@ public final class VistaSimulacionAlternativa extends JPanel {
             case WAITING_FULL_BUFFER -> "Buffer lleno";
             case NETWORK_LATENCY -> "Red";
             case WAITING_IO -> "E/S";
+            case WAITING_DISK -> "Disco"; // [P2]
+            case SWAPPING_OUT -> "Swap-out"; // [P2]
+            case SWAPPING_IN -> "Swap-in"; // [P2]
             case NONE -> "—";
         };
     }

@@ -61,7 +61,7 @@
 // 
 //         // Ciclo 3: Termina el proceso
 //         controller.stepSimulation();
-//         if (p.getState() != ProcessState.SALIENTE) throw new AssertionError("El proceso debe pasar a SALIENTE");
+//         if (p.getState() != ProcessState.TERMINADO) throw new AssertionError("El proceso debe pasar a TERMINADO");
 //         if (comp.getKernel().getEndedQueue().size() != 1) throw new AssertionError("endedQueue debe tener al proceso terminado");
 //     }
 // 
@@ -158,7 +158,7 @@
 //         for (int i = 4; i <= 10; i++) {
 //             controller.stepSimulation();
 //         }
-//         if (prod.getState() != ProcessState.SALIENTE) throw new AssertionError("Productor debe terminar exitosamente tras 10 ticks");
+//         if (prod.getState() != ProcessState.TERMINADO) throw new AssertionError("Productor debe terminar exitosamente tras 10 ticks");
 //         if (prod.getProcessedElements() != 1) throw new AssertionError("Debe haber producido 1 elemento");
 // 
 //         // 2. Latencia 0: No debe bloquearse por demora de red
@@ -219,14 +219,14 @@
 //         prodD.setMemoryAddressRegister(1);
 //         controller.stepSimulation(); // Ciclo 1: Bloqueado por red, deadline 2 -> 1
 //         if (prodD.getState() != ProcessState.BLOQUEADO) throw new AssertionError("Debe estar bloqueado");
-//         controller.stepSimulation(); // Ciclo 2: Deadline vence -> SALIENTE
-//         if (prodD.getState() != ProcessState.SALIENTE) throw new AssertionError("Debe vencer por deadline");
+//         controller.stepSimulation(); // Ciclo 2: Deadline vence -> TERMINADO
+//         if (prodD.getState() != ProcessState.TERMINADO) throw new AssertionError("Debe vencer por deadline");
 // 
 //         // Avanzar más ticks donde la latencia de red llegaría a 0: NO debe reactivarse
 //         for (int i = 0; i < 6; i++) {
 //             controller.stepSimulation();
 //         }
-//         if (prodD.getState() != ProcessState.SALIENTE) throw new AssertionError("Proceso terminado no debe reactivarse");
+//         if (prodD.getState() != ProcessState.TERMINADO) throw new AssertionError("Proceso terminado no debe reactivarse");
 //         if (c2_d.getKernel().getReadyQueue().removeElement(prodD)) {
 //             throw new AssertionError("Proceso terminado por deadline no debe volver a readyQueue");
 //         }
@@ -281,8 +281,8 @@
 // 
 //         if (buf.getProduced() != 1) throw new AssertionError("Debe haber producido 1 elemento");
 //         if (buf.getComsumed() != 1) throw new AssertionError("Consumidor debe haber despertado y consumido 1 elemento");
-//         if (cons.getState() != ProcessState.SALIENTE) throw new AssertionError("Consumidor debe terminar en SALIENTE");
-//         if (prod.getState() != ProcessState.SALIENTE) throw new AssertionError("Productor debe terminar en SALIENTE");
+//         if (cons.getState() != ProcessState.TERMINADO) throw new AssertionError("Consumidor debe terminar en TERMINADO");
+//         if (prod.getState() != ProcessState.TERMINADO) throw new AssertionError("Productor debe terminar en TERMINADO");
 // 
 //         // 2. Probar lleno (WAITING_FULL_BUFFER)
 //         controller.reset();
@@ -313,7 +313,7 @@
 //         }
 //         // P2 debió despertar y producir su elemento
 //         if (buf1.getProduced() != 2) throw new AssertionError("P2 debió despertar y producir, total producidos = 2");
-//         if (p2.getState() != ProcessState.SALIENTE) throw new AssertionError("P2 debe haber terminado");
+//         if (p2.getState() != ProcessState.TERMINADO) throw new AssertionError("P2 debe haber terminado");
 // 
 //         // 3. Probar mutex (WAITING_MUTEX)
 //         controller.reset();
@@ -328,7 +328,7 @@
 //             controller.stepSimulation();
 //         }
 //         if (bufMutex.getProduced() != 2) throw new AssertionError("Ambos procesos deben haber producido bajo exclusión mutua");
-//         if (pm1.getState() != ProcessState.SALIENTE || pm2.getState() != ProcessState.SALIENTE) {
+//         if (pm1.getState() != ProcessState.TERMINADO || pm2.getState() != ProcessState.TERMINADO) {
 //             throw new AssertionError("Ambos procesos deben terminar tras liberar mutex");
 //         }
 //     }
@@ -363,8 +363,8 @@
 //             controller.stepSimulation();
 //         }
 // 
-//         if (prod.getState() != ProcessState.SALIENTE) {
-//             throw new AssertionError("Productor debe estar en SALIENTE tras 6 ticks");
+//         if (prod.getState() != ProcessState.TERMINADO) {
+//             throw new AssertionError("Productor debe estar en TERMINADO tras 6 ticks");
 //         }
 //         if (comp.getKernel().getEndedQueue().size() != 1) {
 //             throw new AssertionError("endedQueue debe tener exactamente 1 entrada, actual: " + comp.getKernel().getEndedQueue().size());
@@ -480,8 +480,8 @@
 //             throw new AssertionError(
 //                 "Tras cancelar ProdA en etapa 1 por deadline, vacios debe recuperarse a 1, got: " + vaciosAfter);
 //         }
-//         if (prodA.getState() != ProcessState.SALIENTE) {
-//             throw new AssertionError("ProdA debe estar SALIENTE tras vencer el deadline");
+//         if (prodA.getState() != ProcessState.TERMINADO) {
+//             throw new AssertionError("ProdA debe estar TERMINADO tras vencer el deadline");
 //         }
 // 
 //         // Segundo escenario: nuevo productor con deadline holgado debe producir sin bloqueo

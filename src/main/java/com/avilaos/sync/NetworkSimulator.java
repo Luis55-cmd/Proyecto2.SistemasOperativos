@@ -69,7 +69,7 @@
 //      * @return true si la demora de red se completó y debe retornar a LISTO; false si aún debe esperar.
 //      */
 //     public boolean stepDelay(ProcessControlBlock pcb) {
-//         if (pcb == null || pcb.getState() == ProcessState.SALIENTE) {
+//         if (pcb == null || pcb.getState() == ProcessState.TERMINADO) {
 //             return false;
 //         }
 //         if (pcb.getNetworkDelayRemaining() > 0) {
