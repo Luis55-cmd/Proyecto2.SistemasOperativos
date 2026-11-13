@@ -4,7 +4,7 @@ import java.awt.*;
 import com.avilaos.hardware.Computer;
 import com.avilaos.simulation.SimulationSnapshot;
 import com.avilaos.simulation.SimulationController;
-import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
 import com.avilaos.core.model.SchedulingPolicyType;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.*;
@@ -340,8 +340,10 @@ public class PanelPrincipal extends JPanel {
             // (capacidad y latencia listos)
             resultadoBuffer.setText("Creando buffer…");
             GuiRequest.model(controller, () -> {
-                Buffer b=controller.createBuffer(compSeleccionado.id(), capacidad, latencia);
-                return b==null ? "Error: RAM insuficiente o anfitrión inválido" : "Buffer ID " + b.getId() + " creado en Host " + compSeleccionado.id();
+                // [P2-LEGACY] Buffer b=controller.createBuffer(compSeleccionado.id(), capacidad, latencia);
+                Object b = null; // [P2] creación de buffers deshabilitada
+                // [P2-LEGACY] return b==null ? "Error: RAM insuficiente o anfitrión inválido" : "Buffer ID " + b.getId() + " creado en Host " + compSeleccionado.id();
+                return "Buffers deshabilitados en Proyecto 2";
             }, resultadoBuffer::setText, error -> resultadoBuffer.setText(error.getMessage()));
 
             

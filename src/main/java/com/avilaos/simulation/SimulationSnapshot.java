@@ -2,7 +2,7 @@ package com.avilaos.simulation;
 import com.avilaos.core.model.*;
 import com.avilaos.core.structures.MyLinkedList;
 import com.avilaos.hardware.Computer;
-import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
 
 /** Copia de valores, sin referencias al modelo vivo. Se publica con volatile.
  * Las listas y arrays se encapsulan; sus elementos son registros inmutables.
@@ -167,8 +167,9 @@ public final class SimulationSnapshot {
         return new QueueView(q.size(), q.toString(), new Values<>(views));
     }
 
+    // [P2-LEGACY] public SimulationSnapshot(long session, int cycle, boolean running, boolean paused, int interval, MyLinkedList<Computer> nodes, MyLinkedList<Buffer> sources, SimulationSnapshot previous) {
     public SimulationSnapshot(long session, int cycle, boolean running, boolean paused, int interval,
-            MyLinkedList<Computer> nodes, MyLinkedList<Buffer> sources, SimulationSnapshot previous) {
+            MyLinkedList<Computer> nodes, SimulationSnapshot previous) { // [P2] sin buffers
         this.session=session; this.cycle=cycle; this.running=running; this.paused=paused; this.interval=interval;
         Object[] copiedNodes = new Object[nodes.size()];
         for (int i=0; i<nodes.size(); i++) {
@@ -184,16 +185,16 @@ public final class SimulationSnapshot {
                     new RamView(c.getRam().getTotalSize()),kernel,c.getCiclosActivos(),c.getCiclosObservados(),
                     c.getProcesosCompletados(),c.getProcesosFinalizados(),c.getDeadlinesCumplidos(),c.getTotalTiempoRespuesta(),c.getTotalTiempoEspera());
         }
-        Object[] copiedBuffers=new Object[sources.size()];
-        for(int i=0;i<sources.size();i++) {
-            var b=sources.get(i);
-            int m = b.getTheoreticalValue(Buffer.SemaphoreKind.MUTEX);
-            int l = b.getTheoreticalValue(Buffer.SemaphoreKind.LLENOS);
-            int v = b.getTheoreticalValue(Buffer.SemaphoreKind.VACIOS);
-            copiedBuffers[i]=new BufferView(b.getId(),b.getIdComp(),b.getStorage(),b.getSizeInMemory(),b.getProduced(),b.getComsumed(),
-                    new QueueView(b.getDatos().size(),b.getDatos().toString()),new PermitView(m),
-                    new PermitView(l),new PermitView(v),b.getBlockedProcessesAsString(), b.getLatency());
-        }
+// [P2-LEGACY]         Object[] copiedBuffers=new Object[sources.size()];
+// [P2-LEGACY]         for(int i=0;i<sources.size();i++) {
+// [P2-LEGACY]             var b=sources.get(i);
+// [P2-LEGACY]             int m = b.getTheoreticalValue(Buffer.SemaphoreKind.MUTEX);
+// [P2-LEGACY]             int l = b.getTheoreticalValue(Buffer.SemaphoreKind.LLENOS);
+// [P2-LEGACY]             int v = b.getTheoreticalValue(Buffer.SemaphoreKind.VACIOS);
+// [P2-LEGACY]             copiedBuffers[i]=new BufferView(b.getId(),b.getIdComp(),b.getStorage(),b.getSizeInMemory(),b.getProduced(),b.getComsumed(),
+// [P2-LEGACY]                     new QueueView(b.getDatos().size(),b.getDatos().toString()),new PermitView(m),
+// [P2-LEGACY]                     new PermitView(l),new PermitView(v),b.getBlockedProcessesAsString(), b.getLatency());
+// [P2-LEGACY]         }
         int processCount = 0;
         for (int i=0; i<nodes.size(); i++) processCount += nodes.get(i).getKernel().getProcessList().size();
         Object[] copiedProcesses = new Object[processCount];
@@ -206,7 +207,7 @@ public final class SimulationSnapshot {
                 copiedProcesses[processIndex++] = new ProcessRow(computer.getId(), computer.getName(), process.getState(), toProcessView(process));
             }
         }
-        computers=new Values<>(copiedNodes); buffers=new Values<>(copiedBuffers); processes=new Values<>(copiedProcesses);
+        computers=new Values<>(copiedNodes); buffers=new Values<>(new Object[0]); /* [P2] sin buffers */ processes=new Values<>(copiedProcesses);
         // Mantener muestras aunque el EDT omita refrescos. Ventana acotada a 2000 ciclos.
         Object[] usages=new Object[computers.size()];
         for(int i=0;i<usages.length;i++) {
