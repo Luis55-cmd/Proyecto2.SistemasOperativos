@@ -1,15 +1,16 @@
 package com.avilaos.core.model;
 
 /**
- * Tipos de procesos admitidos en el simulador ÁvilaOS.
- * Requisito: RF §1 y RF §2.
+ * Modelo de 7 estados de ÁvilaOS (Proyecto 2).
+ * NUEVO -> LISTO <-> EJECUTANDO -> TERMINADO; BLOQUEADO por E/S de disco;
+ * SUSPENDIDO_LISTO y SUSPENDIDO_BLOQUEADO: procesos enviados al área de Swap.
  */
 public enum ProcessState {
     NUEVO,
     LISTO,
     EJECUTANDO,
     BLOQUEADO,
-    SALIENTE,
+    TERMINADO, // [P2] antes SALIENTE
     SUSPENDIDO_LISTO,
     SUSPENDIDO_BLOQUEADO,
 }
