@@ -12,7 +12,7 @@ import com.avilaos.core.model.ProcessType;
 import com.avilaos.core.model.SchedulingPolicyType;
 import com.avilaos.core.structures.MyLinkedList;
 import com.avilaos.simulation.SimulationController;
-import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
 import java.awt.*;
 import java.io.File;
 import javax.swing.*;
@@ -222,7 +222,7 @@ public final class MonitorSimulacion extends JPanel {
                     int bufId = Integer.parseInt(sel.substring("Buffer ".length(), endIdx).trim());
                     int nuevaLat = (Integer) spinnerNuevaLatencia.getValue();
                     GuiRequest.control(controller, () -> {
-                        controller.setBufferLatency(bufId, nuevaLat);
+// [P2-LEGACY]                         controller.setBufferLatency(bufId, nuevaLat);
                     });
                 } catch (Exception ex) {
                     // ignore
