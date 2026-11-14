@@ -30,7 +30,7 @@ public class MemoriaCalculadaTest {
             pc = c.getComputers().get(0);
             check(p.isIoRequestInstruction() && p.getRequiredMemory() == 13, "Conserva regla tras cargar");
             int solicitudes = 0;
-            for (int i = 0; i < 40 && p.getState() != ProcessState.SALIENTE; i++) {
+            for (int i = 0; i < 40 && p.getState() != ProcessState.TERMINADO; i++) {
                 boolean antes = p.getBlockReason() == BlockReason.WAITING_IO;
                 c.stepSimulation();
                 if (!antes && p.getBlockReason() == BlockReason.WAITING_IO) solicitudes++;

@@ -10,8 +10,8 @@ import com.avilaos.core.model.ProcessState;
 import com.avilaos.core.model.ProcessType;
 import com.avilaos.core.model.SchedulingPolicyType;
 import com.avilaos.core.scheduler.*;
-import com.avilaos.sync.Buffer;
-import com.avilaos.sync.ProducerConsumerDriver;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.ProducerConsumerDriver;
 
 /**
  * Núcleo del computador simulado (Capa 1: Kernel).
@@ -190,7 +190,7 @@ public class ComputerKernel {
             case BLOQUEADO:
                 this.blockedQueue.enqueue(p);
                 break;
-            case SALIENTE:
+            case TERMINADO:
                 this.endedQueue.enqueue(p);
                 break;
             case NUEVO:
@@ -361,7 +361,7 @@ public class ComputerKernel {
                     this.newQueue.removeElement(proceso);
                 }
 
-                proceso.setState(ProcessState.SALIENTE);
+                proceso.setState(ProcessState.TERMINADO);
                 this.endedQueue.enqueue(proceso);
 
                 this.processList.deletePos(i);
@@ -385,7 +385,7 @@ public class ComputerKernel {
             com.registrarTerminacion(p, clock != null ? clock.getCycleCounter() : Math.max(0, p.getCompletionCycle()));
         }
         p.setTerminated(true);
-        p.setState(ProcessState.SALIENTE);
+        p.setState(ProcessState.TERMINADO);
         p.setBlockReason(BlockReason.NONE);
 
         this.blockedQueue.removeElement(p);
@@ -421,7 +421,7 @@ public class ComputerKernel {
      * Versión sin Computer: usada internamente por ProducerConsumerDriver.
      */
     public void blockProcess(ProcessControlBlock p) {
-        if (p == null || p.getState() == ProcessState.SALIENTE) {
+        if (p == null || p.getState() == ProcessState.TERMINADO) {
             return;
         }
         p.setState(ProcessState.BLOQUEADO);
@@ -452,7 +452,7 @@ public class ComputerKernel {
      * Acepta procesos en estado BLOQUEADO o LISTO (cuando wakeUpProcess ya actualizó el estado).
      */
     public void blockedToReady(ProcessControlBlock p) {
-        if (p == null || p.getState() == ProcessState.SALIENTE) {
+        if (p == null || p.getState() == ProcessState.TERMINADO) {
             return;
         }
         boolean estabaBloqueado = p.getState() == ProcessState.BLOQUEADO;
@@ -465,76 +465,76 @@ public class ComputerKernel {
         if (estabaBloqueado) event(proceso(p) + " despertó y pasó a listos");
     }
 
-    public boolean placeBufferRAM(Buffer buffer, Computer com) {
-        if (buffer == null || com == null) {
-            return false;
-        }
-        int cantidad = buffer.getSizeInMemory();
-        if (cantidad <= 0) {
-            return false;
-        }
-        if (com.getRam() == null || com.getRam().getSpace() == null) {
-            return false;
-        }
-
-        // 1. Validar disponibilidad contable previa
-        if (com.getMemoryManager() != null && !com.getMemoryManager().hasAvailableMemory(cantidad)) {
-            return false;
-        }
-
-        // 2. Validar disponibilidad física de bloques contiguos en RAM
-        int[] space = com.getRam().getSpace();
-        int ramTotalSize = space.length;
-        int consecutiveFreeBlocks = 0;
-        int startIndex = -1;
-        for (int i = 0; i < ramTotalSize; i++) {
-            if (space[i] == 0) {
-                if (consecutiveFreeBlocks == 0) {
-                    startIndex = i;
-                }
-                consecutiveFreeBlocks++;
-                if (consecutiveFreeBlocks == cantidad) {
-                    break;
-                }
-            } else {
-                consecutiveFreeBlocks = 0;
-                startIndex = -1;
-            }
-        }
-
-        if (consecutiveFreeBlocks < cantidad || startIndex < 0) {
-            return false;
-        }
-
-        // 3. Realizar reserva contable (solo tras verificar espacio contiguo)
-        if (com.getMemoryManager() != null) {
-            if (!com.getMemoryManager().allocateMemory(cantidad)) {
-                return false;
-            }
-        } else {
-            com.getRam().setUsedSize(com.getRam().getUsedSize() + cantidad);
-        }
-
-        // 4. Ubicar físicamente el búfer en RAM con reversión en caso de fallo
-        try {
-            for (int i = startIndex; i < startIndex + cantidad; i++) {
-                space[i] = buffer.getId() + 1000;
-            }
-            return true;
-        } catch (Exception e) {
-            for (int i = startIndex; i < startIndex + cantidad; i++) {
-                if (space[i] == buffer.getId() + 1000) {
-                    space[i] = 0;
-                }
-            }
-            if (com.getMemoryManager() != null) {
-                com.getMemoryManager().freeMemory(cantidad);
-            } else {
-                com.getRam().setUsedSize(Math.max(0, com.getRam().getUsedSize() - cantidad));
-            }
-            return false;
-        }
-    }
+// [P2-LEGACY]     public boolean placeBufferRAM(Buffer buffer, Computer com) {
+// [P2-LEGACY]         if (buffer == null || com == null) {
+// [P2-LEGACY]             return false;
+// [P2-LEGACY]         }
+// [P2-LEGACY]         int cantidad = buffer.getSizeInMemory();
+// [P2-LEGACY]         if (cantidad <= 0) {
+// [P2-LEGACY]             return false;
+// [P2-LEGACY]         }
+// [P2-LEGACY]         if (com.getRam() == null || com.getRam().getSpace() == null) {
+// [P2-LEGACY]             return false;
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         // 1. Validar disponibilidad contable previa
+// [P2-LEGACY]         if (com.getMemoryManager() != null && !com.getMemoryManager().hasAvailableMemory(cantidad)) {
+// [P2-LEGACY]             return false;
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         // 2. Validar disponibilidad física de bloques contiguos en RAM
+// [P2-LEGACY]         int[] space = com.getRam().getSpace();
+// [P2-LEGACY]         int ramTotalSize = space.length;
+// [P2-LEGACY]         int consecutiveFreeBlocks = 0;
+// [P2-LEGACY]         int startIndex = -1;
+// [P2-LEGACY]         for (int i = 0; i < ramTotalSize; i++) {
+// [P2-LEGACY]             if (space[i] == 0) {
+// [P2-LEGACY]                 if (consecutiveFreeBlocks == 0) {
+// [P2-LEGACY]                     startIndex = i;
+// [P2-LEGACY]                 }
+// [P2-LEGACY]                 consecutiveFreeBlocks++;
+// [P2-LEGACY]                 if (consecutiveFreeBlocks == cantidad) {
+// [P2-LEGACY]                     break;
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             } else {
+// [P2-LEGACY]                 consecutiveFreeBlocks = 0;
+// [P2-LEGACY]                 startIndex = -1;
+// [P2-LEGACY]             }
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         if (consecutiveFreeBlocks < cantidad || startIndex < 0) {
+// [P2-LEGACY]             return false;
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         // 3. Realizar reserva contable (solo tras verificar espacio contiguo)
+// [P2-LEGACY]         if (com.getMemoryManager() != null) {
+// [P2-LEGACY]             if (!com.getMemoryManager().allocateMemory(cantidad)) {
+// [P2-LEGACY]                 return false;
+// [P2-LEGACY]             }
+// [P2-LEGACY]         } else {
+// [P2-LEGACY]             com.getRam().setUsedSize(com.getRam().getUsedSize() + cantidad);
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         // 4. Ubicar físicamente el búfer en RAM con reversión en caso de fallo
+// [P2-LEGACY]         try {
+// [P2-LEGACY]             for (int i = startIndex; i < startIndex + cantidad; i++) {
+// [P2-LEGACY]                 space[i] = buffer.getId() + 1000;
+// [P2-LEGACY]             }
+// [P2-LEGACY]             return true;
+// [P2-LEGACY]         } catch (Exception e) {
+// [P2-LEGACY]             for (int i = startIndex; i < startIndex + cantidad; i++) {
+// [P2-LEGACY]                 if (space[i] == buffer.getId() + 1000) {
+// [P2-LEGACY]                     space[i] = 0;
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]             if (com.getMemoryManager() != null) {
+// [P2-LEGACY]                 com.getMemoryManager().freeMemory(cantidad);
+// [P2-LEGACY]             } else {
+// [P2-LEGACY]                 com.getRam().setUsedSize(Math.max(0, com.getRam().getUsedSize() - cantidad));
+// [P2-LEGACY]             }
+// [P2-LEGACY]             return false;
+// [P2-LEGACY]         }
+// [P2-LEGACY]     }
 
     // =========================================================================
     // CICLO DE EJECUCIÓN — único punto de acceso al hardware de CPU (ARC-06)
@@ -545,9 +545,10 @@ public class ComputerKernel {
      * Centraliza todo acceso a CPU en la capa del kernel:
      * tick del scheduler, deadlines, despacho, ejecución y sync de registros.
      */
-    public void executeCycle(Computer comp, int currentCycle,
-                             ProducerConsumerDriver syncDriver,
-                             MyLinkedList<Buffer> buffers) {
+    // [P2-LEGACY] public void executeCycle(Computer comp, int currentCycle,
+    // [P2-LEGACY]                          ProducerConsumerDriver syncDriver,
+    // [P2-LEGACY]                          MyLinkedList<Buffer> buffers) {
+    public void executeCycle(Computer comp, int currentCycle) {
         CPU cpu = comp.getCpu();
         if (cpu == null) return;
 
@@ -560,10 +561,11 @@ public class ComputerKernel {
         }
 
         // 2. Verificar y vencer deadlines (D-07, D-13)
-        checkDeadlines(comp, currentCycle, buffers);
+        // [P2-LEGACY] checkDeadlines(comp, currentCycle, buffers);
+        checkDeadlines(comp, currentCycle);
 
         // 3. Avanzar solicitudes pendientes de red para procesos bloqueados
-        advanceNetworkDelays(comp, syncDriver);
+        // [P2-LEGACY] advanceNetworkDelays(comp, syncDriver);
 
         // 3.2 Avanzar temporizadores de bloqueo IO para procesos IO-bound
         advanceIOBlocks();
@@ -583,22 +585,22 @@ public class ComputerKernel {
             executedThisCycle = currentRunning;
             comp.incrementarCicloActivo();
             if (currentRunning.getStartCycle() < 0) currentRunning.setStartCycle(currentCycle);
-            if (currentRunning.getType() == ProcessType.PRODUCER
-                    || currentRunning.getType() == ProcessType.CONSUMER) {
-                Buffer targetBuf = findBufferById(
-                        parseBufferId(currentRunning.getTargetBufferId()), buffers);
-                if (targetBuf != null) {
-                    boolean continueRunning = syncDriver.executeCycle(currentRunning, targetBuf);
-                    if (!continueRunning) {
-                        if (currentRunning.getState() == ProcessState.BLOQUEADO) {
-                            blockProcess(comp, currentRunning);
-                            event(proceso(currentRunning) + " se bloqueó: " + motivo(currentRunning));
-                        }
-                    }
-                } else {
-                    currentRunning.executeOneCycle(currentCycle);
-                }
-            } else {
+// [P2-LEGACY]             if (currentRunning.getType() == ProcessType.PRODUCER
+// [P2-LEGACY]                     || currentRunning.getType() == ProcessType.CONSUMER) {
+// [P2-LEGACY]                 Buffer targetBuf = findBufferById(
+// [P2-LEGACY]                         parseBufferId(currentRunning.getTargetBufferId()), buffers);
+// [P2-LEGACY]                 if (targetBuf != null) {
+// [P2-LEGACY]                     boolean continueRunning = syncDriver.executeCycle(currentRunning, targetBuf);
+// [P2-LEGACY]                     if (!continueRunning) {
+// [P2-LEGACY]                         if (currentRunning.getState() == ProcessState.BLOQUEADO) {
+// [P2-LEGACY]                             blockProcess(comp, currentRunning);
+// [P2-LEGACY]                             event(proceso(currentRunning) + " se bloqueó: " + motivo(currentRunning));
+// [P2-LEGACY]                         }
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                 } else {
+// [P2-LEGACY]                     currentRunning.executeOneCycle(currentCycle);
+// [P2-LEGACY]                 }
+            { // [P2] rama unica: ya no existen PRODUCER/CONSUMER
                 boolean solicitudIO = currentRunning.getType() == ProcessType.IO_BOUND
                         && currentRunning.isIoRequestInstruction() && currentRunning.getIoCycleCountdown() == 0;
                 currentRunning.executeOneCycle(currentCycle);
@@ -626,10 +628,11 @@ public class ComputerKernel {
             }
 
             // Verificar terminación natural
-            if (currentRunning.getState() == ProcessState.SALIENTE
-                    || (currentRunning.getType() != ProcessType.PRODUCER
-                        && currentRunning.getType() != ProcessType.CONSUMER
-                        && currentRunning.getRemainingTime() <= 0)) {
+            if (currentRunning.getState() == ProcessState.TERMINADO
+                    || (currentRunning.getRemainingTime() <= 0)) {
+// [P2-LEGACY] || (currentRunning.getType() != ProcessType.PRODUCER
+// [P2-LEGACY] && currentRunning.getType() != ProcessType.CONSUMER
+// [P2-LEGACY] && currentRunning.getRemainingTime() <= 0)) {
                 terminateProcess(comp, currentRunning);
             }
         }
@@ -650,15 +653,16 @@ public class ComputerKernel {
         }
     }
 
-    private void checkDeadlines(Computer comp, int currentCycle, MyLinkedList<Buffer> buffers) {
+    // [P2-LEGACY] private void checkDeadlines(Computer comp, int currentCycle, MyLinkedList<Buffer> buffers) {
+    private void checkDeadlines(Computer comp, int currentCycle) {
         for (int i = 0; i < this.processList.size(); i++) {
             ProcessControlBlock p = this.processList.get(i);
             if (p != null
-                    && p.getState() != ProcessState.SALIENTE
+                    && p.getState() != ProcessState.TERMINADO
                     && p.getState() != ProcessState.NUEVO) {
                 p.updateDeadlineOnTick(currentCycle);
                 if (p.getRemainingDeadline() <= 0) {
-                    cleanupProcessResources(p, buffers);
+                    // [P2-LEGACY] cleanupProcessResources(p, buffers);
                     terminateProcess(comp, p);
                 }
             }
@@ -668,21 +672,21 @@ public class ComputerKernel {
         }
     }
 
-    private void advanceNetworkDelays(Computer comp, ProducerConsumerDriver syncDriver) {
-        if (syncDriver == null) return;
-        for (int i = 0; i < this.processList.size(); i++) {
-            ProcessControlBlock p = this.processList.get(i);
-            if (p != null
-                    && p.getState() == ProcessState.BLOQUEADO
-                    && p.getBlockReason() == BlockReason.NETWORK_LATENCY) {
-                boolean completed = syncDriver.stepNetworkDelay(p);
-                // Notificar y desbloquear al completarse, sin reactivar si fue cancelado por deadline
-                if (completed && p.getState() != ProcessState.SALIENTE) {
-                    blockedToReady(p);
-                }
-            }
-        }
-    }
+// [P2-LEGACY]     private void advanceNetworkDelays(Computer comp, ProducerConsumerDriver syncDriver) {
+// [P2-LEGACY]         if (syncDriver == null) return;
+// [P2-LEGACY]         for (int i = 0; i < this.processList.size(); i++) {
+// [P2-LEGACY]             ProcessControlBlock p = this.processList.get(i);
+// [P2-LEGACY]             if (p != null
+// [P2-LEGACY]                     && p.getState() == ProcessState.BLOQUEADO
+// [P2-LEGACY]                     && p.getBlockReason() == BlockReason.NETWORK_LATENCY) {
+// [P2-LEGACY]                 boolean completed = syncDriver.stepNetworkDelay(p);
+// [P2-LEGACY]                 // Notificar y desbloquear al completarse, sin reactivar si fue cancelado por deadline
+// [P2-LEGACY]                 if (completed && p.getState() != ProcessState.TERMINADO) {
+// [P2-LEGACY]                     blockedToReady(p);
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]         }
+// [P2-LEGACY]     }
 
     /**
      * Avanza el contador de bloqueo IO para procesos IO-bound bloqueados por WAITING_IO.
@@ -697,7 +701,7 @@ public class ComputerKernel {
                     && p.getBlockReason() == BlockReason.WAITING_IO) {
                 int countdown = p.getIoCycleCountdown() - 1;
                 p.setIoCycleCountdown(countdown);
-                if (countdown <= 0 && p.getState() != ProcessState.SALIENTE) {
+                if (countdown <= 0 && p.getState() != ProcessState.TERMINADO) {
                     // Desbloquear: volver a READY y preparar countdown para el próximo IO
                     p.setIoCycleCountdown(p.getIoInterval());
                     blockedToReady(p);
@@ -730,31 +734,31 @@ public class ComputerKernel {
         reorderReadyQueue(this.currentPolicy, false);
     }
 
-    private void cleanupProcessResources(ProcessControlBlock pcb, MyLinkedList<Buffer> buffers) {
-        if (pcb == null) return;
-        Buffer buf = findBufferById(parseBufferId(pcb.getTargetBufferId()), buffers);
-        if (buf == null) return;
-
-        buf.cleanupPermits(pcb);
-    }
-
-    private Buffer findBufferById(int id, MyLinkedList<Buffer> buffers) {
-        if (buffers == null) return null;
-        for (int i = 0; i < buffers.size(); i++) {
-            Buffer b = buffers.get(i);
-            if (b != null && b.getId() == id) return b;
-        }
-        return null;
-    }
-
-    private int parseBufferId(String targetId) {
-        if (targetId == null || targetId.trim().isEmpty()) return 1;
-        try {
-            return Integer.parseInt(targetId.replaceAll("[^0-9]", ""));
-        } catch (NumberFormatException e) {
-            return 1;
-        }
-    }
+// [P2-LEGACY]     private void cleanupProcessResources(ProcessControlBlock pcb, MyLinkedList<Buffer> buffers) {
+// [P2-LEGACY]         if (pcb == null) return;
+// [P2-LEGACY]         Buffer buf = findBufferById(parseBufferId(pcb.getTargetBufferId()), buffers);
+// [P2-LEGACY]         if (buf == null) return;
+// [P2-LEGACY] 
+// [P2-LEGACY]         buf.cleanupPermits(pcb);
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     private Buffer findBufferById(int id, MyLinkedList<Buffer> buffers) {
+// [P2-LEGACY]         if (buffers == null) return null;
+// [P2-LEGACY]         for (int i = 0; i < buffers.size(); i++) {
+// [P2-LEGACY]             Buffer b = buffers.get(i);
+// [P2-LEGACY]             if (b != null && b.getId() == id) return b;
+// [P2-LEGACY]         }
+// [P2-LEGACY]         return null;
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     private int parseBufferId(String targetId) {
+// [P2-LEGACY]         if (targetId == null || targetId.trim().isEmpty()) return 1;
+// [P2-LEGACY]         try {
+// [P2-LEGACY]             return Integer.parseInt(targetId.replaceAll("[^0-9]", ""));
+// [P2-LEGACY]         } catch (NumberFormatException e) {
+// [P2-LEGACY]             return 1;
+// [P2-LEGACY]         }
+// [P2-LEGACY]     }
 
     // --- GETTERS DE COLAS ---
     public MyLinkedList<ProcessControlBlock> getProcessList() {

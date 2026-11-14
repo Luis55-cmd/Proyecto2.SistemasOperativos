@@ -4,7 +4,7 @@ import java.awt.*;
 import com.avilaos.hardware.Computer;
 import com.avilaos.simulation.SimulationSnapshot;
 import com.avilaos.simulation.SimulationController;
-import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
 import com.avilaos.core.model.SchedulingPolicyType;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.*;
@@ -44,15 +44,15 @@ public class PanelPrincipal extends JPanel {
         @Override public String toString() { return nombre + " · ID " + id; }
     }
     // NOTA: El campo ID numérico se deshabilita/elimina visualmente porque el Controller lo autogenera.
-    private final JComboBox<OpcionComputador> comboComputadorBuffer = new JComboBox<>();
-    private final JSpinner spinnerAlmacenamiento = new JSpinner(new SpinnerNumberModel(10, 1, 1000, 1));
-    private final JSpinner spinnerLatenciaBuffer = new JSpinner(new SpinnerNumberModel(2, 0, 1000, 1));
-    private final JTextField memoriaBuffer = new JTextField("10");
-    private final JLabel resultadoBuffer = texto("Ningún buffer creado en esta sesión.", 12, GRIS, false);
-    private final DefaultTableModel buffersVisibles = new DefaultTableModel(
-            new String[]{"ID Buffer", "Host", "Capacidad (Items)", "Tama\u00f1o en RAM", "Latencia (ticks)"}, 0) {
-        @Override public boolean isCellEditable(int fila, int columna) { return false; }
-    };
+// [P2-LEGACY]     private final JComboBox<OpcionComputador> comboComputadorBuffer = new JComboBox<>();
+// [P2-LEGACY]     private final JSpinner spinnerAlmacenamiento = new JSpinner(new SpinnerNumberModel(10, 1, 1000, 1));
+// [P2-LEGACY]     private final JSpinner spinnerLatenciaBuffer = new JSpinner(new SpinnerNumberModel(2, 0, 1000, 1));
+// [P2-LEGACY]     private final JTextField memoriaBuffer = new JTextField("10");
+// [P2-LEGACY]     private final JLabel resultadoBuffer = texto("Ningún buffer creado en esta sesión.", 12, GRIS, false);
+// [P2-LEGACY]     private final DefaultTableModel buffersVisibles = new DefaultTableModel(
+// [P2-LEGACY]             new String[]{"ID Buffer", "Host", "Capacidad (Items)", "Tama\u00f1o en RAM", "Latencia (ticks)"}, 0) {
+// [P2-LEGACY]         @Override public boolean isCellEditable(int fila, int columna) { return false; }
+// [P2-LEGACY]     };
 
     public PanelPrincipal() {
         super(new BorderLayout());
@@ -67,8 +67,10 @@ public class PanelPrincipal extends JPanel {
         lateral.add(marca);
         lateral.add(Box.createVerticalStrut(28));
         
-        String[] titulos = {"01   Inicio", "02   Computadores", "03   Buffers", "04   Procesos", "05   Simulación", "06   Métricas"};
+        // [P2-LEGACY] String[] titulos = {"01   Inicio", "02   Computadores", "03   Buffers", "04   Procesos", "05   Simulación", "06   Métricas"};
+        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Procesos", "04   Simulación", "05   Métricas"}; // [P2] sin Buffers
         for (Destino destino : Destino.values()) {
+            if (destino == Destino.BUFFER) continue; // [P2] pantalla de buffers oculta
             JButton boton = accion(titulos[destino.ordinal()], false);
             boton.setHorizontalAlignment(SwingConstants.LEFT);
             boton.setMaximumSize(new Dimension(180, 46));
@@ -87,7 +89,7 @@ public class PanelPrincipal extends JPanel {
         pantallas.add(inicio(), Destino.MENU.name());
         pantallas.add(computador(), Destino.COMPUTADOR.name());
         
-        pantallas.add(buffer(), Destino.BUFFER.name());
+// [P2-LEGACY]         pantallas.add(buffer(), Destino.BUFFER.name());
         
         editorProceso = new EditorProceso(() -> mostrarPanel(Destino.COMPUTADOR));
         pantallas.add(editorProceso, Destino.PROCESO.name());
@@ -106,8 +108,8 @@ public class PanelPrincipal extends JPanel {
         controller.addGUIListener(() -> {
             metricas.actualizarMetricas();
             actualizarListaComputadores();
-            actualizarListaBuffers();
-            actualizarOpcionesComputadoresBuffer();
+// [P2-LEGACY]             actualizarListaBuffers();
+// [P2-LEGACY]             actualizarOpcionesComputadoresBuffer();
         });
 
         mostrarPanel(Destino.MENU);
@@ -120,12 +122,13 @@ public class PanelPrincipal extends JPanel {
         }
         if (destino == Destino.PROCESO) editorProceso.actualizarListas();
         
-        if (destino == Destino.BUFFER) actualizarOpcionesComputadoresBuffer();
+// [P2-LEGACY]         if (destino == Destino.BUFFER) actualizarOpcionesComputadoresBuffer();
         
         distribucion.show(pantallas, destino.name());
         destinoActual = destino;
         for (Destino item : Destino.values()) {
             JButton boton = navegacion[item.ordinal()];
+            if (boton == null) continue; // [P2] BUFFER oculto
             boton.setBackground(item == destino ? ACENTO : TINTA);
             boton.setForeground(item == destino ? Color.WHITE : new Color(225, 220, 201));
         }
@@ -158,16 +161,16 @@ public class PanelPrincipal extends JPanel {
         equipo.addActionListener(e -> mostrarPanel(Destino.COMPUTADOR));
         equipos.add(equipo);
         
-        JPanel buffers = tarjeta();
-        buffers.add(texto("02 / BUFFERS", 11, ACENTO, true));
-        buffers.add(Box.createVerticalStrut(14));
-        buffers.add(texto("Sincronización", 21, TINTA, true));
-        buffers.add(Box.createVerticalStrut(8));
-        buffers.add(texto("Espacios de memoria.", 13, GRIS, false));
-        buffers.add(Box.createVerticalStrut(22));
-        JButton btnBuffer = accion("Crear buffer  →", true);
-        btnBuffer.addActionListener(e -> mostrarPanel(Destino.BUFFER));
-        buffers.add(btnBuffer);
+// [P2-LEGACY]         JPanel buffers = tarjeta();
+// [P2-LEGACY]         buffers.add(texto("02 / BUFFERS", 11, ACENTO, true));
+// [P2-LEGACY]         buffers.add(Box.createVerticalStrut(14));
+// [P2-LEGACY]         buffers.add(texto("Sincronización", 21, TINTA, true));
+// [P2-LEGACY]         buffers.add(Box.createVerticalStrut(8));
+// [P2-LEGACY]         buffers.add(texto("Espacios de memoria.", 13, GRIS, false));
+// [P2-LEGACY]         buffers.add(Box.createVerticalStrut(22));
+// [P2-LEGACY]         JButton btnBuffer = accion("Crear buffer  →", true);
+// [P2-LEGACY]         btnBuffer.addActionListener(e -> mostrarPanel(Destino.BUFFER));
+// [P2-LEGACY]         buffers.add(btnBuffer);
         
         JPanel programas = tarjeta();
         programas.add(texto("03 / PROCESOS", 11, ACENTO, true));
@@ -180,7 +183,8 @@ public class PanelPrincipal extends JPanel {
         proceso.addActionListener(e -> mostrarPanel(Destino.PROCESO));
         programas.add(proceso);
         
-        opciones.add(equipos); opciones.add(buffers); opciones.add(programas);
+// [P2-LEGACY]         opciones.add(equipos); opciones.add(buffers); opciones.add(programas);
+        opciones.add(equipos); opciones.add(programas); // [P2] sin tarjeta de buffers
         panel.add(opciones);
         panel.add(Box.createVerticalStrut(24));
         return panel;
@@ -243,137 +247,139 @@ public class PanelPrincipal extends JPanel {
         return panel;
     }
 
-    private JPanel buffer() {
-        JPanel panel = pagina("BUFFERS", "Gestión de Buffers", "Asigna memoria en un computador específico para el esquema Productor/Consumidor.");
-        JPanel tarjeta = tarjeta();
-        tarjeta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 300));
-        tarjeta.add(texto("Propiedades del Buffer", 20, TINTA, true));
-        tarjeta.add(Box.createVerticalStrut(16));
-        
-        JPanel fila1 = new JPanel(new GridLayout(1, 2, 24, 0));
-        fila1.setOpaque(false);
-        fila1.setAlignmentX(LEFT_ALIGNMENT);
-        fila1.setMaximumSize(new Dimension(500, 62));
-        // Se autogenera el ID en el controlador, por eso se oculta el ID visual
-        fila1.add(campo("Computador Host", comboComputadorBuffer));
-        spinnerLatenciaBuffer.setName("latenciaBuffer");
-        fila1.add(campo("Latencia de Red (ticks)", spinnerLatenciaBuffer));
-        tarjeta.add(fila1);
-        tarjeta.add(Box.createVerticalStrut(16));
-        
-        JPanel fila2 = new JPanel(new GridLayout(1, 2, 24, 0));
-        fila2.setOpaque(false);
-        fila2.setAlignmentX(LEFT_ALIGNMENT);
-        fila2.setMaximumSize(new Dimension(500, 62));
-        fila2.add(campo("Capacidad (Elementos)", spinnerAlmacenamiento));
-        memoriaBuffer.setEditable(false);
-        memoriaBuffer.setName("ramBuffer");
-        spinnerAlmacenamiento.setName("capacidadBuffer");
-        ((javax.swing.text.DefaultFormatter) ((JSpinner.DefaultEditor) spinnerAlmacenamiento.getEditor())
-                .getTextField().getFormatter()).setCommitsOnValidEdit(true);
-        spinnerAlmacenamiento.addChangeListener(e ->
-                memoriaBuffer.setText(spinnerAlmacenamiento.getValue().toString()));
-        Runnable actualizarRamBuffer = () -> {
-            try { memoriaBuffer.setText(Integer.toString(EditorProceso.numeroVisible(spinnerAlmacenamiento))); }
-            catch (IllegalArgumentException ex) { memoriaBuffer.setText("—"); }
-        };
-        ((JSpinner.DefaultEditor) spinnerAlmacenamiento.getEditor()).getTextField().getDocument()
-                .addDocumentListener(new javax.swing.event.DocumentListener() {
-                    public void insertUpdate(javax.swing.event.DocumentEvent e) { actualizarRamBuffer.run(); }
-                    public void removeUpdate(javax.swing.event.DocumentEvent e) { actualizarRamBuffer.run(); }
-                    public void changedUpdate(javax.swing.event.DocumentEvent e) { actualizarRamBuffer.run(); }
-                });
-        fila2.add(campo("Tamaño en RAM", memoriaBuffer));
-        tarjeta.add(fila2);
-        tarjeta.add(Box.createVerticalStrut(22));
-        
-        JButton crear = accion("Crear y registrar Buffer", true);
-        crear.addActionListener(e -> crearBufferDesdeFormulario());
-        tarjeta.add(crear);
-        tarjeta.add(Box.createVerticalStrut(10));
-        resultadoBuffer.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
-        tarjeta.add(resultadoBuffer);
-        
-        panel.add(tarjeta);
-        panel.add(Box.createVerticalStrut(20));
-        
-        JTable tabla = new JTable(buffersVisibles);
-        tabla.setRowHeight(32);
-        tabla.setBackground(PAPEL);
-        tabla.setForeground(TINTA);
-        JScrollPane lista = new JScrollPane(tabla);
-        lista.setColumnHeaderView(tabla.getTableHeader());
-        lista.setAlignmentX(LEFT_ALIGNMENT);
-        lista.setPreferredSize(new Dimension(600, 160));
-        panel.add(lista);
-        
-        actualizarListaBuffers();
-        return panel;
-    }
-
-    private void actualizarOpcionesComputadoresBuffer() {
-        var view = controller.snapshot();
-        OpcionComputador seleccion = (OpcionComputador) comboComputadorBuffer.getSelectedItem();
-        comboComputadorBuffer.removeAllItems();
-        for (int i = 0; i < view.computers.size(); i++) {
-            var c = view.computers.get(i);
-            OpcionComputador op = new OpcionComputador(c.getId(), c.getName());
-            comboComputadorBuffer.addItem(op);
-            if (seleccion != null && seleccion.id() == c.getId()) {
-                comboComputadorBuffer.setSelectedItem(op);
-            }
-        }
-    }
-
-    private void crearBufferDesdeFormulario() {
-        try {
-            OpcionComputador compSeleccionado = (OpcionComputador) comboComputadorBuffer.getSelectedItem();
-            if (compSeleccionado == null) {
-                resultadoBuffer.setText("Error: Debes crear y seleccionar un computador primero.");
-                return;
-            }
-            
-            int capacidad = EditorProceso.numeroVisible(spinnerAlmacenamiento); spinnerAlmacenamiento.setValue(capacidad);
-            int latencia = EditorProceso.numeroVisible(spinnerLatenciaBuffer); spinnerLatenciaBuffer.setValue(latencia);
-            
-            // Valores ya validados y asignados arriba
-            // (capacidad y latencia listos)
-            resultadoBuffer.setText("Creando buffer…");
-            GuiRequest.model(controller, () -> {
-                Buffer b=controller.createBuffer(compSeleccionado.id(), capacidad, latencia);
-                return b==null ? "Error: RAM insuficiente o anfitrión inválido" : "Buffer ID " + b.getId() + " creado en Host " + compSeleccionado.id();
-            }, resultadoBuffer::setText, error -> resultadoBuffer.setText(error.getMessage()));
-
-            
-        } catch (Exception ex) {
-            resultadoBuffer.setText("Error: Capacidad (1-1000) y latencia (0-1000) deben ser enteros válidos.");
-        }
-    }
-    
-    private void actualizarListaBuffers() {
-        var view = controller.snapshot();
-        buffersVisibles.setRowCount(0);
-        for (int i = 0; i < view.buffers.size(); i++) {
-            var b = view.buffers.get(i);
-            String hostInfo = "Host " + b.getIdComp();
-            if (view.computers != null) {
-                for (int c = 0; c < view.computers.size(); c++) {
-                    var comp = view.computers.get(c);
-                    if (comp.getId() == b.getIdComp()) {
-                        hostInfo = comp.getName() + " (" + b.getIdComp() + ")";
-                        break;
-                    }
-                }
-            }
-            buffersVisibles.addRow(new Object[]{
-                b.getId(),
-                hostInfo,
-                b.getStorage(),
-                b.getSizeInMemory(),
-                b.getLatency()
-            });
-        }
-    }
+// [P2-LEGACY]     private JPanel buffer() {
+// [P2-LEGACY]         JPanel panel = pagina("BUFFERS", "Gestión de Buffers", "Asigna memoria en un computador específico para el esquema Productor/Consumidor.");
+// [P2-LEGACY]         JPanel tarjeta = tarjeta();
+// [P2-LEGACY]         tarjeta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 300));
+// [P2-LEGACY]         tarjeta.add(texto("Propiedades del Buffer", 20, TINTA, true));
+// [P2-LEGACY]         tarjeta.add(Box.createVerticalStrut(16));
+// [P2-LEGACY]         
+// [P2-LEGACY]         JPanel fila1 = new JPanel(new GridLayout(1, 2, 24, 0));
+// [P2-LEGACY]         fila1.setOpaque(false);
+// [P2-LEGACY]         fila1.setAlignmentX(LEFT_ALIGNMENT);
+// [P2-LEGACY]         fila1.setMaximumSize(new Dimension(500, 62));
+// [P2-LEGACY]         // Se autogenera el ID en el controlador, por eso se oculta el ID visual
+// [P2-LEGACY]         fila1.add(campo("Computador Host", comboComputadorBuffer));
+// [P2-LEGACY]         spinnerLatenciaBuffer.setName("latenciaBuffer");
+// [P2-LEGACY]         fila1.add(campo("Latencia de Red (ticks)", spinnerLatenciaBuffer));
+// [P2-LEGACY]         tarjeta.add(fila1);
+// [P2-LEGACY]         tarjeta.add(Box.createVerticalStrut(16));
+// [P2-LEGACY]         
+// [P2-LEGACY]         JPanel fila2 = new JPanel(new GridLayout(1, 2, 24, 0));
+// [P2-LEGACY]         fila2.setOpaque(false);
+// [P2-LEGACY]         fila2.setAlignmentX(LEFT_ALIGNMENT);
+// [P2-LEGACY]         fila2.setMaximumSize(new Dimension(500, 62));
+// [P2-LEGACY]         fila2.add(campo("Capacidad (Elementos)", spinnerAlmacenamiento));
+// [P2-LEGACY]         memoriaBuffer.setEditable(false);
+// [P2-LEGACY]         memoriaBuffer.setName("ramBuffer");
+// [P2-LEGACY]         spinnerAlmacenamiento.setName("capacidadBuffer");
+// [P2-LEGACY]         ((javax.swing.text.DefaultFormatter) ((JSpinner.DefaultEditor) spinnerAlmacenamiento.getEditor())
+// [P2-LEGACY]                 .getTextField().getFormatter()).setCommitsOnValidEdit(true);
+// [P2-LEGACY]         spinnerAlmacenamiento.addChangeListener(e ->
+// [P2-LEGACY]                 memoriaBuffer.setText(spinnerAlmacenamiento.getValue().toString()));
+// [P2-LEGACY]         Runnable actualizarRamBuffer = () -> {
+// [P2-LEGACY]             try { memoriaBuffer.setText(Integer.toString(EditorProceso.numeroVisible(spinnerAlmacenamiento))); }
+// [P2-LEGACY]             catch (IllegalArgumentException ex) { memoriaBuffer.setText("—"); }
+// [P2-LEGACY]         };
+// [P2-LEGACY]         ((JSpinner.DefaultEditor) spinnerAlmacenamiento.getEditor()).getTextField().getDocument()
+// [P2-LEGACY]                 .addDocumentListener(new javax.swing.event.DocumentListener() {
+// [P2-LEGACY]                     public void insertUpdate(javax.swing.event.DocumentEvent e) { actualizarRamBuffer.run(); }
+// [P2-LEGACY]                     public void removeUpdate(javax.swing.event.DocumentEvent e) { actualizarRamBuffer.run(); }
+// [P2-LEGACY]                     public void changedUpdate(javax.swing.event.DocumentEvent e) { actualizarRamBuffer.run(); }
+// [P2-LEGACY]                 });
+// [P2-LEGACY]         fila2.add(campo("Tamaño en RAM", memoriaBuffer));
+// [P2-LEGACY]         tarjeta.add(fila2);
+// [P2-LEGACY]         tarjeta.add(Box.createVerticalStrut(22));
+// [P2-LEGACY]         
+// [P2-LEGACY]         JButton crear = accion("Crear y registrar Buffer", true);
+// [P2-LEGACY]         crear.addActionListener(e -> crearBufferDesdeFormulario());
+// [P2-LEGACY]         tarjeta.add(crear);
+// [P2-LEGACY]         tarjeta.add(Box.createVerticalStrut(10));
+// [P2-LEGACY]         resultadoBuffer.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+// [P2-LEGACY]         tarjeta.add(resultadoBuffer);
+// [P2-LEGACY]         
+// [P2-LEGACY]         panel.add(tarjeta);
+// [P2-LEGACY]         panel.add(Box.createVerticalStrut(20));
+// [P2-LEGACY]         
+// [P2-LEGACY]         JTable tabla = new JTable(buffersVisibles);
+// [P2-LEGACY]         tabla.setRowHeight(32);
+// [P2-LEGACY]         tabla.setBackground(PAPEL);
+// [P2-LEGACY]         tabla.setForeground(TINTA);
+// [P2-LEGACY]         JScrollPane lista = new JScrollPane(tabla);
+// [P2-LEGACY]         lista.setColumnHeaderView(tabla.getTableHeader());
+// [P2-LEGACY]         lista.setAlignmentX(LEFT_ALIGNMENT);
+// [P2-LEGACY]         lista.setPreferredSize(new Dimension(600, 160));
+// [P2-LEGACY]         panel.add(lista);
+// [P2-LEGACY]         
+// [P2-LEGACY]         actualizarListaBuffers();
+// [P2-LEGACY]         return panel;
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     private void actualizarOpcionesComputadoresBuffer() {
+// [P2-LEGACY]         var view = controller.snapshot();
+// [P2-LEGACY]         OpcionComputador seleccion = (OpcionComputador) comboComputadorBuffer.getSelectedItem();
+// [P2-LEGACY]         comboComputadorBuffer.removeAllItems();
+// [P2-LEGACY]         for (int i = 0; i < view.computers.size(); i++) {
+// [P2-LEGACY]             var c = view.computers.get(i);
+// [P2-LEGACY]             OpcionComputador op = new OpcionComputador(c.getId(), c.getName());
+// [P2-LEGACY]             comboComputadorBuffer.addItem(op);
+// [P2-LEGACY]             if (seleccion != null && seleccion.id() == c.getId()) {
+// [P2-LEGACY]                 comboComputadorBuffer.setSelectedItem(op);
+// [P2-LEGACY]             }
+// [P2-LEGACY]         }
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     private void crearBufferDesdeFormulario() {
+// [P2-LEGACY]         try {
+// [P2-LEGACY]             OpcionComputador compSeleccionado = (OpcionComputador) comboComputadorBuffer.getSelectedItem();
+// [P2-LEGACY]             if (compSeleccionado == null) {
+// [P2-LEGACY]                 resultadoBuffer.setText("Error: Debes crear y seleccionar un computador primero.");
+// [P2-LEGACY]                 return;
+// [P2-LEGACY]             }
+// [P2-LEGACY]             
+// [P2-LEGACY]             int capacidad = EditorProceso.numeroVisible(spinnerAlmacenamiento); spinnerAlmacenamiento.setValue(capacidad);
+// [P2-LEGACY]             int latencia = EditorProceso.numeroVisible(spinnerLatenciaBuffer); spinnerLatenciaBuffer.setValue(latencia);
+// [P2-LEGACY]             
+// [P2-LEGACY]             // Valores ya validados y asignados arriba
+// [P2-LEGACY]             // (capacidad y latencia listos)
+// [P2-LEGACY]             resultadoBuffer.setText("Creando buffer…");
+// [P2-LEGACY]             GuiRequest.model(controller, () -> {
+// [P2-LEGACY]                 // [P2-LEGACY] Buffer b=controller.createBuffer(compSeleccionado.id(), capacidad, latencia);
+// [P2-LEGACY]                 Object b = null; // [P2] creación de buffers deshabilitada
+// [P2-LEGACY]                 // [P2-LEGACY] return b==null ? "Error: RAM insuficiente o anfitrión inválido" : "Buffer ID " + b.getId() + " creado en Host " + compSeleccionado.id();
+// [P2-LEGACY]                 return "Buffers deshabilitados en Proyecto 2";
+// [P2-LEGACY]             }, resultadoBuffer::setText, error -> resultadoBuffer.setText(error.getMessage()));
+// [P2-LEGACY] 
+// [P2-LEGACY]             
+// [P2-LEGACY]         } catch (Exception ex) {
+// [P2-LEGACY]             resultadoBuffer.setText("Error: Capacidad (1-1000) y latencia (0-1000) deben ser enteros válidos.");
+// [P2-LEGACY]         }
+// [P2-LEGACY]     }
+// [P2-LEGACY]     
+// [P2-LEGACY]     private void actualizarListaBuffers() {
+// [P2-LEGACY]         var view = controller.snapshot();
+// [P2-LEGACY]         buffersVisibles.setRowCount(0);
+// [P2-LEGACY]         for (int i = 0; i < view.buffers.size(); i++) {
+// [P2-LEGACY]             var b = view.buffers.get(i);
+// [P2-LEGACY]             String hostInfo = "Host " + b.getIdComp();
+// [P2-LEGACY]             if (view.computers != null) {
+// [P2-LEGACY]                 for (int c = 0; c < view.computers.size(); c++) {
+// [P2-LEGACY]                     var comp = view.computers.get(c);
+// [P2-LEGACY]                     if (comp.getId() == b.getIdComp()) {
+// [P2-LEGACY]                         hostInfo = comp.getName() + " (" + b.getIdComp() + ")";
+// [P2-LEGACY]                         break;
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]             buffersVisibles.addRow(new Object[]{
+// [P2-LEGACY]                 b.getId(),
+// [P2-LEGACY]                 hostInfo,
+// [P2-LEGACY]                 b.getStorage(),
+// [P2-LEGACY]                 b.getSizeInMemory(),
+// [P2-LEGACY]                 b.getLatency()
+// [P2-LEGACY]             });
+// [P2-LEGACY]         }
+// [P2-LEGACY]     }
     
     
     private JPanel selectorPolitica() {

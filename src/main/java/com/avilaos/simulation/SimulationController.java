@@ -16,8 +16,8 @@ import com.avilaos.hardware.CPU;
 import com.avilaos.hardware.Computer;
 import com.avilaos.hardware.DMA;
 import com.avilaos.hardware.RAM;
-import com.avilaos.sync.Buffer;
-import com.avilaos.sync.ProducerConsumerDriver;
+// [P2-LEGACY] import com.avilaos.sync.Buffer;
+// [P2-LEGACY] import com.avilaos.sync.ProducerConsumerDriver;
 
 import javax.swing.SwingUtilities;
 import com.avilaos.concurrency.StateAccess;
@@ -37,9 +37,9 @@ public class SimulationController implements IClockTickable {
     private static volatile SimulationController instance;
 
     private final MyLinkedList<Computer> computers;
-    private final MyLinkedList<Buffer> buffers;
-    private final GlobalClock clock;
-    private final ProducerConsumerDriver syncDriver;
+// [P2-LEGACY]     private final MyLinkedList<Buffer> buffers;
+    private final GlobalClock clock; // [P2] restaurado (no es de buffers)
+// [P2-LEGACY]     private final ProducerConsumerDriver syncDriver;
 
     // Lista de observadores de la interfaz gráfica y de logs
     private final MyLinkedList<Runnable> guiListeners;
@@ -58,7 +58,8 @@ public class SimulationController implements IClockTickable {
     }
     private void publishSnapshot() {
         snapshot = new SimulationSnapshot(session, clock.getCycleCounter(), clock.isRunning(), clock.isPaused(),
-                clock.getCycleDurationMs(), computers, buffers, snapshot);
+                // [P2-LEGACY] clock.getCycleDurationMs(), computers, buffers, snapshot);
+                clock.getCycleDurationMs(), computers, snapshot); // [P2] sin buffers
         synchronized (guiListeners) {
             if (refreshPending) return;
             refreshPending = true;
@@ -93,12 +94,12 @@ public class SimulationController implements IClockTickable {
 
     private SimulationController() {
         this.computers = new MyLinkedList<>();
-        this.buffers = new MyLinkedList<>();
+// [P2-LEGACY]         this.buffers = new MyLinkedList<>();
         this.guiListeners = new MyLinkedList<>();
         this.logListeners = new MyLinkedList<>();
         this.clock = GlobalClock.getInstance();
-        this.syncDriver = new ProducerConsumerDriver(2); // Latencia por defecto: 2 ciclos
-        this.syncDriver.setEventListener(this::logEvent);
+// [P2-LEGACY]         this.syncDriver = new ProducerConsumerDriver(2); // Latencia por defecto: 2 ciclos
+// [P2-LEGACY]         this.syncDriver.setEventListener(this::logEvent);
         this.clock.addSubscriber(this);
         StateAccess.setPublisher(this::publishSnapshot);
     }
@@ -189,6 +190,10 @@ public class SimulationController implements IClockTickable {
     public Computer createComputer(int ramSize, SchedulingPolicyType policy, int quantum) {
         StateAccess.enter();
         try {
+        // [P2] Una sola instancia de computador.
+        if (computers.size() >= 1) {
+            throw new IllegalArgumentException("Proyecto 2: solo se admite un computador");
+        }
         int id = nextComputerId++;
         RAM ram = new RAM(ramSize, 0, new int[ramSize]);
         CPU cpu = new CPU(0, 0, 0, null, ExecutionMode.USER);
@@ -309,6 +314,11 @@ public class SimulationController implements IClockTickable {
         try {
         if (name == null || name.trim().isEmpty()) {
             logEvent("Error: El nombre del proceso no puede estar vacío");
+            return null;
+        }
+        // [P2] Los tipos PRODUCER/CONSUMER dejan de existir en la práctica.
+        if (type == ProcessType.PRODUCER || type == ProcessType.CONSUMER) {
+            logEvent("Error: tipo de proceso no soportado en Proyecto 2 (" + type + ")");
             return null;
         }
 
@@ -443,53 +453,53 @@ public class SimulationController implements IClockTickable {
         } finally { StateAccess.exit(); }
     }
 
-    public Buffer createBuffer(int hostComputerId, int storage) {
-        StateAccess.enter();
-        try {
-        return createBuffer(hostComputerId, storage, storage, getNetworkLatency());
-
-        } finally { StateAccess.exit(); }
-    }
-
-    /** Compatibilidad con cargas anteriores: la RAM se deriva de capacidad, no del campo legacy memory. */
-    public Buffer createBuffer(int hostComputerId, int storage, int latency) {
-        StateAccess.enter();
-        try {
-        return createBuffer(hostComputerId, storage, storage, latency);
-
-        } finally { StateAccess.exit(); }
-    }
-
-
-    public Buffer createBuffer(int hostComputerId, int storage, int memory, int latency) {
-        StateAccess.enter();
-        try {
-        if (storage <= 0) {
-            return null;
-        }
-        Computer host = getComputerById(hostComputerId);
-        if (host == null || host.getKernel() == null) {
-            logEvent("Error: Computador anfitrión inválido para crear Buffer");
-            return null;
-        }
-
-        int id = nextBufferId;
-        Buffer buffer = new Buffer(null, null, null, hostComputerId, storage, id, new MyQueue<>(), storage, latency);
-        boolean success = host.getKernel().placeBufferRAM(buffer, host);
-        if (!success) {
-            logEvent("Error: Memoria RAM insuficiente en " + host.getName() + " para crear el Buffer " + id);
-            return null;
-        }
-
-        nextBufferId++;
-        this.buffers.append(buffer);
-
-        logEvent("Buffer " + id + " creado en " + host.getName() + " con capacidad " + storage + " y latencia " + latency + " ticks");
-        notifyGUI();
-        return buffer;
-
-        } finally { StateAccess.exit(); }
-    }
+// [P2-LEGACY]     public Buffer createBuffer(int hostComputerId, int storage) {
+// [P2-LEGACY]         StateAccess.enter();
+// [P2-LEGACY]         try {
+// [P2-LEGACY]         return createBuffer(hostComputerId, storage, storage, getNetworkLatency());
+// [P2-LEGACY] 
+// [P2-LEGACY]         } finally { StateAccess.exit(); }
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     /** Compatibilidad con cargas anteriores: la RAM se deriva de capacidad, no del campo legacy memory. */
+// [P2-LEGACY]     public Buffer createBuffer(int hostComputerId, int storage, int latency) {
+// [P2-LEGACY]         StateAccess.enter();
+// [P2-LEGACY]         try {
+// [P2-LEGACY]         return createBuffer(hostComputerId, storage, storage, latency);
+// [P2-LEGACY] 
+// [P2-LEGACY]         } finally { StateAccess.exit(); }
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY] 
+// [P2-LEGACY]     public Buffer createBuffer(int hostComputerId, int storage, int memory, int latency) {
+// [P2-LEGACY]         StateAccess.enter();
+// [P2-LEGACY]         try {
+// [P2-LEGACY]         if (storage <= 0) {
+// [P2-LEGACY]             return null;
+// [P2-LEGACY]         }
+// [P2-LEGACY]         Computer host = getComputerById(hostComputerId);
+// [P2-LEGACY]         if (host == null || host.getKernel() == null) {
+// [P2-LEGACY]             logEvent("Error: Computador anfitrión inválido para crear Buffer");
+// [P2-LEGACY]             return null;
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         int id = nextBufferId;
+// [P2-LEGACY]         Buffer buffer = new Buffer(null, null, null, hostComputerId, storage, id, new MyQueue<>(), storage, latency);
+// [P2-LEGACY]         boolean success = host.getKernel().placeBufferRAM(buffer, host);
+// [P2-LEGACY]         if (!success) {
+// [P2-LEGACY]             logEvent("Error: Memoria RAM insuficiente en " + host.getName() + " para crear el Buffer " + id);
+// [P2-LEGACY]             return null;
+// [P2-LEGACY]         }
+// [P2-LEGACY] 
+// [P2-LEGACY]         nextBufferId++;
+// [P2-LEGACY]         this.buffers.append(buffer);
+// [P2-LEGACY] 
+// [P2-LEGACY]         logEvent("Buffer " + id + " creado en " + host.getName() + " con capacidad " + storage + " y latencia " + latency + " ticks");
+// [P2-LEGACY]         notifyGUI();
+// [P2-LEGACY]         return buffer;
+// [P2-LEGACY] 
+// [P2-LEGACY]         } finally { StateAccess.exit(); }
+// [P2-LEGACY]     }
 
     // =========================================================================
     // CONTROL DEL RELOJ GLOBAL (Play, Pausa, Step, Velocidad)
@@ -541,58 +551,58 @@ public class SimulationController implements IClockTickable {
         return this.clock.isPaused();
     }
 
-    public void setNetworkLatency(int latencyCycles) {
-        StateAccess.enter();
-        try { 
-            this.syncDriver.setLatencia(latencyCycles);
-            for (int i = 0; i < this.buffers.size(); i++) {
-                Buffer b = this.buffers.get(i);
-                if (b != null) {
-                    b.setLatency(latencyCycles);
-                }
-            }
-            logEvent("Latencia de red actualizada a " + latencyCycles + " ciclos");
-        } finally { StateAccess.exit(); }
-    }
-
-    public int getNetworkLatency() {
-        return this.syncDriver.getLatencia();
-    }
-
-    public void setBufferLatency(int bufferId, int latency) {
-        StateAccess.enter();
-        try {
-            Buffer b = getBufferById(bufferId);
-            if (b != null) {
-                b.setLatency(latency);
-                int nuevaLat = b.getLatency();
-                MyLinkedList<ProcessControlBlock> procs = getAllProcesses();
-                for (int i = 0; i < procs.size(); i++) {
-                    ProcessControlBlock p = procs.get(i);
-                    if (p != null && p.getState() == ProcessState.BLOQUEADO && p.getBlockReason() == BlockReason.NETWORK_LATENCY) {
-                        int pBufId = p.getPermitBufferId();
-                        if (pBufId <= 0 && p.getTargetBufferId() != null) {
-                            try {
-                                pBufId = Integer.parseInt(p.getTargetBufferId().replaceAll("[^0-9]", ""));
-                            } catch (Exception ignored) {}
-                        }
-                        if (pBufId == bufferId) {
-                            if (p.getNetworkDelayRemaining() > nuevaLat) {
-                                p.setNetworkDelayRemaining(nuevaLat);
-                                if (nuevaLat <= 0) {
-                                    p.setNetworkDelayDone(true);
-                                }
-                            }
-                        }
-                    }
-                }
-                logEvent("Latencia del Buffer " + bufferId + " actualizada a " + nuevaLat + " ticks");
-                notifyGUI();
-            } else {
-                logEvent("Error: No se encontrÃ³ el Buffer con ID " + bufferId);
-            }
-        } finally { StateAccess.exit(); }
-    }
+// [P2-LEGACY]     public void setNetworkLatency(int latencyCycles) {
+// [P2-LEGACY]         StateAccess.enter();
+// [P2-LEGACY]         try { 
+// [P2-LEGACY]             this.syncDriver.setLatencia(latencyCycles);
+// [P2-LEGACY]             for (int i = 0; i < this.buffers.size(); i++) {
+// [P2-LEGACY]                 Buffer b = this.buffers.get(i);
+// [P2-LEGACY]                 if (b != null) {
+// [P2-LEGACY]                     b.setLatency(latencyCycles);
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]             logEvent("Latencia de red actualizada a " + latencyCycles + " ciclos");
+// [P2-LEGACY]         } finally { StateAccess.exit(); }
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     public int getNetworkLatency() {
+// [P2-LEGACY]         return this.syncDriver.getLatencia();
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     public void setBufferLatency(int bufferId, int latency) {
+// [P2-LEGACY]         StateAccess.enter();
+// [P2-LEGACY]         try {
+// [P2-LEGACY]             Buffer b = getBufferById(bufferId);
+// [P2-LEGACY]             if (b != null) {
+// [P2-LEGACY]                 b.setLatency(latency);
+// [P2-LEGACY]                 int nuevaLat = b.getLatency();
+// [P2-LEGACY]                 MyLinkedList<ProcessControlBlock> procs = getAllProcesses();
+// [P2-LEGACY]                 for (int i = 0; i < procs.size(); i++) {
+// [P2-LEGACY]                     ProcessControlBlock p = procs.get(i);
+// [P2-LEGACY]                     if (p != null && p.getState() == ProcessState.BLOQUEADO && p.getBlockReason() == BlockReason.NETWORK_LATENCY) {
+// [P2-LEGACY]                         int pBufId = p.getPermitBufferId();
+// [P2-LEGACY]                         if (pBufId <= 0 && p.getTargetBufferId() != null) {
+// [P2-LEGACY]                             try {
+// [P2-LEGACY]                                 pBufId = Integer.parseInt(p.getTargetBufferId().replaceAll("[^0-9]", ""));
+// [P2-LEGACY]                             } catch (Exception ignored) {}
+// [P2-LEGACY]                         }
+// [P2-LEGACY]                         if (pBufId == bufferId) {
+// [P2-LEGACY]                             if (p.getNetworkDelayRemaining() > nuevaLat) {
+// [P2-LEGACY]                                 p.setNetworkDelayRemaining(nuevaLat);
+// [P2-LEGACY]                                 if (nuevaLat <= 0) {
+// [P2-LEGACY]                                     p.setNetworkDelayDone(true);
+// [P2-LEGACY]                                 }
+// [P2-LEGACY]                             }
+// [P2-LEGACY]                         }
+// [P2-LEGACY]                     }
+// [P2-LEGACY]                 }
+// [P2-LEGACY]                 logEvent("Latencia del Buffer " + bufferId + " actualizada a " + nuevaLat + " ticks");
+// [P2-LEGACY]                 notifyGUI();
+// [P2-LEGACY]             } else {
+// [P2-LEGACY]                 logEvent("Error: No se encontrÃ³ el Buffer con ID " + bufferId);
+// [P2-LEGACY]             }
+// [P2-LEGACY]         } finally { StateAccess.exit(); }
+// [P2-LEGACY]     }
 
     // =========================================================================
     // AVANCE SINCRONIZADO POR CICLO (IClockTickable) Y REPORTE DE LOGS
@@ -620,7 +630,8 @@ public class SimulationController implements IClockTickable {
         for (int i = 0; i < this.computers.size(); i++) {
             Computer comp = this.computers.get(i);
             if (comp != null && comp.getKernel() != null) {
-                comp.getKernel().executeCycle(comp, currentCycle, this.syncDriver, this.buffers);
+                // [P2-LEGACY] comp.getKernel().executeCycle(comp, currentCycle, this.syncDriver, this.buffers);
+                comp.getKernel().executeCycle(comp, currentCycle); // [P2] sin syncDriver/buffers
 
                 // Construcción del reporte de log por cada CPU
                 ProcessControlBlock runningPcb = comp.getCpu().getPCB();
@@ -663,9 +674,9 @@ public class SimulationController implements IClockTickable {
         return computers;
     }
 
-    public MyLinkedList<Buffer> getBuffers() {
-        return buffers;
-    }
+// [P2-LEGACY]     public MyLinkedList<Buffer> getBuffers() {
+// [P2-LEGACY]         return buffers;
+// [P2-LEGACY]     }
 
     public Computer getComputerById(int id) {
         for (int i = 0; i < this.computers.size(); i++) {
@@ -677,15 +688,15 @@ public class SimulationController implements IClockTickable {
         return null;
     }
 
-    public Buffer getBufferById(int id) {
-        for (int i = 0; i < this.buffers.size(); i++) {
-            Buffer b = this.buffers.get(i);
-            if (b != null && b.getId() == id) {
-                return b;
-            }
-        }
-        return null;
-    }
+// [P2-LEGACY]     public Buffer getBufferById(int id) {
+// [P2-LEGACY]         for (int i = 0; i < this.buffers.size(); i++) {
+// [P2-LEGACY]             Buffer b = this.buffers.get(i);
+// [P2-LEGACY]             if (b != null && b.getId() == id) {
+// [P2-LEGACY]                 return b;
+// [P2-LEGACY]             }
+// [P2-LEGACY]         }
+// [P2-LEGACY]         return null;
+// [P2-LEGACY]     }
 
     public MyLinkedList<ProcessControlBlock> getAllProcesses() {
         MyLinkedList<ProcessControlBlock> all = new MyLinkedList<>();
@@ -725,9 +736,9 @@ public class SimulationController implements IClockTickable {
         while (!this.computers.isEmpty()) {
             this.computers.deletePos(0);
         }
-        while (!this.buffers.isEmpty()) {
-            this.buffers.deletePos(0);
-        }
+// [P2-LEGACY]         while (!this.buffers.isEmpty()) {
+// [P2-LEGACY]             this.buffers.deletePos(0);
+// [P2-LEGACY]         }
         this.nextComputerId = 1;
         this.nextBufferId = 1;
         this.ultimoEstadoInactividad = 0;

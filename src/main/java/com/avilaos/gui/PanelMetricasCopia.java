@@ -70,10 +70,10 @@ public class PanelMetricasCopia extends JPanel {
             new Object[]{"ID", "Proceso", "Computador", "Estado", "En listo (ticks)", "Bloqueado (ticks)", "En semáforos (ticks)"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
-    private final DefaultTableModel tablaBuffers = new DefaultTableModel(
-            new Object[]{"Buffer", "Computador anfitrión", "Elementos producidos", "Elementos consumidos", "Espera en semáforos promedio (ticks/proceso)"}, 0) {
-        @Override public boolean isCellEditable(int row, int column) { return false; }
-    };
+// [P2-LEGACY]     private final DefaultTableModel tablaBuffers = new DefaultTableModel(
+// [P2-LEGACY]             new Object[]{"Buffer", "Computador anfitrión", "Elementos producidos", "Elementos consumidos", "Espera en semáforos promedio (ticks/proceso)"}, 0) {
+// [P2-LEGACY]         @Override public boolean isCellEditable(int row, int column) { return false; }
+// [P2-LEGACY]     };
 
     public PanelMetricasCopia(SimulationController controller) {
         this.controller = controller;
@@ -131,7 +131,7 @@ public class PanelMetricasCopia extends JPanel {
         JTabbedPane tablas = new JTabbedPane();
         tablas.addTab("Computadores", crearTabla(tablaEquipos));
         tablas.addTab("Procesos", crearTabla(tablaProcesos));
-        tablas.addTab("Buffers", crearTabla(tablaBuffers));
+// [P2-LEGACY]         tablas.addTab("Buffers", crearTabla(tablaBuffers));
         pnlInferior.add(tablas, BorderLayout.CENTER);
         lblDetalle.setText("Totales de todos los procesos · semáforos está incluido en bloqueado");
         pnlInferior.add(lblDetalle, BorderLayout.SOUTH);
@@ -223,7 +223,7 @@ public class PanelMetricasCopia extends JPanel {
         long activosGlobal = 0, observadosGlobal = 0;
         tablaEquipos.setRowCount(0);
         tablaProcesos.setRowCount(0);
-        tablaBuffers.setRowCount(0);
+// [P2-LEGACY]         tablaBuffers.setRowCount(0);
         double maxUtil = -1.0;
         double minUtil = 101.0;
         
@@ -300,25 +300,25 @@ public class PanelMetricasCopia extends JPanel {
         lblTiempos.setText(String.format("Respuesta promedio (completados): %.1f ticks   ·   Bloqueo en semáforos promedio: %s ticks/proceso   ·   Brecha de CPU: %.1f puntos",
                 tiempoRespuestaPromedio, promedioSemaforos, equidad));
 
-        // Actualizar KPIs de Buffers usando iteración estándar sobre tu MyLinkedList
-        var buffers = view.buffers;
-        for (int i = 0; i < buffers.size(); i++) {
-            var b = buffers.get(i);
-            String anfitrion = "ID " + b.getIdComp();
-            for (int c = 0; c < computadores.size(); c++) {
-                if (computadores.get(c).getId() == b.getIdComp()) anfitrion = computadores.get(c).getName();
-            }
-            int total = 0, cantidad = 0;
-            for (int p = 0; p < view.processes.size(); p++) {
-                var proceso = view.processes.get(p).process();
-                if (esProductorConsumidor(proceso) && correspondeAlBuffer(proceso.targetBufferId(), b.getId())) {
-                    cantidad++;
-                    total += proceso.semaphoreWaitTicks();
-                }
-            }
-            tablaBuffers.addRow(new Object[]{b.getId(), anfitrion, b.getProduced(), b.getComsumed(),
-                    cantidad == 0 ? "—" : String.format("%.1f", (double) total / cantidad)});
-        }
+// [P2-LEGACY]         // Actualizar KPIs de Buffers usando iteración estándar sobre tu MyLinkedList
+// [P2-LEGACY]         var buffers = view.buffers;
+// [P2-LEGACY]         for (int i = 0; i < buffers.size(); i++) {
+// [P2-LEGACY]             var b = buffers.get(i);
+// [P2-LEGACY]             String anfitrion = "ID " + b.getIdComp();
+// [P2-LEGACY]             for (int c = 0; c < computadores.size(); c++) {
+// [P2-LEGACY]                 if (computadores.get(c).getId() == b.getIdComp()) anfitrion = computadores.get(c).getName();
+// [P2-LEGACY]             }
+// [P2-LEGACY]             int total = 0, cantidad = 0;
+// [P2-LEGACY]             for (int p = 0; p < view.processes.size(); p++) {
+// [P2-LEGACY]                 var proceso = view.processes.get(p).process();
+// [P2-LEGACY]                 if (esProductorConsumidor(proceso) && correspondeAlBuffer(proceso.targetBufferId(), b.getId())) {
+// [P2-LEGACY]                     cantidad++;
+// [P2-LEGACY]                     total += proceso.semaphoreWaitTicks();
+// [P2-LEGACY]                 }
+// [P2-LEGACY]             }
+// [P2-LEGACY]             tablaBuffers.addRow(new Object[]{b.getId(), anfitrion, b.getProduced(), b.getComsumed(),
+// [P2-LEGACY]                     cantidad == 0 ? "—" : String.format("%.1f", (double) total / cantidad)});
+// [P2-LEGACY]         }
         lblDetalle.setText("Totales incluyen procesos activos y finalizados · semáforos está incluido en bloqueado · promedios de semáforos: productores y consumidores creados");
     }
 

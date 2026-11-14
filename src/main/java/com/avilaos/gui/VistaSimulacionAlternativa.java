@@ -26,12 +26,12 @@ public final class VistaSimulacionAlternativa extends JPanel {
     private final JComboBox<Integer> intervalo = new JComboBox<>(new Integer[]{100, 250, 500, 1000});
     private final JTabbedPane vistas = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
     private final JPanel resumenEquipos = new JPanel();
-    private final DefaultTableModel modeloBuffers = tabla("Buffer", "Computador", "Elementos", "Capacidad", "Latencia", "Mutex", "Llenos", "Vacíos");
-    private final JTable buffers = new JTable(modeloBuffers);
-    private final JScrollPane scrollBuffers = new JScrollPane(buffers);
-    private final JTextArea esperaBuffers = new JTextArea(3, 30);
-    private final JSpinner latencia = new JSpinner(new SpinnerNumberModel(0, 0, 1000, 1));
-    private final JButton aplicarLatencia = accion("Aplicar latencia", false);
+// [P2-LEGACY]     private final DefaultTableModel modeloBuffers = tabla("Buffer", "Computador", "Elementos", "Capacidad", "Latencia", "Mutex", "Llenos", "Vacíos");
+// [P2-LEGACY]     private final JTable buffers = new JTable(modeloBuffers);
+// [P2-LEGACY]     private final JScrollPane scrollBuffers = new JScrollPane(buffers);
+// [P2-LEGACY]     private final JTextArea esperaBuffers = new JTextArea(3, 30);
+// [P2-LEGACY]     private final JSpinner latencia = new JSpinner(new SpinnerNumberModel(0, 0, 1000, 1));
+// [P2-LEGACY]     private final JButton aplicarLatencia = accion("Aplicar latencia", false);
     private final JTextArea eventos = new JTextArea(5, 40);
     private final JPanel resumen = columna();
     private int[] ids = new int[0];
@@ -143,32 +143,32 @@ public final class VistaSimulacionAlternativa extends JPanel {
         resumenEquipos.setLayout(new BoxLayout(resumenEquipos, BoxLayout.Y_AXIS));
         resumenEquipos.setOpaque(false); resumenEquipos.setAlignmentX(LEFT_ALIGNMENT);
         resumen.add(resumenEquipos);
-        resumen.add(Box.createVerticalStrut(16));
-        resumen.add(encabezado("Buffers globales", "Ocupación, semáforos y procesos en espera"));
-        buffers.setRowHeight(30); buffers.setBackground(PAPEL); buffers.setForeground(TINTA);
-        buffers.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        scrollBuffers.setColumnHeaderView(buffers.getTableHeader());
-        scrollBuffers.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
-        desplazarVistaDesdeTabla(scrollBuffers);
-        scrollBuffers.setPreferredSize(new Dimension(800, 90)); scrollBuffers.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
-        scrollBuffers.setAlignmentX(LEFT_ALIGNMENT); resumen.add(scrollBuffers);
-        esperaBuffers.setEditable(false); esperaBuffers.setLineWrap(true); esperaBuffers.setWrapStyleWord(true);
-        esperaBuffers.setBackground(PAPEL); esperaBuffers.setForeground(TINTA);
-        esperaBuffers.setText("Selecciona un buffer para ver las colas de sus semáforos.");
-        JScrollPane espera = new JScrollPane(esperaBuffers);
-        espera.setPreferredSize(new Dimension(800, 70)); espera.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
-        espera.setAlignmentX(LEFT_ALIGNMENT); resumen.add(Box.createVerticalStrut(8)); resumen.add(espera);
-        JPanel ajuste = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0)); ajuste.setOpaque(false); ajuste.setAlignmentX(LEFT_ALIGNMENT);
-        ajuste.add(texto("Latencia del buffer seleccionado (ticks)", 12, GRIS, false)); ajuste.add(latencia); ajuste.add(aplicarLatencia);
-        resumen.add(Box.createVerticalStrut(8)); resumen.add(ajuste);
-        buffers.getSelectionModel().addListSelectionListener(e -> { if (!e.getValueIsAdjusting() && !actualizando) mostrarBuffer(); });
-        aplicarLatencia.addActionListener(e -> {
-            int fila = buffers.getSelectedRow();
-            if (fila < 0 || fila >= view.buffers.size()) return;
-            try { latencia.setValue(EditorProceso.numeroVisible(latencia)); } catch (IllegalArgumentException ex) { esperaBuffers.setText("Escribe una latencia válida."); return; }
-            int id = view.buffers.get(fila).id(), valor = (Integer) latencia.getValue();
-            GuiRequest.control(controller, () -> controller.setBufferLatency(id, valor));
-        });
+// [P2-LEGACY]         resumen.add(Box.createVerticalStrut(16));
+// [P2-LEGACY]         resumen.add(encabezado("Buffers globales", "Ocupación, semáforos y procesos en espera"));
+// [P2-LEGACY]         buffers.setRowHeight(30); buffers.setBackground(PAPEL); buffers.setForeground(TINTA);
+// [P2-LEGACY]         buffers.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+// [P2-LEGACY]         scrollBuffers.setColumnHeaderView(buffers.getTableHeader());
+// [P2-LEGACY]         scrollBuffers.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+// [P2-LEGACY]         desplazarVistaDesdeTabla(scrollBuffers);
+// [P2-LEGACY]         scrollBuffers.setPreferredSize(new Dimension(800, 90)); scrollBuffers.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
+// [P2-LEGACY]         scrollBuffers.setAlignmentX(LEFT_ALIGNMENT); resumen.add(scrollBuffers);
+// [P2-LEGACY]         esperaBuffers.setEditable(false); esperaBuffers.setLineWrap(true); esperaBuffers.setWrapStyleWord(true);
+// [P2-LEGACY]         esperaBuffers.setBackground(PAPEL); esperaBuffers.setForeground(TINTA);
+// [P2-LEGACY]         esperaBuffers.setText("Selecciona un buffer para ver las colas de sus semáforos.");
+// [P2-LEGACY]         JScrollPane espera = new JScrollPane(esperaBuffers);
+// [P2-LEGACY]         espera.setPreferredSize(new Dimension(800, 70)); espera.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+// [P2-LEGACY]         espera.setAlignmentX(LEFT_ALIGNMENT); resumen.add(Box.createVerticalStrut(8)); resumen.add(espera);
+// [P2-LEGACY]         JPanel ajuste = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0)); ajuste.setOpaque(false); ajuste.setAlignmentX(LEFT_ALIGNMENT);
+// [P2-LEGACY]         ajuste.add(texto("Latencia del buffer seleccionado (ticks)", 12, GRIS, false)); ajuste.add(latencia); ajuste.add(aplicarLatencia);
+// [P2-LEGACY]         resumen.add(Box.createVerticalStrut(8)); resumen.add(ajuste);
+// [P2-LEGACY]         buffers.getSelectionModel().addListSelectionListener(e -> { if (!e.getValueIsAdjusting() && !actualizando) mostrarBuffer(); });
+// [P2-LEGACY]         aplicarLatencia.addActionListener(e -> {
+// [P2-LEGACY]             int fila = buffers.getSelectedRow();
+// [P2-LEGACY]             if (fila < 0 || fila >= view.buffers.size()) return;
+// [P2-LEGACY]             try { latencia.setValue(EditorProceso.numeroVisible(latencia)); } catch (IllegalArgumentException ex) { esperaBuffers.setText("Escribe una latencia válida."); return; }
+// [P2-LEGACY]             int id = view.buffers.get(fila).id(), valor = (Integer) latencia.getValue();
+// [P2-LEGACY]             GuiRequest.control(controller, () -> { /* [P2-LEGACY] controller.setBufferLatency(id, valor) */ });
+// [P2-LEGACY]         });
     }
 
     private JPanel panelEventos() {
@@ -206,9 +206,10 @@ public final class VistaSimulacionAlternativa extends JPanel {
             resumenEquipos.add(card); resumenEquipos.add(Box.createVerticalStrut(8));
             detalles[i].actualizar(c);
         }
-        if (view.computers.size() < 2) resumenEquipos.add(texto("Crea al menos 2 computadores para comenzar la simulación.", 13, GRIS, false));
+// [P2-LEGACY]         if (view.computers.size() < 2) resumenEquipos.add(texto("Crea al menos 2 computadores para comenzar la simulación.", 13, GRIS, false));
+        if (view.computers.size() < 1) resumenEquipos.add(texto("Crea el computador para comenzar la simulación.", 13, GRIS, false)); // [P2]
         resumenEquipos.revalidate(); resumenEquipos.repaint();
-        actualizarBuffers();
+// [P2-LEGACY]         actualizarBuffers();
     }
 
     private void reconstruir() {
@@ -222,37 +223,37 @@ public final class VistaSimulacionAlternativa extends JPanel {
         vistas.setSelectedIndex(Math.min(seleccionado, vistas.getTabCount()-1));
     }
 
-    private void actualizarBuffers() {
-        int seleccionado = buffers.getSelectedRow();
-        int id = seleccionado >= 0 && seleccionado < modeloBuffers.getRowCount() ? (Integer) modeloBuffers.getValueAt(seleccionado, 0) : -1;
-        actualizando = true;
-        modeloBuffers.setRowCount(0);
-        int nuevoIndice = -1;
-        for (int i=0; i<view.buffers.size(); i++) {
-            var b = view.buffers.get(i);
-            String anfitrion = "ID " + b.idComp();
-            for (int j=0; j<view.computers.size(); j++) if (view.computers.get(j).id() == b.idComp()) anfitrion = view.computers.get(j).name();
-            modeloBuffers.addRow(new Object[]{b.id(), anfitrion, b.datos().size(), b.storage(), b.latency(), b.mutex().count(), b.llenos().count(), b.vacios().count()});
-            if (b.id() == id) nuevoIndice = i;
-        }
-        int altura = 28 + Math.max(2, view.buffers.size()) * buffers.getRowHeight();
-        scrollBuffers.setPreferredSize(new Dimension(800, altura));
-        scrollBuffers.setMaximumSize(new Dimension(Integer.MAX_VALUE, altura));
-        if (nuevoIndice < 0 && view.buffers.size() > 0) nuevoIndice = 0;
-        if (nuevoIndice >= 0) buffers.setRowSelectionInterval(nuevoIndice, nuevoIndice);
-        actualizando = false;
-        mostrarBuffer();
-    }
-
-    private void mostrarBuffer() {
-        int fila = buffers.getSelectedRow();
-        aplicarLatencia.setEnabled(fila >= 0 && fila < view.buffers.size());
-        if (fila < 0 || fila >= view.buffers.size()) { esperaBuffers.setText("No hay buffers creados."); return; }
-        var b = view.buffers.get(fila);
-        esperaBuffers.setText("Buffer " + b.id() + " · Contenido: " + b.datos().text()
-                + "\nProcesos en espera: " + b.blockedProcessesAsString());
-        if (!((JSpinner.DefaultEditor) latencia.getEditor()).getTextField().hasFocus()) latencia.setValue(b.latency());
-    }
+// [P2-LEGACY]     private void actualizarBuffers() {
+// [P2-LEGACY]         int seleccionado = buffers.getSelectedRow();
+// [P2-LEGACY]         int id = seleccionado >= 0 && seleccionado < modeloBuffers.getRowCount() ? (Integer) modeloBuffers.getValueAt(seleccionado, 0) : -1;
+// [P2-LEGACY]         actualizando = true;
+// [P2-LEGACY]         modeloBuffers.setRowCount(0);
+// [P2-LEGACY]         int nuevoIndice = -1;
+// [P2-LEGACY]         for (int i=0; i<view.buffers.size(); i++) {
+// [P2-LEGACY]             var b = view.buffers.get(i);
+// [P2-LEGACY]             String anfitrion = "ID " + b.idComp();
+// [P2-LEGACY]             for (int j=0; j<view.computers.size(); j++) if (view.computers.get(j).id() == b.idComp()) anfitrion = view.computers.get(j).name();
+// [P2-LEGACY]             modeloBuffers.addRow(new Object[]{b.id(), anfitrion, b.datos().size(), b.storage(), b.latency(), b.mutex().count(), b.llenos().count(), b.vacios().count()});
+// [P2-LEGACY]             if (b.id() == id) nuevoIndice = i;
+// [P2-LEGACY]         }
+// [P2-LEGACY]         int altura = 28 + Math.max(2, view.buffers.size()) * buffers.getRowHeight();
+// [P2-LEGACY]         scrollBuffers.setPreferredSize(new Dimension(800, altura));
+// [P2-LEGACY]         scrollBuffers.setMaximumSize(new Dimension(Integer.MAX_VALUE, altura));
+// [P2-LEGACY]         if (nuevoIndice < 0 && view.buffers.size() > 0) nuevoIndice = 0;
+// [P2-LEGACY]         if (nuevoIndice >= 0) buffers.setRowSelectionInterval(nuevoIndice, nuevoIndice);
+// [P2-LEGACY]         actualizando = false;
+// [P2-LEGACY]         mostrarBuffer();
+// [P2-LEGACY]     }
+// [P2-LEGACY] 
+// [P2-LEGACY]     private void mostrarBuffer() {
+// [P2-LEGACY]         int fila = buffers.getSelectedRow();
+// [P2-LEGACY]         aplicarLatencia.setEnabled(fila >= 0 && fila < view.buffers.size());
+// [P2-LEGACY]         if (fila < 0 || fila >= view.buffers.size()) { esperaBuffers.setText("No hay buffers creados."); return; }
+// [P2-LEGACY]         var b = view.buffers.get(fila);
+// [P2-LEGACY]         esperaBuffers.setText("Buffer " + b.id() + " · Contenido: " + b.datos().text()
+// [P2-LEGACY]                 + "\nProcesos en espera: " + b.blockedProcessesAsString());
+// [P2-LEGACY]         if (!((JSpinner.DefaultEditor) latencia.getEditor()).getTextField().hasFocus()) latencia.setValue(b.latency());
+// [P2-LEGACY]     }
 
     private final class DetalleComputador extends JPanel {
         private final int id;
@@ -313,6 +314,9 @@ public final class VistaSimulacionAlternativa extends JPanel {
             case WAITING_FULL_BUFFER -> "Buffer lleno";
             case NETWORK_LATENCY -> "Red";
             case WAITING_IO -> "E/S";
+            case WAITING_DISK -> "Disco"; // [P2]
+            case SWAPPING_OUT -> "Swap-out"; // [P2]
+            case SWAPPING_IN -> "Swap-in"; // [P2]
             case NONE -> "—";
         };
     }

@@ -63,7 +63,7 @@ public class PanelMetricas extends JPanel {
             new Object[]{"Computador", "CPU %", "Completados", "Proc/tick", "Respuesta (ticks)", "Espera (ticks)", "Deadline %"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
-    private final JPanel panelBuffers = new JPanel(new GridLayout(0, 1));
+// [P2-LEGACY]     private final JPanel panelBuffers = new JPanel(new GridLayout(0, 1));
 
     public PanelMetricas(SimulationController controller) {
         this.controller = controller;
@@ -122,7 +122,7 @@ public class PanelMetricas extends JPanel {
         JTable tabla = new JTable(tablaEquipos);
         tabla.setRowHeight(24);
         tablas.add(new JScrollPane(tabla));
-        tablas.add(new JScrollPane(panelBuffers));
+// [P2-LEGACY]         tablas.add(new JScrollPane(panelBuffers));
         pnlInferior.add(tablas, BorderLayout.CENTER);
         
         pnlInferior.setPreferredSize(new Dimension(800, 270));
@@ -262,17 +262,17 @@ public class PanelMetricas extends JPanel {
                 tiempoRespuestaPromedio, tiempoEsperaPromedio,
                 observadosGlobal == 0 ? 0.0 : 100.0 * activosGlobal / observadosGlobal));
 
-        // Actualizar KPIs de Buffers usando iteración estándar sobre tu MyLinkedList
-        panelBuffers.removeAll();
-        var buffers = view.buffers;
-        for (int i = 0; i < buffers.size(); i++) {
-            var b = buffers.get(i);
-            String stats = String.format("Buffer %d -> Producidos: %d | Consumidos: %d", 
-                    b.getId(), b.getProduced(), b.getComsumed());
-            panelBuffers.add(new JLabel(stats));
-        }
-        
-        panelBuffers.revalidate();
-        panelBuffers.repaint();
+// [P2-LEGACY]         // Actualizar KPIs de Buffers usando iteración estándar sobre tu MyLinkedList
+// [P2-LEGACY]         panelBuffers.removeAll();
+// [P2-LEGACY]         var buffers = view.buffers;
+// [P2-LEGACY]         for (int i = 0; i < buffers.size(); i++) {
+// [P2-LEGACY]             var b = buffers.get(i);
+// [P2-LEGACY]             String stats = String.format("Buffer %d -> Producidos: %d | Consumidos: %d", 
+// [P2-LEGACY]                     b.getId(), b.getProduced(), b.getComsumed());
+// [P2-LEGACY]             panelBuffers.add(new JLabel(stats));
+// [P2-LEGACY]         }
+// [P2-LEGACY]         
+// [P2-LEGACY]         panelBuffers.revalidate();
+// [P2-LEGACY]         panelBuffers.repaint();
     }
 }
