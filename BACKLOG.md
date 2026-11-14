@@ -1,6 +1,6 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
-Corte: 14 de noviembre de 2026, `develop` en `edde1ec`. Los estados son una fotografía: **pendiente** significa que todavía no se ha verificado o completado aquí; no implica que no exista código. Los issues cerrados no certifican integración. NetBeans compiló y abrió la interfaz; el usuario informa que no logra iniciar el reloj ni la simulación. Las pruebas automáticas siguen pendientes.
+Corte: 14 de noviembre de 2026, `develop` en `edde1ec`. Los estados son una fotografía: **pendiente** significa que todavía no se ha verificado o completado aquí; no implica que no exista código. Los issues cerrados no certifican integración. NetBeans compiló y abrió la interfaz; el usuario confirmó que la simulación arranca después de corregir el requisito de dos computadores. Las pruebas automáticas siguen pendientes.
 
 **Cómo usarlo:** atender una tarea por vez en el orden indicado. El orden es sugerido; las dependencias entre áreas se indican debajo. Al terminar, registrar evidencia y actualizar estado. Antes de programar, elaborar y explicar el mapa de la función según la regla pedagógica del proyecto.
 
@@ -10,11 +10,11 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 
 ## Base y disco — #1, #2, #5–#9
 
-**Bloqueo observado:** `VistaSimulacionAlternativa` habilita Iniciar y Paso solo con al menos dos computadores. El Proyecto 2 exige uno. Revisar también las validaciones de ambos botones antes de corregir y comprobar el arranque.
+**Corrección comprobada por el usuario:** la vista exigía dos computadores; ahora permite iniciar con uno y dirige a creación cuando no hay ninguno.
 
 | ID | Estado | Acción y comprobación de terminado |
 |---|---|---|
-| T01 | 🟨 | Compilación de 64 archivos y apertura de interfaz confirmadas; investigar por qué no arranca el reloj y registrar resultado. |
+| T01 | ✅ | Compilar y abrir en NetBeans; comprobar arranque de la simulación con un computador. |
 | T02 | ⬜ | Ejecutar las pruebas existentes de disco y registrar resultados y fallos. |
 | T03 | ⬜ | Verificar límites de configuración: bloques totales, swap, cabezal y velocidad. |
 | T04 | ⬜ | Comprobar que las zonas de archivos y swap no se solapen. |
@@ -112,4 +112,4 @@ El árbol y disco sustentan el CRUD; el CRUD y las solicitudes de disco sustenta
 
 | Tarea | Fecha |
 |---|---|---|
-| T01 | 14-11-2026 | NetBeans compiló 64 archivos con destino Java 25 y abrió la interfaz; responde y permite configurar. El usuario informa que no puede arrancar reloj ni simulación. La vista activa exige al menos dos computadores para habilitar Iniciar, condición incompatible con el requisito de uno; pendiente corregir y comprobar. |
+| T01 | 14-11-2026 | NetBeans compiló 64 archivos con destino Java 25 y abrió la interfaz; responde y permite configurar. El usuario confirmó que la simulación arranca tras corregir la condición de dos computadores. |

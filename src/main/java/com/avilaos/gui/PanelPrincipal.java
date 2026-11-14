@@ -93,7 +93,7 @@ public class PanelPrincipal extends JPanel {
         
         editorProceso = new EditorProceso(() -> mostrarPanel(Destino.COMPUTADOR));
         pantallas.add(editorProceso, Destino.PROCESO.name());
-        pantallas.add(new VistaSimulacionAlternativa(controller), Destino.SIMULACION.name());
+        pantallas.add(new VistaSimulacionAlternativa(controller, () -> mostrarPanel(Destino.COMPUTADOR)), Destino.SIMULACION.name());
         metricas = new PanelMetricasCopia(controller);
         JPanel vistaMetricas = new JPanel(new BorderLayout(0, 16));
         vistaMetricas.setBackground(FONDO);
