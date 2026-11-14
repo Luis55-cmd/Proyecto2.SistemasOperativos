@@ -37,12 +37,18 @@ public final class VistaSimulacionAlternativa extends JPanel {
     private int[] ids = new int[0];
     private DetalleComputador[] detalles = new DetalleComputador[0];
     private SimulationSnapshot view;
+    private final Runnable irACrearComputador;
     private long session;
     private boolean actualizando;
 
     public VistaSimulacionAlternativa(SimulationController controller) {
+        this(controller, () -> {});
+    }
+
+    public VistaSimulacionAlternativa(SimulationController controller, Runnable irACrearComputador) {
         super(new BorderLayout(0, 12));
         this.controller = controller;
+        this.irACrearComputador = irACrearComputador;
         this.configuracion = new ConfiguracionSimulacion(controller);
         this.view = controller.snapshot();
         this.session = view.session;
@@ -73,9 +79,9 @@ public final class VistaSimulacionAlternativa extends JPanel {
         JPanel controles = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         controles.setOpaque(false);
         controles.setAlignmentX(LEFT_ALIGNMENT);
-        iniciar.addActionListener(e -> { if (controller.snapshot().computers.size() < 2) { controller.logEvent("Se requieren mínimo 2 computadores creados para iniciar la simulación."); return; } GuiRequest.control(controller, controller::startSimulation); });
+        iniciar.addActionListener(e -> { if (controller.snapshot().computers.size() == 0) { irACrearComputador.run(); return; } GuiRequest.control(controller, controller::startSimulation); });
         pausar.addActionListener(e -> GuiRequest.control(controller, controller::pauseSimulation));
-        paso.addActionListener(e -> { if (controller.snapshot().computers.size() < 2) { controller.logEvent("Se requieren mínimo 2 computadores creados para iniciar la simulación."); return; } GuiRequest.control(controller, controller::stepSimulation); });
+        paso.addActionListener(e -> { if (controller.snapshot().computers.size() == 0) return; GuiRequest.control(controller, controller::stepSimulation); });
         controles.add(iniciar); controles.add(pausar); controles.add(paso);
         controles.add(texto("Intervalo (ms)", 12, GRIS, false));
         controles.add(intervalo);
@@ -188,8 +194,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
         boolean activo = view.running && !view.paused;
         relojAnimado.setActivo(activo);
         iniciar.setText(view.running && view.paused ? "Reanudar" : "Iniciar");
-        boolean minComputadores = view.computers.size() >= 2;
-        iniciar.setEnabled(!activo && minComputadores); pausar.setEnabled(activo); paso.setEnabled(!activo && minComputadores);
+        iniciar.setEnabled(!activo); pausar.setEnabled(activo); paso.setEnabled(!activo && view.computers.size() > 0);
         if (anterior.interval != view.interval || anterior.session != view.session) intervalo.setSelectedItem(view.interval);
         boolean cambio = ids.length != view.computers.size() || anterior.session != view.session;
         if (!cambio) for (int i=0; i<ids.length; i++) if (ids[i] != view.computers.get(i).id()) { cambio=true; break; }
