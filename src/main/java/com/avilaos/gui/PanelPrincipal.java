@@ -12,7 +12,7 @@ import javax.swing.border.EmptyBorder;
 
 /** Vista Swing: conserva formularios; no modifica el kernel ni ejecuta procesos. */
 public class PanelPrincipal extends JPanel {
-    public enum Destino { MENU, COMPUTADOR, BUFFER, PROCESO, SIMULACION, METRICAS }
+    public enum Destino { MENU, COMPUTADOR, BUFFER, PROCESO, SIMULACION, METRICAS, INICIO_NUEVO }
     static final Color FONDO = new Color(246, 243, 234);
     static final Color TINTA = new Color(38, 58, 43);
     static final Color GRIS = new Color(119, 105, 85);
@@ -23,6 +23,10 @@ public class PanelPrincipal extends JPanel {
     private final JPanel pantallas = new JPanel(distribucion);
     private final JButton[] navegacion = new JButton[Destino.values().length];
     private Destino destinoActual;
+    private final JLabel estadoCargaArchivos = texto(" ", 12, ACENTO, true);
+    private Timer avisoCargaTimer;
+    private final JLabel estadoCargaProcesos = texto(" ", 12, ACENTO, true);
+    private Timer avisoProcesosTimer;
     private final EditorProceso editorProceso;
     private final PanelMetricasCopia metricas;
     private final SimulationController controller = SimulationController.getInstance();
@@ -68,7 +72,7 @@ public class PanelPrincipal extends JPanel {
         lateral.add(Box.createVerticalStrut(28));
         
         // [P2-LEGACY] String[] titulos = {"01   Inicio", "02   Computadores", "03   Buffers", "04   Procesos", "05   Simulación", "06   Métricas"};
-        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Procesos", "04   Simulación", "05   Métricas"}; // [P2] sin Buffers
+        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Procesos", "04   Simulación", "05   Métricas", "06   Inicio nuevo"}; // [P2] sin Buffers
         for (Destino destino : Destino.values()) {
             if (destino == Destino.BUFFER) continue; // [P2] pantalla de buffers oculta
             JButton boton = accion(titulos[destino.ordinal()], false);
@@ -87,6 +91,7 @@ public class PanelPrincipal extends JPanel {
         add(lateral, BorderLayout.WEST);
         pantallas.setBackground(FONDO);
         pantallas.add(inicio(), Destino.MENU.name());
+        pantallas.add(inicioNuevo(), Destino.INICIO_NUEVO.name());
         pantallas.add(computador(), Destino.COMPUTADOR.name());
         
 // [P2-LEGACY]         pantallas.add(buffer(), Destino.BUFFER.name());
@@ -188,6 +193,207 @@ public class PanelPrincipal extends JPanel {
         panel.add(opciones);
         panel.add(Box.createVerticalStrut(24));
         return panel;
+    }
+
+    /** Maqueta visual: los botones de persistencia todavía no ejecutan acciones. */
+    private JPanel inicioNuevo() {
+        JPanel panel = pagina("BIENVENIDO A AVILAOS", "Prepara tu simulación",
+                "Crea una configuración nueva, carga archivos o combina ambas opciones.");
+
+        JPanel bienvenida = new JPanel(new BorderLayout(16, 0));
+        bienvenida.setBackground(PAPEL);
+        bienvenida.setAlignmentX(LEFT_ALIGNMENT);
+        bienvenida.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDE), new EmptyBorder(12, 24, 12, 24)));
+        bienvenida.setMaximumSize(new Dimension(Integer.MAX_VALUE, 125));
+        JPanel cita = new JPanel();
+        cita.setOpaque(false);
+        cita.setLayout(new BoxLayout(cita, BoxLayout.Y_AXIS));
+        cita.add(texto("UNA MEDITACIÓN PARA EMPEZAR", 11, ACENTO, true));
+        cita.add(Box.createVerticalStrut(8));
+        cita.add(texto("“Nada llega demasiado pronto ni demasiado tarde si llega a su debido tiempo.”", 16, TINTA, true));
+        cita.add(Box.createVerticalStrut(6));
+        cita.add(texto("Marco Aurelio · Meditaciones IV.23 · traducción libre", 12, GRIS, false));
+        bienvenida.add(cita, BorderLayout.CENTER);
+        java.net.URL imagen = getClass().getResource("/imagenes/marco-aurelio.png");
+        if (imagen != null) {
+            Image retrato = new ImageIcon(imagen).getImage().getScaledInstance(90, 92, Image.SCALE_SMOOTH);
+            JLabel retratoLabel = new JLabel(new ImageIcon(retrato));
+            retratoLabel.setToolTipText("Retrato de Marco Aurelio");
+            bienvenida.add(retratoLabel, BorderLayout.EAST);
+        }
+        panel.add(bienvenida);
+        panel.add(Box.createVerticalStrut(22));
+        panel.add(texto("TU RECORRIDO", 11, ACENTO, true));
+        panel.add(Box.createVerticalStrut(8));
+        JPanel recorrido = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        recorrido.setOpaque(false);
+        recorrido.setAlignmentX(LEFT_ALIGNMENT);
+        recorrido.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
+        String[] etapas = {"Computador", "Disco", "Archivos", "Procesos", "Simulación"};
+        Destino[] destinos = {Destino.COMPUTADOR, null, null, Destino.PROCESO, Destino.SIMULACION};
+        for (int i = 0; i < etapas.length; i++) {
+            if (i > 0) {
+                JLabel flecha = texto("  →  ", 15, GRIS, false);
+                recorrido.add(flecha);
+            }
+            JButton etapa = new JButton(etapas[i]);
+            etapa.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 15));
+            etapa.setBorder(new EmptyBorder(5, 2, 5, 2));
+            etapa.setBorderPainted(false);
+            etapa.setContentAreaFilled(false);
+            etapa.setFocusPainted(true);
+            etapa.setForeground(ACENTO);
+            Destino destino = destinos[i];
+            if (destino == null) {
+                etapa.setEnabled(false);
+                etapa.setToolTipText("Vista pendiente de implementar");
+            } else {
+                etapa.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                etapa.addActionListener(e -> mostrarPanel(destino));
+            }
+            recorrido.add(etapa);
+        }
+        panel.add(recorrido);
+        panel.add(Box.createVerticalStrut(22));
+        panel.add(texto("ARCHIVOS DE LA SIMULACIÓN", 11, ACENTO, true));
+        panel.add(Box.createVerticalStrut(10));
+
+        JPanel opciones = new JPanel(new GridLayout(1, 2, 18, 0));
+        opciones.setOpaque(false);
+        opciones.setAlignmentX(LEFT_ALIGNMENT);
+        opciones.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
+        String[] titulos = {"Sistema de archivos", "Procesos y configuración"};
+        String[] descripciones = {"Disco, directorios y archivos.", "Computador, políticas y procesos."};
+        for (int i = 0; i < titulos.length; i++) {
+            JPanel tarjeta = tarjeta();
+            tarjeta.add(texto(titulos[i], 18, TINTA, true));
+            tarjeta.add(Box.createVerticalStrut(8));
+            tarjeta.add(texto(descripciones[i], 12, GRIS, false));
+            tarjeta.add(Box.createVerticalStrut(16));
+            JPanel botones = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+            botones.setOpaque(false);
+            botones.setAlignmentX(LEFT_ALIGNMENT);
+            JButton cargar = accion("Cargar JSON", true);
+            JButton guardar = accion("Guardar JSON", false);
+            if (i == 0) {
+                cargar.addActionListener(e -> cargarSistemaArchivos(cargar));
+            } else {
+                cargar.addActionListener(e -> cargarProcesosConfiguracion(cargar));
+            }
+            guardar.setEnabled(false);
+            botones.add(cargar);
+            botones.add(guardar);
+            tarjeta.add(botones);
+            tarjeta.add(Box.createVerticalStrut(8));
+            tarjeta.add(i == 0 ? estadoCargaArchivos : estadoCargaProcesos);
+            opciones.add(tarjeta);
+        }
+        panel.add(opciones);
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(texto("Carga de JSON disponible. Guardado pendiente de conectar.", 12, GRIS, false));
+        return panel;
+    }
+
+    private void cargarSistemaArchivos(JButton boton) {
+        JFileChooser selector = new JFileChooser();
+        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        java.io.File archivo = selector.getSelectedFile();
+        boton.setEnabled(false);
+        if (avisoCargaTimer != null) avisoCargaTimer.stop();
+        estadoCargaArchivos.setText(" ");
+        GuiRequest.model(controller, () -> controller.isFileSystemJsonLoaded()
+                || !controller.getFileSystemManager().getAllNodesPreOrder().isEmpty(), hayDatos -> {
+            if (hayDatos) {
+                int confirmacion = JOptionPane.showConfirmDialog(this,
+                        "La carga reemplazará el disco y los archivos actuales. ¿Deseas continuar?",
+                        "Cargar sistema de archivos", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                if (confirmacion != JOptionPane.YES_OPTION) {
+                    boton.setEnabled(true);
+                    return;
+                }
+            }
+            aplicarCargaSistemaArchivos(archivo, boton);
+        }, error -> {
+            boton.setEnabled(true);
+            controller.logEvent("Error al comprobar el sistema de archivos: " + error.getMessage());
+            JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void aplicarCargaSistemaArchivos(java.io.File archivo, JButton boton) {
+        GuiRequest.model(controller, () -> {
+            controller.logEvent("Intento de carga del sistema de archivos: " + archivo.getName());
+            if (controller.isRunning()) {
+                throw new IllegalStateException("Detén y reinicia la simulación antes de reemplazar el disco.");
+            }
+            controller.loadFileSystemJson(archivo);
+            return true;
+        }, resultado -> {
+            boton.setEnabled(true);
+            estadoCargaArchivos.setText("Sistema de archivos cargado correctamente.");
+            if (avisoCargaTimer != null) avisoCargaTimer.stop();
+            avisoCargaTimer = new Timer(2500, e -> estadoCargaArchivos.setText(" "));
+            avisoCargaTimer.setRepeats(false);
+            avisoCargaTimer.start();
+        }, error -> {
+            boton.setEnabled(true);
+            String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+            controller.logEvent("Error al cargar sistema de archivos: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void cargarProcesosConfiguracion(JButton boton) {
+        JFileChooser selector = new JFileChooser();
+        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        java.io.File archivo = selector.getSelectedFile();
+        boton.setEnabled(false);
+        if (avisoProcesosTimer != null) avisoProcesosTimer.stop();
+        estadoCargaProcesos.setText(" ");
+        GuiRequest.model(controller, () -> controller.isProcessesJsonLoaded()
+                || !controller.getComputers().isEmpty() || !controller.getAllProcesses().isEmpty(), hayDatos -> {
+            if (hayDatos) {
+                int confirmacion = JOptionPane.showConfirmDialog(this,
+                        "La carga reemplazará el computador y sus procesos, y cambiará ajustes del reloj y disco. ¿Deseas continuar?",
+                        "Cargar procesos y configuración", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                if (confirmacion != JOptionPane.YES_OPTION) {
+                    boton.setEnabled(true);
+                    return;
+                }
+            }
+            aplicarCargaProcesosConfiguracion(archivo, boton);
+        }, error -> {
+            boton.setEnabled(true);
+            String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+            controller.logEvent("Error al comprobar la configuración: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void aplicarCargaProcesosConfiguracion(java.io.File archivo, JButton boton) {
+        GuiRequest.model(controller, () -> {
+            controller.logEvent("Intento de carga de procesos y configuración: " + archivo.getName());
+            if (controller.isRunning()) {
+                throw new IllegalStateException("Detén y reinicia la simulación antes de reemplazar la configuración.");
+            }
+            controller.loadProcessesConfigJson(archivo);
+            return true;
+        }, resultado -> {
+            boton.setEnabled(true);
+            estadoCargaProcesos.setText("Procesos y configuración cargados correctamente.");
+            if (avisoProcesosTimer != null) avisoProcesosTimer.stop();
+            avisoProcesosTimer = new Timer(2500, e -> estadoCargaProcesos.setText(" "));
+            avisoProcesosTimer.setRepeats(false);
+            avisoProcesosTimer.start();
+        }, error -> {
+            boton.setEnabled(true);
+            String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+            controller.logEvent("Error al cargar procesos y configuración: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+        });
     }
 
     private JPanel computador() {
