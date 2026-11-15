@@ -132,6 +132,12 @@ PR [#29](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/29), pe
 - **T40, T42–T44 y T45–T61 siguen pendientes:** no se ha completado su comprobación integral, la creación manual ni el guardado desde el nuevo Inicio. La propuesta de arranque manual sigue pendiente de validación por el equipo y difiere de la redacción literal del enunciado.
 - **Siguiente propuesta:** diseñar una nueva pantalla de Computador que muestre y configure el único computador y permita contrastar los datos cargados, sin alterar la pantalla anterior durante su revisión. Revisar la diferencia del log entre «Computador 1» y «AvilaOS-PC».
 
+## Vista de Computador — 15 de noviembre de 2026
+
+En revisión: Inicio pasa a ser la vista nueva única; Computador muestra creación o consulta según exista un equipo. La vista permite cambiar política y quantum mediante los métodos existentes; RAM y nombre quedan solo de lectura tras crear. La eliminación permanece deshabilitada y depende de la integración del disco con el reloj ([#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30)) y de definir e implementar la limpieza de procesos, cola y swap.
+
+El estudiante comprobó desde la interfaz el escenario `09-cambio-fcfs-prioridades.json`: FCFS durante 3 ciclos; cambio a prioridades apropiativas; Urgente termina en ciclo 6, Medio en 10 y Lento en 15. Coincide con la ejecución de referencia del controlador. Falta comprobar Round Robin y cambios de quantum desde esta vista; el escenario prueba CPU, no la integración de E/S. La aplicación y los archivos de prueba compilan; no se agregaron pruebas automáticas para la nueva vista.
+
 ## Resultados de pruebas — 14 de noviembre de 2026
 
 Estos resultados corresponden a una revisión anterior; los estados actualizados por el equipo y sus evidencias aparecen arriba.
