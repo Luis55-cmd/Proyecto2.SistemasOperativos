@@ -1,0 +1,7 @@
+{
+  "diskConfig": {
+    "totalBlocks": 200,
+    "initialHead": 200
+  },
+  "fileSystem": []
+}

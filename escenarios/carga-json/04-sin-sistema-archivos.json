@@ -1,0 +1,6 @@
+{
+  "diskConfig": {
+    "totalBlocks": 200,
+    "initialHead": 50
+  }
+}
