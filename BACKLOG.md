@@ -1,12 +1,12 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
-Corte: 14 de noviembre de 2026, `develop` en `edde1ec`. Los estados son una fotografía: **pendiente** significa que todavía no se ha verificado o completado aquí; no implica que no exista código. Los issues cerrados no certifican integración. NetBeans compiló y abrió la interfaz; el usuario confirmó que la simulación arranca después de corregir el requisito de dos computadores. Las pruebas automáticas siguen pendientes.
+Corte: 14 de noviembre de 2026, `develop` en `edde1ec`. Los estados son una fotografía: **pendiente** significa que todavía no se ha verificado o completado aquí; no implica que no exista código. Los issues cerrados no certifican integración. NetBeans compiló y abrió la interfaz; el usuario confirmó que la simulación arranca después de corregir el requisito de dos computadores. Se ejecutaron directamente pruebas existentes el 14-11-2026; ver resultados y límites al final.
 
 **Cómo usarlo:** atender una tarea por vez en el orden indicado. El orden es sugerido; las dependencias entre áreas se indican debajo. Al terminar, registrar evidencia y actualizar estado. Antes de programar, elaborar y explicar el mapa de la función según la regla pedagógica del proyecto.
 
 Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Ninguna tarea está marcada como comprobada sin evidencia.
 
-**Punto de partida:** `main` solo contiene README; `develop` contiene la base heredada, disco, políticas, árbol y pruebas. Issues #1–#3 y #5–#9 cerrados; #10–#17 abiertos. El código se revisó superficialmente y no se ejecutó.
+**Punto de partida:** `main` solo contiene README; `develop` contiene la base heredada, disco, políticas, árbol y pruebas. Issues #1–#3 y #5–#9 cerrados; #10–#17 abiertos. La integración completa aún no se ha verificado.
 
 ## Base y disco — #1, #2, #5–#9
 
@@ -70,7 +70,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T39 | ⬜ | Validar configuración y jerarquía del JSON del sistema de archivos antes de aplicarla. |
 | T40 | ⬜ | Restaurar bloques, cabezal, dueño y permisos; probar archivo de varios bloques. |
 | T41 | ⬜ | Validar JSON de procesos, políticas y rutas, con mensajes de error comprensibles. |
-| T42 | ⬜ | Impedir el inicio del reloj hasta cargar ambos JSON válidos. |
+| T42 | ⬜ | Validar los datos de disco y procesos antes de iniciar; permitir creación manual y carga JSON. El enunciado exige literalmente cargar ambos archivos: ver decisión y diferencia debajo. |
 | T43 | ⬜ | Guardar el estado modificado del sistema de archivos y volver a cargarlo. |
 | T44 | ⬜ | Reiniciar con nuevos procesos conservando el disco guardado. |
 
@@ -100,8 +100,13 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 
 El árbol y disco sustentan el CRUD; el CRUD y las solicitudes de disco sustentan el recorrido de procesos de E/S. Los estados y el disco son necesarios para suspensión. La persistencia necesita modelos de archivos y procesos; la interfaz y métricas dependen de los datos que muestran. Las comprobaciones de cada área pueden adelantarse cuando su componente exista.
 
+## Propuesta de diseño: creación manual y JSON
+
+El [enunciado original convertido a Markdown](instrucciones/enunciado-proyecto-2.md#formato-de-los-json-a-utilizar) exige literalmente cargar ambos archivos JSON antes de iniciar el reloj. La propuesta del estudiante, enviada al equipo para validación, es permitir también crear desde cero ambos conjuntos de datos en la interfaz e iniciar cuando sean válidos, sin obligar a crear archivos físicos. Esta propuesta se aparta de la redacción literal y no equivale a una aclaratoria de los preparadores; mantiene disponible la carga de ambos JSON. El guardado será a petición, no en cada ciclo. Queda por definir y verificar el alcance exacto de lo que se guarda y si permite reanudar una ejecución o solo preparar otra.
+
 ## Referencias y entrega
 
+- Fuente: [enunciado Proyecto 2 en Markdown](instrucciones/enunciado-proyecto-2.md) y [DOCX original](instrucciones/enunciado-proyecto-2-original.docx).
 - Issues: [#1–#3](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues?q=is%3Aissue), [#5–#9](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues?q=is%3Aissue), [#10–#17](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues?q=is%3Aissue). Las secciones indican sus issues; verificar el estado en GitHub antes de actualizar.
 - Cumplir restricciones: Java posterior a 21, NetBeans, estructuras propias, hilos y semáforos; revisar librerías y ausencia de colecciones prohibidas.
 - Preparar informe PDF, dos UML y conclusiones; entregar enlace y PDF a los preparadores y añadirlos al spreadsheet antes del viernes de semana 11 a las 7:00 a. m. Confirmar la fecha en el calendario del curso.
@@ -110,10 +115,27 @@ El árbol y disco sustentan el CRUD; el CRUD y las solicitudes de disco sustenta
 
 ## Registro de evidencia
 
-| Tarea | Fecha |
+| Tarea | Fecha | Resultado, prueba o PR |
 |---|---|---|
 | T01 | 14-11-2026 | NetBeans compiló 64 archivos con destino Java 25 y abrió la interfaz; responde y permite configurar. El usuario confirmó que la simulación arranca tras corregir la condición de dos computadores. |
 
 | T02–T13 | 15-11-2026 | Ejecutadas y aprobadas `SimulatedDiskTest` y `DiskSchedulingPoliciesTest` (`COMPILE 0`): límites, partición datos/swap sin solapamiento, cadenas multibloque, liberación, Casos P1–P4 y Anexo (518, 208, 332, 192 bloques) y cambio de política en caliente en 0 ticks. |
 | T14–T22 | 15-11-2026 | Ejecutadas y aprobadas `FileSystemTreeTest` y `FileSystemManagerTest` (`COMPILE 0`): CRUD en `FileSystemManager` protegido con `Semaphore`, vinculación con asignación encadenada en `SimulatedDisk`, rechazo atómico cuando no hay espacio libre y eliminación recursiva de directorios liberando sus bloques en el SD. |
 | T23–T26 | 15-11-2026 | Ejecutada y aprobada `AccessControlManagerTest` (`COMPILE 0`): permisos completos en modo `ADMIN`, restricciones en modo `USER` (lectura de estructura y propios/públicos, creación solo en directorio propio, prohibición de modificar/eliminar recursos del sistema o ajenos) y retorno de `AccessDecision` con motivo claro sin interrumpir la simulación. |
+
+## Resultados de pruebas — 14 de noviembre de 2026
+
+Estos resultados corresponden a una revisión anterior; los estados actualizados por el equipo y sus evidencias aparecen arriba.
+
+- `mvn test` compiló el proyecto y los archivos de prueba, pero ejecutó **cero pruebas**: las pruebas existentes son programas con `main`, no pruebas reconocidas por Surefire. No interpretar BUILD SUCCESS como validación de la suite.
+- Ejecutadas directamente con Java 25: pasaron 19 programas sin argumentos de disco, árbol, reloj, PCB, planificadores, estructuras y algunos componentes Swing en modo sin pantalla. Incluyen `SimulatedDiskTest`, `DiskSchedulingPoliciesTest` y `FileSystemTreeTest`; FIFO, SSTF, SCAN y C-SCAN coinciden con los órdenes P1–P4 y los desplazamientos del anexo según las pruebas.
+- El cambio de política con solicitudes en cola pasó en la prueba de disco; falta comprobar pausa/reanudación integrada con el disco para cerrar T12. El rechazo por espacio insuficiente pasó, pero la prueba no verifica explícitamente ausencia de cambios parciales (T07). T03 requiere revisar límites y T16 todos los metadatos.
+- `CreacionComputadoresGuiTest` falló al esperar varias instancias; es una expectativa heredada incompatible con el requisito de un computador. `MonitorSimulacionTest` falló en entradas del menú y requiere revisión frente a la interfaz actual. `CargaDuplicadosTest` y `EventosLogTest` requieren un archivo de entrada: la ejecución sin argumento no los valida.
+- Riesgo de interpretación: el disco implementa `totalBlocks` como bloques de datos y agrega `swapSizeBlocks` aparte; por ejemplo 200 + 100 produce 300 físicos. Contrastar con el enunciado, que describe swap como área reservada del disco. Las pruebas actuales esperan el comportamiento implementado y no resuelven esa duda.
+- El test concurrente de disco comprueba resultados finales, pero las aserciones dentro de hilos no se propagan al hilo principal; no demuestra por sí solo ausencia de errores de concurrencia.
+
+## Revisión de regresión — 15 de noviembre de 2026
+
+Base: `develop` 110536e. Compilar con Maven pasó, pero Surefire sigue ejecutando cero pruebas; se ejecutaron los programas de prueba directamente con Java 25 y modo sin pantalla. Pasaron 20 programas, incluidos los tres nuevos de CRUD, permisos y persistencia. Dos de los programas que habían pasado ahora fallan: `ControlesRelojGuiTest` (aserción Paso) y `LogCompletoYRelojTest` (se exige cargar ambos JSON antes de iniciar). La nueva condición de JSON está en el enunciado; hay que revisar y adaptar los escenarios antes de determinar si existe una regresión funcional. También siguen fallando las pruebas heredadas `CreacionComputadoresGuiTest` y `MonitorSimulacionTest`. `CargaDuplicadosTest` y `EventosLogTest` requieren archivos de entrada y no se ejecutaron en esta revisión.
+
+Las pruebas nuevas verifican operaciones CRUD, permisos y carga/guardado de ambos JSON a nivel de componentes y controlador. Esto no demuestra integración completa con la interfaz ni que CRUD se ejecute mediante procesos de E/S. La marca T26 del remoto se refiere a la devolución de un motivo en el control de permisos; mostrarlo correctamente en la interfaz sigue pendiente de validación. Mantener abierta la duda sobre si swap debe formar parte de `totalBlocks`.
