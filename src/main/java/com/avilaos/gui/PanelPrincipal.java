@@ -12,7 +12,7 @@ import javax.swing.border.EmptyBorder;
 
 /** Vista Swing: conserva formularios; no modifica el kernel ni ejecuta procesos. */
 public class PanelPrincipal extends JPanel {
-    public enum Destino { MENU, COMPUTADOR, BUFFER, PROCESO, SIMULACION, METRICAS }
+    public enum Destino { MENU, COMPUTADOR, BUFFER, DISCO, PROCESO, SIMULACION, METRICAS }
     static final Color FONDO = new Color(246, 243, 234);
     static final Color TINTA = new Color(38, 58, 43);
     static final Color GRIS = new Color(119, 105, 85);
@@ -40,6 +40,86 @@ public class PanelPrincipal extends JPanel {
     private final JComboBox<SchedulingPolicyType> politicaGestion = new JComboBox<>(SchedulingPolicyType.values());
     private final JSpinner quantumGestion = new JSpinner(new SpinnerNumberModel(3, 1, 9999, 1));
     private boolean actualizandoGestion = false;
+    private final JLabel discoOrigen = texto("Consultando disco…", 12, GRIS, false);
+    private final JLabel discoCapacidad = texto(" ", 15, TINTA, true);
+    private final JLabel discoOcupacion = texto(" ", 14, GRIS, false);
+    private final JLabel discoCabezal = texto(" ", 14, GRIS, false);
+    private final JLabel discoPolitica = texto(" ", 14, GRIS, false);
+    private boolean consultaDiscoPendiente = false;
+    private final JToggleButton[] botonesPoliticaDisco = new JToggleButton[4];
+    private final com.avilaos.disk.DiskSchedulingPolicyType[] politicasDisco = {
+        com.avilaos.disk.DiskSchedulingPolicyType.FIFO, com.avilaos.disk.DiskSchedulingPolicyType.SSTF,
+        com.avilaos.disk.DiskSchedulingPolicyType.SCAN, com.avilaos.disk.DiskSchedulingPolicyType.C_SCAN
+    };
+    private boolean[] bloquesOcupados = new boolean[0];
+    private int cabezalMapa = 0;
+    private int limiteDatosMapa = 0;
+    private final JPanel mapaDisco = new JPanel() {
+        @Override protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            int total = bloquesOcupados.length;
+            if (total == 0) return;
+            int alto = Math.max(1, getHeight() - 16);
+            int filas = Math.min(total, Math.max(1, alto / 5));
+            int ancho = Math.min(150, Math.max(20, getWidth() - 110));
+            int x = 40;
+            for (int i = 0; i < filas; i++) {
+                int inicio = (int) ((long) i * total / filas);
+                int fin = (int) ((long) (i + 1) * total / filas);
+                int ocupados = 0;
+                for (int j = inicio; j < fin; j++) if (bloquesOcupados[j]) ocupados++;
+                int y = 8 + i * alto / filas;
+                int siguiente = 8 + (i + 1) * alto / filas;
+                g.setColor(ocupados == 0 ? Color.WHITE : ocupados == fin - inicio
+                        ? new Color(38, 90, 83) : new Color(155, 190, 172));
+                g.fillRect(x, y, ancho, Math.max(1, siguiente - y));
+                g.setColor(new Color(218, 210, 190));
+                g.drawRect(x, y, ancho, Math.max(1, siguiente - y));
+            }
+            g.setColor(new Color(35, 35, 35));
+            for (int marca = 0; marca <= 4; marca++) {
+                int bloque = (int) ((long) marca * (total - 1) / 4);
+                int yMarca = 8 + (int) ((long) bloque * alto / total);
+                g.drawLine(x - 6, yMarca, x - 1, yMarca);
+                String etiqueta = Integer.toString(bloque);
+                int anchoTexto = g.getFontMetrics().stringWidth(etiqueta);
+                g.drawString(etiqueta, x - 10 - anchoTexto,
+                        Math.min(getHeight() - 2, Math.max(12, yMarca + 4)));
+            }
+            if (limiteDatosMapa < total) {
+                int ySwap = 8 + (int) ((long) limiteDatosMapa * alto / total);
+                Graphics sombreado = g.create(x, ySwap, ancho, Math.max(0, 8 + alto - ySwap));
+                sombreado.setColor(new Color(156, 142, 107));
+                for (int linea = -alto; linea < ancho + alto; linea += 9) {
+                    sombreado.drawLine(linea, alto, linea + alto, 0);
+                }
+                sombreado.dispose();
+                g.setColor(new Color(119, 105, 85));
+                g.drawLine(x, ySwap, x + ancho, ySwap);
+            }
+            int yCabezal = 8 + (int) ((long) cabezalMapa * alto / total);
+            g.setColor(new Color(185, 47, 43));
+            g.fillRect(x - 8, yCabezal, ancho + 16, 3);
+            g.drawString("Cabezal", x + ancho + 12, Math.max(14, yCabezal));
+            if (limiteDatosMapa < total) {
+                int ySwap = 8 + (int) ((long) limiteDatosMapa * alto / total);
+                g.setColor(new Color(119, 105, 85));
+                g.drawString("Swap", x + ancho + 12, Math.min(getHeight() - 5, ySwap + 14));
+            }
+        }
+        @Override public String getToolTipText(java.awt.event.MouseEvent e) {
+            int total = bloquesOcupados.length;
+            int alto = Math.max(1, getHeight() - 16);
+            if (total == 0 || e.getY() < 8 || e.getY() >= 8 + alto) return null;
+            int filas = Math.min(total, Math.max(1, alto / 5));
+            int fila = Math.min(filas - 1, (e.getY() - 8) * filas / alto);
+            int inicio = (int) ((long) fila * total / filas);
+            int fin = (int) ((long) (fila + 1) * total / filas);
+            int ocupados = 0;
+            for (int i = inicio; i < fin; i++) if (bloquesOcupados[i]) ocupados++;
+            return "Bloques " + inicio + "–" + (fin - 1) + ": " + ocupados + " ocupados de " + (fin - inicio);
+        }
+    };
 
     // Controles de Computador
     private final JTextField nombreComputador = new JTextField();
@@ -82,7 +162,7 @@ public class PanelPrincipal extends JPanel {
         lateral.add(Box.createVerticalStrut(28));
         
         // [P2-LEGACY] String[] titulos = {"01   Inicio", "02   Computadores", "03   Buffers", "04   Procesos", "05   Simulación", "06   Métricas"};
-        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Procesos", "04   Simulación", "05   Métricas"}; // [P2] sin Buffers
+        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Disco", "04   Procesos", "05   Simulación", "06   Métricas"}; // [P2] sin Buffers
         for (Destino destino : Destino.values()) {
             if (destino == Destino.BUFFER) continue; // [P2] pantalla de buffers oculta
             JButton boton = accion(titulos[destino.ordinal()], false);
@@ -102,6 +182,11 @@ public class PanelPrincipal extends JPanel {
         pantallas.setBackground(FONDO);
         pantallas.add(inicioNuevo(), Destino.MENU.name());
         pantallas.add(computador(), Destino.COMPUTADOR.name());
+        JScrollPane paginaDisco = new JScrollPane(disco());
+        paginaDisco.setBorder(null);
+        paginaDisco.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        paginaDisco.getVerticalScrollBar().setUnitIncrement(20);
+        pantallas.add(paginaDisco, Destino.DISCO.name());
         
 // [P2-LEGACY]         pantallas.add(buffer(), Destino.BUFFER.name());
         
@@ -122,6 +207,7 @@ public class PanelPrincipal extends JPanel {
         controller.addGUIListener(() -> {
             metricas.actualizarMetricas();
             actualizarListaComputadores();
+            if (destinoActual == Destino.DISCO) actualizarVistaDisco();
 // [P2-LEGACY]             actualizarListaBuffers();
 // [P2-LEGACY]             actualizarOpcionesComputadoresBuffer();
         });
@@ -140,6 +226,7 @@ public class PanelPrincipal extends JPanel {
         
         distribucion.show(pantallas, destino.name());
         destinoActual = destino;
+        if (destino == Destino.DISCO) actualizarVistaDisco();
         for (Destino item : Destino.values()) {
             JButton boton = navegacion[item.ordinal()];
             if (boton == null) continue; // [P2] BUFFER oculto
@@ -186,7 +273,7 @@ public class PanelPrincipal extends JPanel {
         recorrido.setAlignmentX(LEFT_ALIGNMENT);
         recorrido.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
         String[] etapas = {"Computador", "Disco", "Archivos", "Procesos", "Simulación"};
-        Destino[] destinos = {Destino.COMPUTADOR, null, null, Destino.PROCESO, Destino.SIMULACION};
+        Destino[] destinos = {Destino.COMPUTADOR, Destino.DISCO, null, Destino.PROCESO, Destino.SIMULACION};
         for (int i = 0; i < etapas.length; i++) {
             if (i > 0) {
                 JLabel flecha = texto("  →  ", 15, GRIS, false);
@@ -348,6 +435,188 @@ public class PanelPrincipal extends JPanel {
             String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
             controller.logEvent("Error al cargar procesos y configuración: " + motivo);
             JOptionPane.showMessageDialog(this, motivo, "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private static final class PanelDiscoAjustable extends JPanel implements Scrollable {
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle r, int orientation, int direction) { return 20; }
+        @Override public int getScrollableBlockIncrement(Rectangle r, int orientation, int direction) { return Math.max(20, r.height - 20); }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
+    /** Vista de consulta; el mapa de bloques aún está pendiente. */
+    private JPanel disco() {
+        JPanel panel = new PanelDiscoAjustable();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(FONDO);
+        panel.setBorder(new EmptyBorder(32, 32, 28, 32));
+        panel.add(texto("DISCO", 11, ACENTO, true));
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(texto("Tu disco", 28, TINTA, true));
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(texto("Observa el disco de la simulación.", 13, GRIS, false));
+        panel.add(Box.createVerticalStrut(28));
+        JPanel configuracion = tarjeta();
+        configuracion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 340));
+        configuracion.add(texto("ESTADO DEL DISCO", 11, ACENTO, true));
+        configuracion.add(Box.createVerticalStrut(8));
+        configuracion.add(discoOrigen);
+        configuracion.add(Box.createVerticalStrut(10));
+        configuracion.add(discoCapacidad);
+        configuracion.add(Box.createVerticalStrut(6));
+        configuracion.add(discoOcupacion);
+        configuracion.add(Box.createVerticalStrut(6));
+        configuracion.add(discoCabezal);
+        configuracion.add(Box.createVerticalStrut(6));
+        configuracion.add(discoPolitica);
+        configuracion.add(Box.createVerticalStrut(12));
+        configuracion.add(texto("POLÍTICA DE DISCO", 11, ACENTO, true));
+        configuracion.add(Box.createVerticalStrut(6));
+        JPanel selectorDisco = new JPanel(new GridLayout(1, 4, 6, 0));
+        selectorDisco.setOpaque(false);
+        selectorDisco.setAlignmentX(LEFT_ALIGNMENT);
+        selectorDisco.setMaximumSize(new Dimension(440, 36));
+        ButtonGroup grupoDisco = new ButtonGroup();
+        for (int i = 0; i < politicasDisco.length; i++) {
+            var politica = politicasDisco[i];
+            JToggleButton boton = new JToggleButton(politica == com.avilaos.disk.DiskSchedulingPolicyType.C_SCAN ? "C-SCAN" : politica.name());
+            boton.setUI(new javax.swing.plaf.basic.BasicToggleButtonUI());
+            boton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+            boton.setOpaque(true);
+            boton.setBorder(BorderFactory.createLineBorder(BORDE));
+            boton.addActionListener(e -> cambiarPoliticaDisco(politica));
+            botonesPoliticaDisco[i] = boton;
+            grupoDisco.add(boton);
+            selectorDisco.add(boton);
+        }
+        configuracion.add(selectorDisco);
+        JPanel columnaIzquierda = new JPanel();
+        columnaIzquierda.setOpaque(false);
+        columnaIzquierda.setMinimumSize(new Dimension(0, 0));
+        columnaIzquierda.setLayout(new BoxLayout(columnaIzquierda, BoxLayout.Y_AXIS));
+        columnaIzquierda.add(configuracion);
+        columnaIzquierda.add(Box.createVerticalStrut(20));
+        JPanel mapa = tarjeta();
+        mapa.setMinimumSize(new Dimension(0, 0));
+        mapa.setMaximumSize(new Dimension(Integer.MAX_VALUE, 520));
+        mapa.add(texto("OCUPACIÓN", 11, ACENTO, true));
+        mapa.add(Box.createVerticalStrut(8));
+        mapa.add(texto("Mapa del disco", 20, TINTA, true));
+        mapa.add(Box.createVerticalStrut(6));
+        mapa.add(texto("Blanco: libre · Oscuro: ocupado", 12, GRIS, false));
+        mapa.add(texto("Verde claro: rango mixto", 12, GRIS, false));
+        mapa.add(texto("Rayado: área de swap", 12, GRIS, false));
+        mapa.add(Box.createVerticalStrut(8));
+        mapaDisco.setBackground(PAPEL);
+        mapaDisco.setAlignmentX(LEFT_ALIGNMENT);
+        mapaDisco.setPreferredSize(new Dimension(360, 380));
+        mapaDisco.setMaximumSize(new Dimension(Integer.MAX_VALUE, 380));
+        mapaDisco.setToolTipText("Pasa el cursor por un rango para ver su ocupación");
+        mapa.add(mapaDisco);
+        JPanel cita = new JPanel(new BorderLayout(16, 0));
+        cita.setBackground(PAPEL);
+        cita.setAlignmentX(LEFT_ALIGNMENT);
+        cita.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDE), new EmptyBorder(12, 24, 12, 24)));
+        cita.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+        JPanel textoCita = new JPanel();
+        textoCita.setOpaque(false);
+        textoCita.setLayout(new BoxLayout(textoCita, BoxLayout.Y_AXIS));
+        textoCita.add(texto("SOBRE EL ESPACIO", 11, ACENTO, true));
+        textoCita.add(Box.createVerticalStrut(8));
+        textoCita.add(texto("“Es el espacio vacío dentro de la vasija", 16, TINTA, true));
+        textoCita.add(texto("lo que la hace útil.”", 16, TINTA, true));
+        textoCita.add(Box.createVerticalStrut(6));
+        textoCita.add(texto("Lao-Tsé · Tao Te Ching 11 · traducción libre", 12, GRIS, false));
+        cita.add(textoCita, BorderLayout.CENTER);
+        java.net.URL imagen = getClass().getResource("/imagenes/lao-tse.png");
+        if (imagen != null) {
+            Image retrato = new ImageIcon(imagen).getImage().getScaledInstance(90, 91, Image.SCALE_SMOOTH);
+            JLabel retratoLabel = new JLabel(new ImageIcon(retrato));
+            retratoLabel.setToolTipText("Retrato de Lao-Tsé");
+            cita.add(retratoLabel, BorderLayout.EAST);
+        }
+        columnaIzquierda.add(cita);
+        JPanel contenido = new JPanel(new GridBagLayout());
+        contenido.setOpaque(false);
+        contenido.setAlignmentX(LEFT_ALIGNMENT);
+        GridBagConstraints posiciones = new GridBagConstraints();
+        posiciones.gridy = 0;
+        posiciones.weighty = 1;
+        posiciones.anchor = GridBagConstraints.NORTH;
+        posiciones.fill = GridBagConstraints.BOTH;
+        posiciones.gridx = 0;
+        posiciones.weightx = 0.62;
+        posiciones.insets = new Insets(0, 0, 0, 20);
+        contenido.add(columnaIzquierda, posiciones);
+        posiciones.gridx = 1;
+        posiciones.weightx = 0.38;
+        posiciones.insets = new Insets(0, 0, 0, 0);
+        contenido.add(mapa, posiciones);
+        panel.add(contenido);
+        return panel;
+    }
+
+    private void actualizarVistaDisco() {
+        if (consultaDiscoPendiente) return;
+        consultaDiscoPendiente = true;
+        GuiRequest.model(controller, () -> {
+            var disco = controller.getDisk();
+            int datos = disco.getTotalBlocks();
+            int swap = disco.getSwapSizeBlocks();
+            boolean[] ocupados = new boolean[disco.getTotalPhysicalBlocks()];
+            for (int i = 0; i < ocupados.length; i++) ocupados[i] = disco.getBlock(i).isOccupied();
+            String[] resumen = new String[]{
+                controller.isFileSystemJsonLoaded() ? "Sistema de archivos cargado desde JSON" : "Disco inicial del simulador; no se ha cargado un JSON",
+                "Bloques de datos: " + datos + " · Swap: " + swap + " · Total físico: " + disco.getTotalPhysicalBlocks(),
+                "Datos libres: " + disco.getFreeDataBlocks() + " / " + datos + " · Swap libre: " + disco.getFreeSwapBlocks() + " / " + swap,
+                "Cabezal: bloque " + disco.getHeadPosition() + " · Dirección: " + (disco.getHeadDirection() == com.avilaos.disk.HeadDirection.UP ? "creciente ↑" : "decreciente ↓"),
+                "Política: " + disco.getPolicyType() + " · Velocidad: " + disco.getHeadSpeedPerTick() + " posiciones por ciclo"
+            };
+            return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType()};
+        }, datos -> {
+            consultaDiscoPendiente = false;
+            String[] resumen = (String[]) datos[0];
+            bloquesOcupados = (boolean[]) datos[1];
+            cabezalMapa = (Integer) datos[2];
+            limiteDatosMapa = (Integer) datos[3];
+            discoOrigen.setText(resumen[0]);
+            discoCapacidad.setText(resumen[1]);
+            discoOcupacion.setText(resumen[2]);
+            discoCabezal.setText(resumen[3]);
+            discoPolitica.setText(resumen[4]);
+            for (int i = 0; i < botonesPoliticaDisco.length; i++) {
+                JToggleButton boton = botonesPoliticaDisco[i];
+                if (boton == null) continue;
+                boolean seleccionada = politicasDisco[i] == datos[4];
+                boton.setSelected(seleccionada);
+                boton.setBackground(seleccionada ? ACENTO : PAPEL);
+                boton.setForeground(seleccionada ? Color.WHITE : TINTA);
+            }
+            mapaDisco.repaint();
+        }, error -> {
+            consultaDiscoPendiente = false;
+            discoOrigen.setText("No se pudo consultar el disco: " + error.getMessage());
+        });
+    }
+
+    private void cambiarPoliticaDisco(com.avilaos.disk.DiskSchedulingPolicyType politica) {
+        GuiRequest.model(controller, () -> {
+            var permiso = controller.getAccessControl().canChangePolicy();
+            if (!permiso.allowed()) throw new IllegalStateException(permiso.message());
+            var disco = controller.getDisk();
+            if (disco.getPolicyType() != politica) {
+                controller.logEvent("Solicitud de cambio de política de disco a " + politica);
+                disco.setSchedulingPolicy(politica);
+            }
+            return true;
+        }, ok -> actualizarVistaDisco(), error -> {
+            String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+            controller.logEvent("Error al cambiar política de disco: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo cambiar la política", JOptionPane.ERROR_MESSAGE);
+            actualizarVistaDisco();
         });
     }
 

@@ -1,0 +1,22 @@
+{
+  "diskConfig": {
+    "totalBlocks": 200,
+    "initialHead": 150
+  },
+  "fileSystem": [
+    {
+      "path": "/pruebas",
+      "type": "DIRECTORY",
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/completo.bin",
+      "type": "FILE",
+      "startBlock": 0,
+      "blocks": 200,
+      "owner": "admin",
+      "permissions": "public"
+    }
+  ]
+}

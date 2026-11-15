@@ -21,7 +21,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T05 | ✅ | Asignar un archivo de varios bloques y recorrer la cadena hasta su fin. |
 | T06 | ✅ | Eliminarlo y comprobar que todos sus bloques vuelven a quedar libres. |
 | T07 | ✅ | Intentar asignar más bloques de los disponibles y verificar que no quede una asignación parcial. |
-| T08 | ✅ | Comprobar que solo se atiende una solicitud a la vez y el disco avanza con el reloj. |
+| T08 | 🟨 | Comprobar que solo se atiende una solicitud a la vez y el disco avanza con el reloj. |
 | T09 | ✅ | Comprobar tiempos de desplazamiento y lectura/escritura por ciclo. |
 | T10 | ✅ | Ejecutar FIFO y SSTF con los casos del enunciado; registrar orden y desplazamiento. |
 | T11 | ✅ | Ejecutar SCAN y C-SCAN en dirección creciente; registrar extremos, retorno y convención del salto. |
@@ -79,10 +79,10 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | ID | Estado | Acción y comprobación de terminado |
 |---|---|---|
 | T45 | ⬜ | Mostrar JTree y detalle del elemento seleccionado. |
-| T46 | ⬜ | Mostrar bloques libres, ocupados y de swap con propietario; mostrar cabezal y dirección. |
+| T46 | 🟨 | Mostrar bloques libres, ocupados y de swap con propietario; mostrar cabezal y dirección. |
 | T47 | ⬜ | Mostrar tabla de asignación y actualizarla tras CRUD. |
 | T48 | ⬜ | Mostrar cola de E/S con operación y colas suspendidas con motivo de bloqueo. |
-| T49 | ⬜ | Mostrar modo activo y permitir cambiar política de disco durante la ejecución. |
+| T49 | 🟨 | Mostrar modo activo y permitir cambiar política de disco durante la ejecución. |
 | T50 | ⬜ | Validar tipo y rango en cada entrada sin detener la simulación. |
 | T51 | ⬜ | Registrar decisiones del disco y del planificador a mediano plazo en el log. |
 | T52 | ⬜ | Medir desplazamiento acumulado, espera media y solicitudes atendidas por política. |
@@ -137,6 +137,15 @@ PR [#29](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/29), pe
 En revisión: Inicio pasa a ser la vista nueva única; Computador muestra creación o consulta según exista un equipo. La vista permite cambiar política y quantum mediante los métodos existentes; RAM y nombre quedan solo de lectura tras crear. La eliminación permanece deshabilitada y depende de la integración del disco con el reloj ([#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30)) y de definir e implementar la limpieza de procesos, cola y swap.
 
 El estudiante comprobó desde la interfaz el escenario `09-cambio-fcfs-prioridades.json`: FCFS durante 3 ciclos; cambio a prioridades apropiativas; Urgente termina en ciclo 6, Medio en 10 y Lento en 15. Coincide con la ejecución de referencia del controlador. Falta comprobar Round Robin y cambios de quantum desde esta vista; el escenario prueba CPU, no la integración de E/S. La aplicación y los archivos de prueba compilan; no se agregaron pruebas automáticas para la nueva vista.
+
+## Vista de Disco — 15 de noviembre de 2026
+
+Se agregó la navegación a Disco y una vista de consulta con estado, ocupación agrupada, marcas de rango, área de swap diferenciada y posición del cabezal, además de los controles de política FIFO, SSTF, SCAN y C-SCAN. La prueba visual del usuario confirmó el mapa con configuraciones vacía, agrupada, llena y dispersa; los ajustes posteriores de ancho, rayado de swap y botones todavía requieren comprobación visual y funcional en NetBeans. La prueba existente `DiskSchedulingPoliciesTest` pasó directamente; no cubre la nueva interfaz.
+
+- **T08 en curso:** las pruebas del componente disco demuestran sus propios ticks, pero no su conexión con el reloj global de la aplicación; esa integración está en [#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30). T12 también debe releerse con el límite de que no se ha comprobado pausa/reanudación integrada.
+- **T46 en curso:** el mapa agrupa bloques y muestra libre, ocupado o mixto; todavía no permite inspeccionar cada bloque ni su propietario. La interpretación de capacidad y swap sigue pendiente de aclaración.
+- **T49 en curso:** hay controles de política de disco con comprobación de permisos, pendientes de prueba de interfaz; aún no existe un selector global visible de modo ADMIN/USER. Se propone colocarlo en un control global con identidad y modo activo.
+- Los escenarios `10` a `12` en `escenarios/carga-json` corresponden a 110, 200 y 20 bloques de datos ocupados; las cantidades se verificaron con el cargador del proyecto. No demuestran el avance del disco con el reloj.
 
 ## Resultados de pruebas — 14 de noviembre de 2026
 
