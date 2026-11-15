@@ -3,28 +3,61 @@ package com.avilaos.fs;
 import com.avilaos.core.structures.MyLinkedList;
 
 /**
- * Nodo del árbol N-ario del sistema de archivos (directorio o archivo).
- * Los hijos se guardan en una MyLinkedList propia (sin java.util).
- * No es seguro entre hilos por sí mismo: FileSystemTree/FileSystem lo protegen.
+ * Nodo del árbol N-ario del sistema de archivos (directorio o archivo) — Issues #3 y #9.
+ * Almacena: nombre, tipo, tamaño en bloques, dueño (owner), permisos (PUBLIC/PRIVATE),
+ * primer bloque (firstBlock / startBlock), proceso creador y color identificador.
+ * Los hijos se guardan en una {@link MyLinkedList} propia (cero java.util).
  */
 public class FSNode {
+    private static final String[] PALETTE = {
+        "#3B82F6", "#10B981", "#F59E0B", "#EF4444",
+        "#8B5CF6", "#EC4899", "#14B8A6", "#F97316",
+        "#06B6D4", "#84CC16", "#6366F1", "#D946EF"
+    };
+    private static int nextColorIndex = 0;
+
     private String name;
     private final FsNodeType type;
     private String owner;
     private FilePermission permission;
-    private int firstBlock;   // -1 si es directorio o aún no tiene bloques
-    private int sizeBlocks;   // 0 para directorios
+    private int firstBlock;         // -1 si es directorio o sin bloques asignados
+    private int sizeBlocks;         // 0 para directorios
+    private String creatorProcess;  // nombre/ID del proceso creador ("SYSTEM" si viene del JSON)
+    private String colorHex;        // color identificador para la tabla de asignación y el disco
     private FSNode parent;
     private final MyLinkedList<FSNode> children = new MyLinkedList<>();
 
     public FSNode(String name, FsNodeType type, String owner, FilePermission permission,
-                  int firstBlock, int sizeBlocks) {
+                  int firstBlock, int sizeBlocks, String creatorProcess, String colorHex) {
         this.name = name;
         this.type = type;
-        this.owner = owner;
-        this.permission = permission;
+        this.owner = (owner != null && !owner.isEmpty()) ? owner : "admin";
+        this.permission = permission != null ? permission : FilePermission.PUBLIC;
         this.firstBlock = type == FsNodeType.DIRECTORY ? -1 : firstBlock;
-        this.sizeBlocks = type == FsNodeType.DIRECTORY ? 0 : sizeBlocks;
+        this.sizeBlocks = type == FsNodeType.DIRECTORY ? 0 : Math.max(0, sizeBlocks);
+        this.creatorProcess = (creatorProcess != null && !creatorProcess.isEmpty()) ? creatorProcess : "SYSTEM";
+        if (type == FsNodeType.DIRECTORY) {
+            this.colorHex = "#64748B";
+        } else if (colorHex != null && !colorHex.isEmpty()) {
+            this.colorHex = colorHex;
+        } else {
+            this.colorHex = nextPaletteColor();
+        }
+    }
+
+    public FSNode(String name, FsNodeType type, String owner, FilePermission permission,
+                  int firstBlock, int sizeBlocks) {
+        this(name, type, owner, permission, firstBlock, sizeBlocks, "SYSTEM", null);
+    }
+
+    private static synchronized String nextPaletteColor() {
+        String c = PALETTE[nextColorIndex % PALETTE.length];
+        nextColorIndex++;
+        return c;
+    }
+
+    public static synchronized void resetColorPalette() {
+        nextColorIndex = 0;
     }
 
     public boolean isDirectory() { return type == FsNodeType.DIRECTORY; }
@@ -41,6 +74,10 @@ public class FSNode {
     public void setFirstBlock(int firstBlock) { this.firstBlock = firstBlock; }
     public int getSizeBlocks() { return sizeBlocks; }
     public void setSizeBlocks(int sizeBlocks) { this.sizeBlocks = sizeBlocks; }
+    public String getCreatorProcess() { return creatorProcess; }
+    public void setCreatorProcess(String creatorProcess) { this.creatorProcess = creatorProcess; }
+    public String getColorHex() { return colorHex; }
+    public void setColorHex(String colorHex) { this.colorHex = colorHex; }
     public FSNode getParent() { return parent; }
     public MyLinkedList<FSNode> getChildren() { return children; }
 

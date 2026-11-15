@@ -627,6 +627,27 @@ public class ProcessControlBlock {
         this.mode = mode;
     }
 
+    // --- Atributos Proyecto 2: E/S de archivos, permisos y área de Swap ---
+    private IOOperationType ioOperation;
+    private String targetPath;
+    private String newFileName;
+    private int fileSizeBlocks;
+    private String owner = "admin";
+    private int swapStartBlock = -1;
+
+    public IOOperationType getIoOperation() { return ioOperation; }
+    public void setIoOperation(IOOperationType ioOperation) { this.ioOperation = ioOperation; }
+    public String getTargetPath() { return targetPath; }
+    public void setTargetPath(String targetPath) { this.targetPath = targetPath; }
+    public String getNewFileName() { return newFileName; }
+    public void setNewFileName(String newFileName) { this.newFileName = newFileName; }
+    public int getFileSizeBlocks() { return fileSizeBlocks; }
+    public void setFileSizeBlocks(int fileSizeBlocks) { this.fileSizeBlocks = fileSizeBlocks; }
+    public String getOwner() { return owner; }
+    public void setOwner(String owner) { this.owner = owner != null ? owner : "admin"; }
+    public int getSwapStartBlock() { return swapStartBlock; }
+    public void setSwapStartBlock(int swapStartBlock) { this.swapStartBlock = swapStartBlock; }
+
     @Override
 public String toString() {
     String textoNombre = name;

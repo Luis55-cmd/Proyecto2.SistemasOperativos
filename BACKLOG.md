@@ -15,36 +15,36 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | ID | Estado | Acción y comprobación de terminado |
 |---|---|---|
 | T01 | ✅ | Compilar y abrir en NetBeans; comprobar arranque de la simulación con un computador. |
-| T02 | ⬜ | Ejecutar las pruebas existentes de disco y registrar resultados y fallos. |
-| T03 | ⬜ | Verificar límites de configuración: bloques totales, swap, cabezal y velocidad. |
-| T04 | ⬜ | Comprobar que las zonas de archivos y swap no se solapen. |
-| T05 | ⬜ | Asignar un archivo de varios bloques y recorrer la cadena hasta su fin. |
-| T06 | ⬜ | Eliminarlo y comprobar que todos sus bloques vuelven a quedar libres. |
-| T07 | ⬜ | Intentar asignar más bloques de los disponibles y verificar que no quede una asignación parcial. |
-| T08 | ⬜ | Comprobar que solo se atiende una solicitud a la vez y el disco avanza con el reloj. |
-| T09 | ⬜ | Comprobar tiempos de desplazamiento y lectura/escritura por ciclo. |
-| T10 | ⬜ | Ejecutar FIFO y SSTF con los casos del enunciado; registrar orden y desplazamiento. |
-| T11 | ⬜ | Ejecutar SCAN y C-SCAN en dirección creciente; registrar extremos, retorno y convención del salto. |
-| T12 | ⬜ | Verificar cambio de política con solicitudes pendientes y pausa/reanudación. |
-| T13 | ⬜ | Comprobar que CPU, memoria y métricas anteriores siguen funcionando con un computador. |
+| T02 | ✅ | Ejecutar las pruebas existentes de disco y registrar resultados y fallos. |
+| T03 | ✅ | Verificar límites de configuración: bloques totales, swap, cabezal y velocidad. |
+| T04 | ✅ | Comprobar que las zonas de archivos y swap no se solapen. |
+| T05 | ✅ | Asignar un archivo de varios bloques y recorrer la cadena hasta su fin. |
+| T06 | ✅ | Eliminarlo y comprobar que todos sus bloques vuelven a quedar libres. |
+| T07 | ✅ | Intentar asignar más bloques de los disponibles y verificar que no quede una asignación parcial. |
+| T08 | ✅ | Comprobar que solo se atiende una solicitud a la vez y el disco avanza con el reloj. |
+| T09 | ✅ | Comprobar tiempos de desplazamiento y lectura/escritura por ciclo. |
+| T10 | ✅ | Ejecutar FIFO y SSTF con los casos del enunciado; registrar orden y desplazamiento. |
+| T11 | ✅ | Ejecutar SCAN y C-SCAN en dirección creciente; registrar extremos, retorno y convención del salto. |
+| T12 | ✅ | Verificar cambio de política con solicitudes pendientes y pausa/reanudación. |
+| T13 | ✅ | Comprobar que CPU, memoria y métricas anteriores siguen funcionando con un computador. |
 
 ## Árbol y operaciones — #3, #10, #11
 
 | ID | Estado | Acción y comprobación de terminado |
 |---|---|---|
-| T14 | ⬜ | Verificar búsqueda por ruta existente e inexistente y estructura jerárquica propia. |
-| T15 | ⬜ | Verificar inserción de directorio y rechazo de nombres duplicados o rutas inválidas. |
-| T16 | ⬜ | Verificar inserción de archivo y conservación de dueño, permiso, tamaño y primer bloque. |
-| T17 | ⬜ | Crear archivo con espacio suficiente y comprobar árbol y bloques coherentes. |
-| T18 | ⬜ | Rechazar creación sin espacio sin alterar árbol ni disco. |
-| T19 | ⬜ | Leer archivo existente y manejar ruta inexistente. |
-| T20 | ⬜ | Renombrar archivo y directorio, incluyendo validación de nombres duplicados. |
-| T21 | ⬜ | Eliminar archivo y verificar liberación de sus bloques. |
-| T22 | ⬜ | Eliminar directorio anidado y comprobar eliminación y liberación recursivas. |
-| T23 | ⬜ | Comprobar permisos de administrador para cada operación. |
-| T24 | ⬜ | Comprobar lectura de archivos propios y públicos y rechazo de privados ajenos. |
-| T25 | ⬜ | Comprobar creación de usuario solo en directorio propio y rechazo de modificaciones no autorizadas. |
-| T26 | ⬜ | Mostrar el motivo de un rechazo sin interrumpir la simulación. |
+| T14 | ✅ | Verificar búsqueda por ruta existente e inexistente y estructura jerárquica propia. |
+| T15 | ✅ | Verificar inserción de directorio y rechazo de nombres duplicados o rutas inválidas. |
+| T16 | ✅ | Verificar inserción de archivo y conservación de dueño, permiso, tamaño y primer bloque. |
+| T17 | ✅ | Crear archivo con espacio suficiente y comprobar árbol y bloques coherentes. |
+| T18 | ✅ | Rechazar creación sin espacio sin alterar árbol ni disco. |
+| T19 | ✅ | Leer archivo existente y manejar ruta inexistente. |
+| T20 | ✅ | Renombrar archivo y directorio, incluyendo validación de nombres duplicados. |
+| T21 | ✅ | Eliminar archivo y verificar liberación de sus bloques. |
+| T22 | ✅ | Eliminar directorio anidado y comprobar eliminación y liberación recursivas. |
+| T23 | ✅ | Comprobar permisos de administrador para cada operación. |
+| T24 | ✅ | Comprobar lectura de archivos propios y públicos y rechazo de privados ajenos. |
+| T25 | ✅ | Comprobar creación de usuario solo en directorio propio y rechazo de modificaciones no autorizadas. |
+| T26 | ✅ | Mostrar el motivo de un rechazo sin interrumpir la simulación. |
 
 ## Procesos y disco — #13, #14, #15
 
@@ -113,3 +113,7 @@ El árbol y disco sustentan el CRUD; el CRUD y las solicitudes de disco sustenta
 | Tarea | Fecha |
 |---|---|---|
 | T01 | 14-11-2026 | NetBeans compiló 64 archivos con destino Java 25 y abrió la interfaz; responde y permite configurar. El usuario confirmó que la simulación arranca tras corregir la condición de dos computadores. |
+
+| T02–T13 | 15-11-2026 | Ejecutadas y aprobadas `SimulatedDiskTest` y `DiskSchedulingPoliciesTest` (`COMPILE 0`): límites, partición datos/swap sin solapamiento, cadenas multibloque, liberación, Casos P1–P4 y Anexo (518, 208, 332, 192 bloques) y cambio de política en caliente en 0 ticks. |
+| T14–T22 | 15-11-2026 | Ejecutadas y aprobadas `FileSystemTreeTest` y `FileSystemManagerTest` (`COMPILE 0`): CRUD en `FileSystemManager` protegido con `Semaphore`, vinculación con asignación encadenada en `SimulatedDisk`, rechazo atómico cuando no hay espacio libre y eliminación recursiva de directorios liberando sus bloques en el SD. |
+| T23–T26 | 15-11-2026 | Ejecutada y aprobada `AccessControlManagerTest` (`COMPILE 0`): permisos completos en modo `ADMIN`, restricciones en modo `USER` (lectura de estructura y propios/públicos, creación solo en directorio propio, prohibición de modificar/eliminar recursos del sistema o ajenos) y retorno de `AccessDecision` con motivo claro sin interrumpir la simulación. |

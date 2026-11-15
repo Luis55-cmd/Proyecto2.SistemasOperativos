@@ -92,6 +92,15 @@ public class SimulationController implements IClockTickable {
     // 0: hubo CPU ocupada o no se ha informado; 1: inactivas con pendientes; 2: procesos terminados.
     private int ultimoEstadoInactividad;
 
+    // --- Componentes Proyecto 2: Disco, Sistema de Archivos, Permisos y Carga Dual JSON ---
+    private com.avilaos.disk.SimulatedDisk disk = new com.avilaos.disk.SimulatedDisk(200, 100, 50, 10);
+    private com.avilaos.fs.FileSystemManager fileSystemManager = new com.avilaos.fs.FileSystemManager(disk);
+    private final com.avilaos.fs.AccessControlManager accessControl = new com.avilaos.fs.AccessControlManager();
+    private int configuredSwapSizeBlocks = 100;
+    private boolean fileSystemJsonLoaded = false;
+    private boolean processesJsonLoaded = false;
+    private boolean dualJsonGateActive = false;
+
     private SimulationController() {
         this.computers = new MyLinkedList<>();
 // [P2-LEGACY]         this.buffers = new MyLinkedList<>();
@@ -508,6 +517,11 @@ public class SimulationController implements IClockTickable {
     public void startSimulation() {
         StateAccess.enter();
         try {
+            if ((dualJsonGateActive || computers.isEmpty()) && !isReadyToStartClock()) {
+                String msg = "Error: Debes cargar ambos archivos JSON (Sistema de Archivos y Procesos/Configuración) antes de iniciar el reloj global.";
+                logEvent(msg);
+                throw new IllegalStateException(msg);
+            }
             this.clock.start();
             logEvent("Simulación iniciada");
             notifyGUI();
@@ -521,8 +535,16 @@ public class SimulationController implements IClockTickable {
     }
 
     public void stepSimulation() {
-        this.clock.step();
-        notifyGUI();
+        StateAccess.enter();
+        try {
+            if ((dualJsonGateActive || computers.isEmpty()) && !isReadyToStartClock()) {
+                String msg = "Error: Debes cargar ambos archivos JSON (Sistema de Archivos y Procesos/Configuración) antes de avanzar el reloj global.";
+                logEvent(msg);
+                throw new IllegalStateException(msg);
+            }
+            this.clock.step();
+            notifyGUI();
+        } finally { StateAccess.exit(); }
     }
 
     public void setCycleDurationMs(int ms) {
@@ -742,11 +764,208 @@ public class SimulationController implements IClockTickable {
         this.nextComputerId = 1;
         this.nextBufferId = 1;
         this.ultimoEstadoInactividad = 0;
+        this.fileSystemJsonLoaded = false;
+        this.processesJsonLoaded = false;
+        this.dualJsonGateActive = false;
+        this.configuredSwapSizeBlocks = 100;
+        this.disk = new com.avilaos.disk.SimulatedDisk(200, 100, 50, 10);
+        this.fileSystemManager = new com.avilaos.fs.FileSystemManager(this.disk);
+        this.accessControl.setSession(com.avilaos.core.model.UserMode.ADMIN, "admin");
         ProcessControlBlock.resetIdGenerator(1);
 
         logEvent("Simulador reiniciado a estado inicial");
         notifyGUI();
 
         } finally { StateAccess.exit(); }
+    }
+
+    // =========================================================================
+    // PROYECTO 2: DISCO, SISTEMA DE ARCHIVOS, PERMISOS Y PERSISTENCIA DUAL JSON
+    // =========================================================================
+
+    public com.avilaos.disk.SimulatedDisk getDisk() {
+        return disk;
+    }
+
+    public com.avilaos.fs.FileSystemManager getFileSystemManager() {
+        return fileSystemManager;
+    }
+
+    public com.avilaos.fs.AccessControlManager getAccessControl() {
+        return accessControl;
+    }
+
+    public boolean isFileSystemJsonLoaded() {
+        return fileSystemJsonLoaded;
+    }
+
+    public boolean isProcessesJsonLoaded() {
+        return processesJsonLoaded;
+    }
+
+    public boolean isReadyToStartClock() {
+        return fileSystemJsonLoaded && processesJsonLoaded;
+    }
+
+    public void setDualJsonGateActive(boolean active) {
+        this.dualJsonGateActive = active;
+    }
+
+    /**
+     * Carga y valida el JSON #1 (Estado del Sistema de Archivos: diskConfig + fileSystem).
+     */
+    public void loadFileSystemJson(String json) {
+        StateAccess.enter();
+        try {
+            com.avilaos.io.FileSystemJsonSerializer.LoadedFileSystem loaded =
+                    com.avilaos.io.FileSystemJsonSerializer.loadFromString(json, configuredSwapSizeBlocks);
+            com.avilaos.disk.DiskSchedulingPolicy currentPolicy = this.disk != null ? this.disk.getSchedulingPolicy() : null;
+            this.disk = loaded.disk();
+            if (currentPolicy != null) {
+                this.disk.setSchedulingPolicy(currentPolicy);
+            }
+            this.disk.setEventListener(this::logEvent);
+            this.fileSystemManager = loaded.fileSystemManager();
+            this.fileSystemJsonLoaded = true;
+            this.dualJsonGateActive = true;
+            logEvent("JSON del Sistema de Archivos cargado: " + loaded.totalBlocks()
+                    + " bloques, cabezal inicial en " + loaded.initialHead());
+            notifyGUI();
+        } finally {
+            StateAccess.exit();
+        }
+    }
+
+    public void loadFileSystemJson(java.io.File file) throws java.io.IOException {
+        StateAccess.enter();
+        try {
+            com.avilaos.io.FileSystemJsonSerializer.LoadedFileSystem loaded =
+                    com.avilaos.io.FileSystemJsonSerializer.loadFromFile(file, configuredSwapSizeBlocks);
+            com.avilaos.disk.DiskSchedulingPolicy currentPolicy = this.disk != null ? this.disk.getSchedulingPolicy() : null;
+            this.disk = loaded.disk();
+            if (currentPolicy != null) {
+                this.disk.setSchedulingPolicy(currentPolicy);
+            }
+            this.disk.setEventListener(this::logEvent);
+            this.fileSystemManager = loaded.fileSystemManager();
+            this.fileSystemJsonLoaded = true;
+            this.dualJsonGateActive = true;
+            logEvent("JSON del Sistema de Archivos cargado desde archivo: " + file.getName());
+            notifyGUI();
+        } finally {
+            StateAccess.exit();
+        }
+    }
+
+    /**
+     * Carga y valida el JSON #2 (Procesos y Configuración: globalConfig + computer + processes).
+     * Si el disco y el sistema de archivos ya estaban cargados (o modificados por una corrida previa),
+     * preserva intacto el estado de los bloques de archivos y el árbol del sistema de archivos (T44).
+     */
+    public void loadProcessesConfigJson(String json) {
+        StateAccess.enter();
+        try {
+            com.avilaos.io.ProcessConfigJsonSerializer.LoadedProcessConfig cfg =
+                    com.avilaos.io.ProcessConfigJsonSerializer.loadFromString(json);
+
+            this.clock.stop();
+            this.clock.setCycleCounter(0);
+            this.clock.setCycleDurationMs(cfg.globalConfig().cycleDurationMs());
+            this.configuredSwapSizeBlocks = cfg.globalConfig().swapSizeBlocks();
+
+            // Si el disco ya tenía un tamaño de swap distinto, redimensionar la partición de swap
+            // preservando todos los bloques de datos y el árbol de archivos actual.
+            if (this.disk != null && this.disk.getSwapSizeBlocks() != this.configuredSwapSizeBlocks) {
+                this.disk = rebuildDiskPreservingDataBlocks(this.disk, this.configuredSwapSizeBlocks);
+                this.fileSystemManager.setDisk(this.disk);
+            }
+            if (this.disk != null) {
+                this.disk.setSchedulingPolicy(cfg.globalConfig().initialDiskPolicy());
+                this.disk.setEventListener(this::logEvent);
+            }
+
+            // Reiniciar únicamente el computador y los procesos sin borrar el sistema de archivos
+            while (!this.computers.isEmpty()) {
+                this.computers.deletePos(0);
+            }
+            this.nextComputerId = 1;
+            ProcessControlBlock.resetIdGenerator(1);
+
+            Computer comp = createComputer("AvilaOS-PC",
+                    cfg.computer().ramCapacity(),
+                    cfg.computer().policy(),
+                    cfg.computer().quantum());
+
+            for (int i = 0; i < cfg.processes().size(); i++) {
+                var p = cfg.processes().get(i);
+                ProcessControlBlock pcb = createProcess(
+                        p.name(), comp.getId(), ProcessType.FILE_IO,
+                        p.instructions(), p.memory(), p.priority(), p.deadline());
+                if (pcb != null) {
+                    pcb.setIoOperation(p.operation());
+                    pcb.setTargetPath(p.targetPath());
+                    pcb.setFileSizeBlocks(p.fileSizeBlocks());
+                    pcb.setOwner(p.owner());
+                    pcb.setNewFileName(p.newFileName());
+                }
+            }
+
+            this.processesJsonLoaded = true;
+            this.dualJsonGateActive = true;
+            logEvent("JSON de Procesos y Configuración cargado: " + cfg.processes().size()
+                    + " procesos, política disco " + cfg.globalConfig().initialDiskPolicy()
+                    + ", swap " + this.configuredSwapSizeBlocks + " bloques");
+            notifyGUI();
+        } finally {
+            StateAccess.exit();
+        }
+    }
+
+    public void loadProcessesConfigJson(java.io.File file) throws java.io.IOException {
+        StringBuilder sb = new StringBuilder();
+        try (java.io.FileReader fr = new java.io.FileReader(file, java.nio.charset.StandardCharsets.UTF_8)) {
+            char[] buf = new char[4096];
+            int n;
+            while ((n = fr.read(buf)) != -1) {
+                sb.append(buf, 0, n);
+            }
+        }
+        loadProcessesConfigJson(sb.toString());
+    }
+
+    public String exportFileSystemJson() {
+        StateAccess.enter();
+        try {
+            return com.avilaos.io.FileSystemJsonSerializer.toJsonString(this.disk, this.fileSystemManager);
+        } finally {
+            StateAccess.exit();
+        }
+    }
+
+    public void saveFileSystemJson(java.io.File file) throws java.io.IOException {
+        StateAccess.enter();
+        try {
+            com.avilaos.io.FileSystemJsonSerializer.saveToFile(file, this.disk, this.fileSystemManager);
+            logEvent("Estado del Sistema de Archivos guardado en " + file.getName());
+        } finally {
+            StateAccess.exit();
+        }
+    }
+
+    private static com.avilaos.disk.SimulatedDisk rebuildDiskPreservingDataBlocks(
+            com.avilaos.disk.SimulatedDisk oldDisk, int newSwapSizeBlocks) {
+        int totalData = oldDisk.getTotalBlocks();
+        int head = oldDisk.getHeadPosition();
+        com.avilaos.disk.SimulatedDisk rebuilt = new com.avilaos.disk.SimulatedDisk(
+                totalData, newSwapSizeBlocks, head, oldDisk.getHeadSpeedPerTick());
+        for (int i = 0; i < totalData; i++) {
+            com.avilaos.disk.DiskBlock src = oldDisk.getBlock(i);
+            if (src.isOccupied()) {
+                rebuilt.allocateChainedBlocksFrom(i, src.getOccupiedBy(), 1, src.getOwnerProcessId());
+                rebuilt.getBlock(i).setNextBlock(src.getNextBlock());
+            }
+        }
+        rebuilt.setSchedulingPolicy(oldDisk.getSchedulingPolicy());
+        return rebuilt;
     }
 }
