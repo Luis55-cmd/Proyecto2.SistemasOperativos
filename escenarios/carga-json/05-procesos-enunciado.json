@@ -1,0 +1,86 @@
+{
+  "globalConfig": {
+    "cycleDurationMs": 300,
+    "swapSizeBlocks": 100,
+    "initialDiskPolicy": "FIFO"
+  },
+  "computer": {
+    "ramCapacity": 1024,
+    "policy": "FCFS",
+    "quantum": 0
+  },
+  "processes": [
+    {
+      "name": "Proc_95",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/sistema/config.sys",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_180",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/usuarios/video.mp4",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_34",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/usuarios/notas.txt",
+      "operation": "UPDATE",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_119",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/usuarios/img1.png",
+      "operation": "DELETE",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_11",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/sistema/boot.bin",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_123",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/usuarios/data.csv",
+      "operation": "UPDATE",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_62",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/sistema/script.py",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_64",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 2,
+      "targetPath": "/sistema/core.dll",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    }
+  ]
+}
