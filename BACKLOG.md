@@ -67,9 +67,9 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 
 | ID | Estado | Acción y comprobación de terminado |
 |---|---|---|
-| T39 | ⬜ | Validar configuración y jerarquía del JSON del sistema de archivos antes de aplicarla. |
+| T39 | 🟨 | Validar configuración y jerarquía del JSON del sistema de archivos antes de aplicarla. |
 | T40 | ⬜ | Restaurar bloques, cabezal, dueño y permisos; probar archivo de varios bloques. |
-| T41 | ⬜ | Validar JSON de procesos, políticas y rutas, con mensajes de error comprensibles. |
+| T41 | 🟨 | Validar JSON de procesos, políticas y rutas, con mensajes de error comprensibles. |
 | T42 | ⬜ | Validar los datos de disco y procesos antes de iniciar; permitir creación manual y carga JSON. El enunciado exige literalmente cargar ambos archivos: ver decisión y diferencia debajo. |
 | T43 | ⬜ | Guardar el estado modificado del sistema de archivos y volver a cargarlo. |
 | T44 | ⬜ | Reiniciar con nuevos procesos conservando el disco guardado. |
@@ -122,6 +122,15 @@ El [enunciado original convertido a Markdown](instrucciones/enunciado-proyecto-2
 | T02–T13 | 15-11-2026 | Ejecutadas y aprobadas `SimulatedDiskTest` y `DiskSchedulingPoliciesTest` (`COMPILE 0`): límites, partición datos/swap sin solapamiento, cadenas multibloque, liberación, Casos P1–P4 y Anexo (518, 208, 332, 192 bloques) y cambio de política en caliente en 0 ticks. |
 | T14–T22 | 15-11-2026 | Ejecutadas y aprobadas `FileSystemTreeTest` y `FileSystemManagerTest` (`COMPILE 0`): CRUD en `FileSystemManager` protegido con `Semaphore`, vinculación con asignación encadenada en `SimulatedDisk`, rechazo atómico cuando no hay espacio libre y eliminación recursiva de directorios liberando sus bloques en el SD. |
 | T23–T26 | 15-11-2026 | Ejecutada y aprobada `AccessControlManagerTest` (`COMPILE 0`): permisos completos en modo `ADMIN`, restricciones en modo `USER` (lectura de estructura y propios/públicos, creación solo en directorio propio, prohibición de modificar/eliminar recursos del sistema o ajenos) y retorno de `AccessDecision` con motivo claro sin interrumpir la simulación. |
+
+## Avance de Inicio y carga JSON — 15 de noviembre de 2026
+
+PR [#29](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/29), pendiente de integración. La vista «Inicio nuevo» conserva el Inicio anterior y permite seleccionar los dos JSON por separado. La carga registra intentos, resultados y errores; pide confirmación al reemplazar datos existentes, muestra un aviso temporal de éxito y rechaza cargas con la simulación iniciada o pausada. Guardar sigue pendiente. Véanse el [borrador de pantallas](instrucciones/borrador-pantallas-proyecto-2.md) y los [escenarios manuales](escenarios/carga-json/README.md).
+
+- **T39 y T41 en curso:** el estudiante probó desde la interfaz los ejemplos del enunciado, el disco vacío, la lista de procesos vacía y los casos de cabezal inválido, sección faltante y JSON malformado. El log reportó las cargas y rechazos esperados. No se han cubierto todas las validaciones de jerarquía, políticas y rutas, ni se ha demostrado desde la interfaz que el estado anterior permanece intacto después de todos los rechazos.
+- La prueba existente `Module2FileSystemAndPersistenceTest` pasó ejecutada directamente; no se agregaron pruebas automatizadas de integración para los botones. La carga de cero procesos actualmente se acepta; falta decidir si debe permitir arrancar.
+- **T40, T42–T44 y T45–T61 siguen pendientes:** no se ha completado su comprobación integral, la creación manual ni el guardado desde el nuevo Inicio. La propuesta de arranque manual sigue pendiente de validación por el equipo y difiere de la redacción literal del enunciado.
+- **Siguiente propuesta:** diseñar una nueva pantalla de Computador que muestre y configure el único computador y permita contrastar los datos cargados, sin alterar la pantalla anterior durante su revisión. Revisar la diferencia del log entre «Computador 1» y «AvilaOS-PC».
 
 ## Resultados de pruebas — 14 de noviembre de 2026
 
