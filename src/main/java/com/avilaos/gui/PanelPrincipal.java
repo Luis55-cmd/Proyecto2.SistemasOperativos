@@ -12,7 +12,7 @@ import javax.swing.border.EmptyBorder;
 
 /** Vista Swing: conserva formularios; no modifica el kernel ni ejecuta procesos. */
 public class PanelPrincipal extends JPanel {
-    public enum Destino { MENU, COMPUTADOR, BUFFER, PROCESO, SIMULACION, METRICAS, INICIO_NUEVO }
+    public enum Destino { MENU, COMPUTADOR, BUFFER, PROCESO, SIMULACION, METRICAS }
     static final Color FONDO = new Color(246, 243, 234);
     static final Color TINTA = new Color(38, 58, 43);
     static final Color GRIS = new Color(119, 105, 85);
@@ -31,6 +31,16 @@ public class PanelPrincipal extends JPanel {
     private final PanelMetricasCopia metricas;
     private final SimulationController controller = SimulationController.getInstance();
     
+    private final CardLayout estadoComputadorLayout = new CardLayout();
+    private final JPanel estadoComputadorPanel = new JPanel(estadoComputadorLayout);
+    private final JLabel resumenNombre = texto(" ", 20, TINTA, true);
+    private final JLabel resumenRam = texto(" ", 15, GRIS, false);
+    private final JLabel resumenPolitica = texto(" ", 15, GRIS, false);
+    private final JLabel resumenReloj = texto(" ", 15, GRIS, false);
+    private final JComboBox<SchedulingPolicyType> politicaGestion = new JComboBox<>(SchedulingPolicyType.values());
+    private final JSpinner quantumGestion = new JSpinner(new SpinnerNumberModel(3, 1, 9999, 1));
+    private boolean actualizandoGestion = false;
+
     // Controles de Computador
     private final JTextField nombreComputador = new JTextField();
     private final javax.swing.border.Border bordeNombreNormal = nombreComputador.getBorder();
@@ -72,7 +82,7 @@ public class PanelPrincipal extends JPanel {
         lateral.add(Box.createVerticalStrut(28));
         
         // [P2-LEGACY] String[] titulos = {"01   Inicio", "02   Computadores", "03   Buffers", "04   Procesos", "05   Simulación", "06   Métricas"};
-        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Procesos", "04   Simulación", "05   Métricas", "06   Inicio nuevo"}; // [P2] sin Buffers
+        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Procesos", "04   Simulación", "05   Métricas"}; // [P2] sin Buffers
         for (Destino destino : Destino.values()) {
             if (destino == Destino.BUFFER) continue; // [P2] pantalla de buffers oculta
             JButton boton = accion(titulos[destino.ordinal()], false);
@@ -90,8 +100,7 @@ public class PanelPrincipal extends JPanel {
         lateral.add(pie);
         add(lateral, BorderLayout.WEST);
         pantallas.setBackground(FONDO);
-        pantallas.add(inicio(), Destino.MENU.name());
-        pantallas.add(inicioNuevo(), Destino.INICIO_NUEVO.name());
+        pantallas.add(inicioNuevo(), Destino.MENU.name());
         pantallas.add(computador(), Destino.COMPUTADOR.name());
         
 // [P2-LEGACY]         pantallas.add(buffer(), Destino.BUFFER.name());
@@ -140,60 +149,6 @@ public class PanelPrincipal extends JPanel {
     }
 
     public Destino getDestinoActual() { return destinoActual; }
-
-    private JPanel inicio() {
-        JPanel panel = pagina("TU ESPACIO DE TRABAJO", "Construye tu simulación", "Configura los computadores y compón los programas que van a ejecutar.");
-        JPanel bienvenida = tarjeta();
-        bienvenida.add(texto("Un clúster. Muchas posibilidades.", 24, TINTA, true));
-        bienvenida.add(Box.createVerticalStrut(12));
-        bienvenida.add(texto("Comienza por los recursos; después define el trabajo.", 15, GRIS, false));
-        panel.add(bienvenida);
-        panel.add(Box.createVerticalStrut(24));
-        
-        JPanel opciones = new JPanel(new GridLayout(1, 3, 20, 0));
-        opciones.setOpaque(false);
-        opciones.setAlignmentX(LEFT_ALIGNMENT);
-        opciones.setMaximumSize(new Dimension(Integer.MAX_VALUE, 210));
-        
-        JPanel equipos = tarjeta();
-        equipos.add(texto("01 / COMPUTADORES", 11, ACENTO, true));
-        equipos.add(Box.createVerticalStrut(14));
-        equipos.add(texto("Define recursos", 21, TINTA, true));
-        equipos.add(Box.createVerticalStrut(8));
-        equipos.add(texto("Memoria y política.", 13, GRIS, false));
-        equipos.add(Box.createVerticalStrut(22));
-        JButton equipo = accion("Configurar  →", true);
-        equipo.addActionListener(e -> mostrarPanel(Destino.COMPUTADOR));
-        equipos.add(equipo);
-        
-// [P2-LEGACY]         JPanel buffers = tarjeta();
-// [P2-LEGACY]         buffers.add(texto("02 / BUFFERS", 11, ACENTO, true));
-// [P2-LEGACY]         buffers.add(Box.createVerticalStrut(14));
-// [P2-LEGACY]         buffers.add(texto("Sincronización", 21, TINTA, true));
-// [P2-LEGACY]         buffers.add(Box.createVerticalStrut(8));
-// [P2-LEGACY]         buffers.add(texto("Espacios de memoria.", 13, GRIS, false));
-// [P2-LEGACY]         buffers.add(Box.createVerticalStrut(22));
-// [P2-LEGACY]         JButton btnBuffer = accion("Crear buffer  →", true);
-// [P2-LEGACY]         btnBuffer.addActionListener(e -> mostrarPanel(Destino.BUFFER));
-// [P2-LEGACY]         buffers.add(btnBuffer);
-        
-        JPanel programas = tarjeta();
-        programas.add(texto("03 / PROCESOS", 11, ACENTO, true));
-        programas.add(Box.createVerticalStrut(14));
-        programas.add(texto("Diseña programas", 21, TINTA, true));
-        programas.add(Box.createVerticalStrut(8));
-        programas.add(texto("Bloques de CPU y E/S.", 13, GRIS, false));
-        programas.add(Box.createVerticalStrut(22));
-        JButton proceso = accion("Borrador  →", true);
-        proceso.addActionListener(e -> mostrarPanel(Destino.PROCESO));
-        programas.add(proceso);
-        
-// [P2-LEGACY]         opciones.add(equipos); opciones.add(buffers); opciones.add(programas);
-        opciones.add(equipos); opciones.add(programas); // [P2] sin tarjeta de buffers
-        panel.add(opciones);
-        panel.add(Box.createVerticalStrut(24));
-        return panel;
-    }
 
     /** Maqueta visual: los botones de persistencia todavía no ejecutan acciones. */
     private JPanel inicioNuevo() {
@@ -397,7 +352,7 @@ public class PanelPrincipal extends JPanel {
     }
 
     private JPanel computador() {
-        JPanel panel = pagina("COMPUTADORES", "Configura un computador", "Cada computador tendrá su propia CPU, memoria y política.");
+        JPanel panel = pagina("COMPUTADOR", "Tu computador", "Crea y consulta el único computador de la simulación.");
         JPanel tarjeta = tarjeta();
         tarjeta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 340));
         tarjeta.add(texto("Recursos del computador", 20, TINTA, true));
@@ -438,17 +393,82 @@ public class PanelPrincipal extends JPanel {
         tarjeta.add(Box.createVerticalStrut(10));
         resultadoComputador.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
         tarjeta.add(resultadoComputador);
-        panel.add(tarjeta);
+        JPanel gestion = tarjeta();
+        gestion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 340));
+        gestion.add(texto("COMPUTADOR CONFIGURADO", 11, ACENTO, true));
+        gestion.add(Box.createVerticalStrut(12));
+        gestion.add(resumenNombre);
+        gestion.add(Box.createVerticalStrut(12));
+        gestion.add(resumenRam);
+        gestion.add(Box.createVerticalStrut(6));
+        gestion.add(resumenPolitica);
+        gestion.add(Box.createVerticalStrut(6));
+        gestion.add(resumenReloj);
+        gestion.add(Box.createVerticalStrut(18));
+        JPanel controles = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        controles.setOpaque(false);
+        controles.setAlignmentX(LEFT_ALIGNMENT);
+        controles.add(texto("Política de CPU", 12, GRIS, true));
+        controles.add(politicaGestion);
+        controles.add(texto("Quantum RR", 12, GRIS, true));
+        controles.add(quantumGestion);
+        politicaGestion.addActionListener(e -> {
+            if (actualizandoGestion || controller.snapshot().computers.size() == 0) return;
+            int id = controller.snapshot().computers.get(0).getId();
+            SchedulingPolicyType nuevaPolitica = (SchedulingPolicyType) politicaGestion.getSelectedItem();
+            GuiRequest.model(controller, () -> { controller.setComputerPolicy(id, nuevaPolitica); return true; },
+                    ok -> actualizarListaComputadores(), error -> {
+                        actualizarListaComputadores();
+                        JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo cambiar la política", JOptionPane.ERROR_MESSAGE);
+                    });
+        });
+        quantumGestion.addChangeListener(e -> {
+            if (actualizandoGestion || controller.snapshot().computers.size() == 0) return;
+            int id = controller.snapshot().computers.get(0).getId();
+            int quantum = (Integer) quantumGestion.getValue();
+            GuiRequest.model(controller, () -> { controller.setComputerQuantum(id, quantum); return true; },
+                    ok -> actualizarListaComputadores(), error -> {
+                        actualizarListaComputadores();
+                        JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo cambiar el quantum", JOptionPane.ERROR_MESSAGE);
+                    });
+        });
+        gestion.add(controles);
+        gestion.add(Box.createVerticalStrut(8));
+        JButton eliminar = accion("Eliminar computador", false);
+        eliminar.setEnabled(false);
+        gestion.add(eliminar);
+        gestion.add(Box.createVerticalStrut(8));
+        gestion.add(texto("Eliminación pendiente de conectar.", 12, GRIS, false));
+        estadoComputadorPanel.setOpaque(false);
+        estadoComputadorPanel.setAlignmentX(LEFT_ALIGNMENT);
+        estadoComputadorPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 340));
+        estadoComputadorPanel.add(tarjeta, "crear");
+        estadoComputadorPanel.add(gestion, "gestionar");
+        panel.add(estadoComputadorPanel);
         panel.add(Box.createVerticalStrut(20));
-        JTable tabla = new JTable(computadoresVisibles);
-        tabla.setRowHeight(32);
-        tabla.setBackground(PAPEL);
-        tabla.setForeground(TINTA);
-        JScrollPane lista = new JScrollPane(tabla);
-        lista.setColumnHeaderView(tabla.getTableHeader());
-        lista.setAlignmentX(LEFT_ALIGNMENT);
-        lista.setPreferredSize(new Dimension(600, 160));
-        panel.add(lista);
+        JPanel reflexion = new JPanel(new BorderLayout(16, 0));
+        reflexion.setBackground(PAPEL);
+        reflexion.setAlignmentX(LEFT_ALIGNMENT);
+        reflexion.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDE), new EmptyBorder(12, 24, 12, 24)));
+        reflexion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 125));
+        JPanel cita = new JPanel();
+        cita.setOpaque(false);
+        cita.setLayout(new BoxLayout(cita, BoxLayout.Y_AXIS));
+        cita.add(texto("SOBRE LA DISTRIBUCIÓN", 11, ACENTO, true));
+        cita.add(Box.createVerticalStrut(8));
+        cita.add(texto("“La justicia en la distribución sigue una proporción.”", 16, TINTA, true));
+        cita.add(Box.createVerticalStrut(6));
+        cita.add(texto("Aristóteles · Ética a Nicómaco V.3 · traducción libre", 12, GRIS, false));
+        reflexion.add(cita, BorderLayout.CENTER);
+        java.net.URL imagen = getClass().getResource("/imagenes/aristoteles.png");
+        if (imagen != null) {
+            Image retrato = new ImageIcon(imagen).getImage().getScaledInstance(72, 92, Image.SCALE_SMOOTH);
+            JLabel retratoLabel = new JLabel(new ImageIcon(retrato));
+            retratoLabel.setToolTipText("Retrato de Aristóteles");
+            reflexion.add(retratoLabel, BorderLayout.EAST);
+        }
+        panel.add(reflexion);
         actualizarListaComputadores();
         return panel;
     }
@@ -651,15 +671,29 @@ public class PanelPrincipal extends JPanel {
 
     private void actualizarListaComputadores() {
         var view = controller.snapshot();
-        computadoresVisibles.setRowCount(0);
-        for (int i = 0; i < view.computers.size(); i++) {
-            var c = view.computers.get(i);
-            String polStr = (c.getPolitica() == SchedulingPolicyType.ROUND_ROBIN)
-                    ? "Round Robin (Q: " + c.getQuantum() + ")"
-                    : c.getPolitica().toString();
-            computadoresVisibles.addRow(new Object[]{c.getId(), c.getName(),
-                    c.getRam().getTotalSize(), polStr});
+        if (view.computers.size() == 0) {
+            estadoComputadorLayout.show(estadoComputadorPanel, "crear");
+            return;
         }
+        var computador = view.computers.get(0);
+        String politica = computador.getPolitica() == SchedulingPolicyType.ROUND_ROBIN
+                ? "Round Robin · quantum " + computador.getQuantum()
+                : computador.getPolitica().toString();
+        resumenNombre.setText(computador.getName() + " · ID " + computador.getId());
+        resumenRam.setText("RAM: " + computador.getRam().getTotalSize() + " unidades");
+        resumenPolitica.setText("Política de CPU: " + politica);
+        resumenReloj.setText("Duración del ciclo global: " + view.interval + " ms");
+        actualizandoGestion = true;
+        try {
+            politicaGestion.setSelectedItem(computador.getPolitica());
+            if (!((JSpinner.DefaultEditor) quantumGestion.getEditor()).getTextField().hasFocus()) {
+                quantumGestion.setValue(Math.max(1, Math.min(9999, computador.getQuantum())));
+            }
+            quantumGestion.setEnabled(computador.getPolitica() == SchedulingPolicyType.ROUND_ROBIN);
+        } finally {
+            actualizandoGestion = false;
+        }
+        estadoComputadorLayout.show(estadoComputadorPanel, "gestionar");
     }
 
     // Funciones de utilidad visual

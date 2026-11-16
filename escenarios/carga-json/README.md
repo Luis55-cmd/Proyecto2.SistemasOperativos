@@ -12,6 +12,7 @@ En «Inicio nuevo», usa el botón de carga de cada tarjeta. Para el escenario d
 | `06-procesos-vacios.json` | Procesos y configuración | Actualmente se acepta con cero procesos; si debe permitirse arrancar así está pendiente de decidir. |
 | `07-sin-computador.json` | Procesos y configuración | Rechaza el JSON porque falta `computer`. |
 | `08-json-malformado.json` | Procesos y configuración | Rechaza el JSON malformado. |
+| `09-cambio-fcfs-prioridades.json` | Procesos y configuración | Con `01`, avanzar 3 ciclos en FCFS y cambiar a PRIORITY_PREEMPTIVE; orden de finalización esperado: Urgente (6), Medio (10), Lento (15). Prueba CPU; E/S no está integrada. |
 
 Tras una carga válida, cargar otra configuración del mismo tipo pide confirmación si existen datos que serán reemplazados. Cancelar conserva el estado. La carga se rechaza si el reloj ya está iniciado, aunque esté pausado. El aviso de éxito desaparece tras 2,5 segundos. Las pruebas de rechazo deben comprobar que el estado previo se conserva; el log por sí solo no demuestra esa conservación.
 
