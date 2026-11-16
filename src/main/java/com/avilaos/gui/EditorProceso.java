@@ -18,6 +18,8 @@ import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import com.avilaos.core.model.ProcessType;
 import com.avilaos.core.model.ProcessSizing;
+import com.avilaos.core.model.IOOperationType;
+import com.avilaos.core.model.ExecutionMode;
 import com.avilaos.simulation.SimulationController;
 import static com.avilaos.gui.PanelPrincipal.*;
 
@@ -25,8 +27,8 @@ import static com.avilaos.gui.PanelPrincipal.*;
 public class EditorProceso extends JPanel {
     private final JTextField campoNombre = new JTextField();
     private final JComboBox<DestinoComputador> destino = new JComboBox<>();
-    // [P2-LEGACY] private final JComboBox<ProcessType> comboTipoProceso = new JComboBox<>(ProcessType.values());
-    private final JComboBox<ProcessType> comboTipoProceso = new JComboBox<>(new ProcessType[] { ProcessType.CPU_BOUND, ProcessType.IO_BOUND }); // [P2] sin PRODUCER/CONSUMER
+    private final JComboBox<ProcessType> comboTipoProceso = new JComboBox<>(new ProcessType[] {
+            ProcessType.CPU_BOUND, ProcessType.IO_BOUND, ProcessType.FILE_IO });
     private final JSpinner spinnerPrioridad = numero(1, 1, 10);
     private final JSpinner spinnerDeadline = numero(20, 1, 100000);
     private final JTextField memoriaCalculada = new JTextField();
@@ -37,9 +39,19 @@ public class EditorProceso extends JPanel {
     private final JComboBox<String> comboBufferId = new JComboBox<>();
     private final JSpinner spinnerCiclosOperacion = numero(1, 1, 1000);
     private final JSpinner spinnerElementos = numero(1, 1, 1000);
+    // FILE_IO fields
+    private final JComboBox<IOOperationType> comboOperacion = new JComboBox<>(new IOOperationType[] {
+            IOOperationType.CREATE, IOOperationType.READ, IOOperationType.UPDATE, IOOperationType.DELETE });
+    private final JTextField campoRuta = new JTextField("/");
+    private final JSpinner spinnerTamanoBloques = numero(1, 1, 500);
+    private final JTextField campoDueno = new JTextField("admin");
+    private final JComboBox<ExecutionMode> comboModo = new JComboBox<>(ExecutionMode.values());
+    private final JTextField campoNuevoNombre = new JTextField();
+
     private final JPanel panelInstrucciones = new JPanel(new GridLayout(1, 2, 24, 0));
     private final JPanel panelIO = new JPanel(new GridLayout(1, 2, 24, 0));
     private final JPanel panelSync = new JPanel(new GridLayout(1, 3, 24, 0));
+    private final JPanel panelFileIO = new JPanel();
     private final JButton crearComputador = accion("Crea un computador primero →", true);
     private final JButton botonCrear = accion("Crear proceso", true);
     private final JLabel mensaje = texto("Completa los datos para crear un proceso.", 12, GRIS, false);
@@ -60,7 +72,7 @@ public class EditorProceso extends JPanel {
         super(new BorderLayout());
         JPanel pagina = pagina("PROCESOS", "Crear proceso", "Configura los datos del proceso y selecciona su computador.");
         JPanel formulario = tarjeta();
-        formulario.setMaximumSize(new Dimension(Integer.MAX_VALUE, 450));
+        formulario.setMaximumSize(new Dimension(Integer.MAX_VALUE, 560));
         formulario.setLayout(new BoxLayout(formulario, BoxLayout.Y_AXIS));
         formulario.add(texto("Propiedades del proceso", 20, TINTA, true));
         formulario.add(Box.createVerticalStrut(16));
@@ -103,13 +115,35 @@ public class EditorProceso extends JPanel {
         panelIO.add(campo("Ciclos de CPU entre operaciones de E/S", spinnerIoInterval));
         panelIO.add(campo("Duración del bloqueo de E/S (ticks)", spinnerIoDuration));
         formulario.add(panelIO);
-// [P2-LEGACY]         panelSync.setOpaque(false);
-// [P2-LEGACY]         panelSync.setAlignmentX(LEFT_ALIGNMENT);
-// [P2-LEGACY]         panelSync.setMaximumSize(new Dimension(900, 62));
-// [P2-LEGACY]         panelSync.add(campo("Buffer", comboBufferId));
-// [P2-LEGACY]         panelSync.add(campo("Ciclos por operación", spinnerCiclosOperacion));
-// [P2-LEGACY]         panelSync.add(campo("Elementos para terminar", spinnerElementos));
-// [P2-LEGACY]         formulario.add(panelSync);
+
+        // ── Panel FILE_IO ──
+        panelFileIO.setOpaque(false);
+        panelFileIO.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        panelFileIO.setAlignmentX(LEFT_ALIGNMENT);
+        panelFileIO.setMaximumSize(new Dimension(900, 150));
+        panelFileIO.setLayout(new BoxLayout(panelFileIO, BoxLayout.Y_AXIS));
+
+        JPanel fila1FileIO = new JPanel(new GridLayout(1, 3, 24, 0));
+        fila1FileIO.setOpaque(false);
+        fila1FileIO.setMaximumSize(new Dimension(900, 62));
+        fila1FileIO.add(campo("Operación CRUD", comboOperacion));
+        campoRuta.setName("campoRuta");
+        fila1FileIO.add(campo("Ruta del archivo (targetPath)", campoRuta));
+        fila1FileIO.add(campo("Tamaño en bloques (CREATE)", spinnerTamanoBloques));
+        panelFileIO.add(fila1FileIO);
+        panelFileIO.add(Box.createVerticalStrut(10));
+
+        JPanel fila2FileIO = new JPanel(new GridLayout(1, 3, 24, 0));
+        fila2FileIO.setOpaque(false);
+        fila2FileIO.setMaximumSize(new Dimension(900, 62));
+        campoDueno.setName("campoDueno");
+        fila2FileIO.add(campo("Dueño del proceso", campoDueno));
+        fila2FileIO.add(campo("Modo de ejecución", comboModo));
+        campoNuevoNombre.setName("campoNuevoNombre");
+        fila2FileIO.add(campo("Nuevo nombre (UPDATE)", campoNuevoNombre));
+        panelFileIO.add(fila2FileIO);
+        formulario.add(panelFileIO);
+
         formulario.add(Box.createVerticalStrut(24));
 
         crearComputador.addActionListener(e -> irAComputadores.run());
@@ -138,7 +172,9 @@ public class EditorProceso extends JPanel {
         add(pagina);
 
         comboTipoProceso.addActionListener(e -> { actualizarCampos(); actualizarMemoria(); });
-        for (JSpinner spinner : new JSpinner[]{spinnerInstrucciones, spinnerIoInterval, spinnerIoDuration, spinnerCiclosOperacion, spinnerElementos}) {
+        comboOperacion.addActionListener(e -> actualizarCamposFileIO());
+        for (JSpinner spinner : new JSpinner[]{spinnerInstrucciones, spinnerIoInterval, spinnerIoDuration,
+                spinnerCiclosOperacion, spinnerElementos, spinnerTamanoBloques}) {
             spinner.addChangeListener(e -> actualizarMemoria());
             ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
                 public void insertUpdate(javax.swing.event.DocumentEvent e) { actualizarMemoria(); }
@@ -170,6 +206,13 @@ public class EditorProceso extends JPanel {
     private void actualizarMemoria() {
         try {
             ProcessType tipo = (ProcessType) comboTipoProceso.getSelectedItem();
+            if (tipo == ProcessType.FILE_IO) {
+                IOOperationType op = (IOOperationType) comboOperacion.getSelectedItem();
+                int bloques = op == IOOperationType.CREATE ? numeroVisible(spinnerTamanoBloques) : 1;
+                memoriaCalculada.setText(Integer.toString(bloques));
+                detalleCalculo.setText("Total: " + bloques + " bloques · 1 bloque = 1 unidad de RAM");
+                return;
+            }
             boolean sync = tipo == ProcessType.PRODUCER || tipo == ProcessType.CONSUMER;
             int trabajo = sync ? 1 : numeroVisible(spinnerInstrucciones);
             int intervalo = tipo == ProcessType.IO_BOUND ? numeroVisible(spinnerIoInterval) : 0;
@@ -188,11 +231,22 @@ public class EditorProceso extends JPanel {
     private void actualizarCampos() {
         ProcessType tipo = (ProcessType) comboTipoProceso.getSelectedItem();
         boolean sincronizado = tipo == ProcessType.PRODUCER || tipo == ProcessType.CONSUMER;
-        panelInstrucciones.setVisible(!sincronizado);
+        boolean esFileIO = tipo == ProcessType.FILE_IO;
+        panelInstrucciones.setVisible(!sincronizado && !esFileIO);
         panelIO.setVisible(tipo == ProcessType.IO_BOUND);
         panelSync.setVisible(sincronizado);
+        panelFileIO.setVisible(esFileIO);
+        if (esFileIO) actualizarCamposFileIO();
         revalidate();
         repaint();
+    }
+
+    /** Habilita / deshabilita campos específicos según la operación FILE_IO seleccionada. */
+    private void actualizarCamposFileIO() {
+        IOOperationType op = (IOOperationType) comboOperacion.getSelectedItem();
+        spinnerTamanoBloques.setEnabled(op == IOOperationType.CREATE);
+        campoNuevoNombre.setEnabled(op == IOOperationType.UPDATE);
+        actualizarMemoria();
     }
 
     /** Actualiza los destinos sin perder la selección ni los datos del formulario. */
@@ -216,14 +270,6 @@ public class EditorProceso extends JPanel {
         crearComputador.setVisible(!hayComputadores);
 
         actualizarProcesos(view);
-
-// [P2-LEGACY]         String bufferSeleccionado = (String) comboBufferId.getSelectedItem();
-// [P2-LEGACY]         comboBufferId.removeAllItems();
-// [P2-LEGACY]         for (int i = 0; i < view.buffers.size(); i++) {
-// [P2-LEGACY]             String id = String.valueOf(view.buffers.get(i).getId());
-// [P2-LEGACY]             comboBufferId.addItem(id);
-// [P2-LEGACY]             if (id.equals(bufferSeleccionado)) comboBufferId.setSelectedItem(id);
-// [P2-LEGACY]         }
     }
 
     private void actualizarProcesos(com.avilaos.simulation.SimulationSnapshot view) {
@@ -233,6 +279,12 @@ public class EditorProceso extends JPanel {
             var p = fila.process();
             String configuracion = switch (p.type()) {
                 case IO_BOUND -> "E/S cada " + p.ioInterval() + " · duración " + p.ioDuration();
+                case FILE_IO -> {
+                    String op = p.ioOperation() != null ? p.ioOperation().name() : "?";
+                    String ruta = p.targetPath() != null ? p.targetPath() : "?";
+                    String extra = p.ioOperation() == IOOperationType.CREATE ? " · " + p.fileSizeBlocks() + " bloques" : "";
+                    yield op + " " + ruta + extra;
+                }
                 case PRODUCER, CONSUMER -> "Buffer " + p.targetBufferId() + " · " + p.cyclesPerOperation()
                         + " ciclos · " + p.requiredElements() + " elementos";
                 default -> "—";
@@ -252,10 +304,15 @@ public class EditorProceso extends JPanel {
         Integer computador = getComputadorDestinoId();
         ProcessType tipo = (ProcessType) comboTipoProceso.getSelectedItem();
         boolean sincronizado = tipo == ProcessType.PRODUCER || tipo == ProcessType.CONSUMER;
+        boolean esFileIO = tipo == ProcessType.FILE_IO;
+
         try {
             spinnerPrioridad.setValue(numeroVisible(spinnerPrioridad));
             spinnerDeadline.setValue(numeroVisible(spinnerDeadline));
-            if (sincronizado) {
+            if (esFileIO) {
+                IOOperationType op = (IOOperationType) comboOperacion.getSelectedItem();
+                if (op == IOOperationType.CREATE) spinnerTamanoBloques.setValue(numeroVisible(spinnerTamanoBloques));
+            } else if (sincronizado) {
                 spinnerCiclosOperacion.setValue(numeroVisible(spinnerCiclosOperacion));
                 spinnerElementos.setValue(numeroVisible(spinnerElementos));
             } else {
@@ -271,6 +328,38 @@ public class EditorProceso extends JPanel {
         }
         if (nombre.isEmpty()) { mensaje.setText("Escribe un nombre para el proceso."); return; }
         if (computador == null) { mensaje.setText("Selecciona un computador destino."); return; }
+
+        if (esFileIO) {
+            IOOperationType op = (IOOperationType) comboOperacion.getSelectedItem();
+            String ruta = campoRuta.getText().trim();
+            String dueno = campoDueno.getText().trim();
+            ExecutionMode modo = (ExecutionMode) comboModo.getSelectedItem();
+            String nuevoNombre = campoNuevoNombre.getText().trim();
+            int bloques = op == IOOperationType.CREATE ? (Integer) spinnerTamanoBloques.getValue() : 0;
+
+            if (!ruta.startsWith("/")) { mensaje.setText("La ruta debe comenzar con '/' (ej: /home/user/archivo.txt)."); return; }
+            if (op == IOOperationType.CREATE && bloques < 1) { mensaje.setText("El tamaño debe ser al menos 1 bloque para CREATE."); return; }
+            if (op == IOOperationType.UPDATE && nuevoNombre.isEmpty()) { mensaje.setText("Especifica el nuevo nombre para la operación UPDATE."); return; }
+
+            int prioridad = (Integer) spinnerPrioridad.getValue();
+            int deadline = (Integer) spinnerDeadline.getValue();
+            final int computadorFinal = computador;
+            final int bloquesFinal = bloques;
+            final String duenoCorrecto = dueno.isEmpty() ? "admin" : dueno;
+
+            SimulationController controller = SimulationController.getInstance();
+            botonCrear.setEnabled(false);
+            mensaje.setText("Creando proceso FILE_IO…");
+            GuiRequest.model(controller, () -> {
+                var pcb = controller.createConfigFileIOProcess(nombre, computadorFinal,
+                        op, ruta, bloquesFinal, duenoCorrecto, modo, nuevoNombre, prioridad, deadline);
+                if (pcb == null) return "No se pudo crear el proceso FILE_IO; revisa los parámetros y el log.";
+                return "Proceso FILE_IO '" + nombre + "' creado: " + pcb.getState() + " · op=" + op + " · ruta=" + ruta;
+            }, resultado -> { mensaje.setText(resultado); botonCrear.setEnabled(true); },
+               error -> { mensaje.setText(error.getMessage()); botonCrear.setEnabled(true); });
+            return;
+        }
+
         String buffer = (String) comboBufferId.getSelectedItem();
         if (sincronizado && buffer == null) { mensaje.setText("Crea y selecciona un buffer primero."); return; }
 

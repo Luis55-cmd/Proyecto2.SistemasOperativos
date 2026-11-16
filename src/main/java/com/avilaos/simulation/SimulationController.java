@@ -5,6 +5,7 @@ import com.avilaos.core.kernel.GlobalClock;
 import com.avilaos.core.kernel.IClockTickable;
 import com.avilaos.core.model.BlockReason;
 import com.avilaos.core.model.ExecutionMode;
+import com.avilaos.core.model.IOOperationType;
 import com.avilaos.core.model.ProcessState;
 import com.avilaos.core.model.ProcessControlBlock;
 import com.avilaos.core.model.ProcessType;
@@ -292,6 +293,52 @@ public class SimulationController implements IClockTickable {
                 pcb.setIoRequestInstruction(true);
                 notifyGUI();
             }
+            return pcb;
+        } finally { StateAccess.exit(); }
+    }
+
+    /** Crea un proceso FILE_IO desde la GUI con operación CRUD, ruta, tamaño en bloques, dueño y modo. */
+    public ProcessControlBlock createConfigFileIOProcess(String name, int computerId,
+            IOOperationType operation, String targetPath, int fileSizeBlocks,
+            String owner, ExecutionMode mode, String newFileName,
+            int priority, int deadline) {
+        StateAccess.enter();
+        try {
+            if (name == null || name.trim().isEmpty()) {
+                logEvent("Error: El nombre del proceso FILE_IO no puede estar vacío");
+                return null;
+            }
+            if (operation == null) {
+                logEvent("Error: Debes especificar una operación CRUD para el proceso FILE_IO");
+                return null;
+            }
+            if (targetPath == null || !targetPath.startsWith("/")) {
+                logEvent("Error: La ruta del archivo debe comenzar con '/' (recibido: " + targetPath + ")");
+                return null;
+            }
+            if (operation == IOOperationType.CREATE && fileSizeBlocks < 1) {
+                logEvent("Error: El tamaño del archivo debe ser al menos 1 bloque para CREATE");
+                return null;
+            }
+            if (operation == IOOperationType.UPDATE && (newFileName == null || newFileName.trim().isEmpty())) {
+                logEvent("Error: Debes especificar un nuevo nombre para la operación UPDATE");
+                return null;
+            }
+            // 1 instruction = 1 unit of RAM for FILE_IO
+            int instructions = Math.max(1, fileSizeBlocks > 0 ? fileSizeBlocks : 1);
+            ProcessControlBlock pcb = createProcess(name, computerId, ProcessType.FILE_IO,
+                    instructions, instructions, priority, deadline);
+            if (pcb == null) return null;
+            pcb.setIoOperation(operation);
+            pcb.setTargetPath(targetPath.trim());
+            pcb.setFileSizeBlocks(fileSizeBlocks);
+            pcb.setOwner(owner != null && !owner.trim().isEmpty() ? owner.trim() : "admin");
+            pcb.setMode(mode != null ? mode : ExecutionMode.USER);
+            pcb.setNewFileName(newFileName != null ? newFileName.trim() : "");
+            logEvent("Proceso FILE_IO creado: " + pcb.getName() + " (ID " + pcb.getId() + ") op=" + operation
+                    + " ruta=" + targetPath + (operation == IOOperationType.CREATE ? " bloques=" + fileSizeBlocks : "")
+                    + " dueño=" + pcb.getOwner() + " modo=" + mode);
+            notifyGUI();
             return pcb;
         } finally { StateAccess.exit(); }
     }

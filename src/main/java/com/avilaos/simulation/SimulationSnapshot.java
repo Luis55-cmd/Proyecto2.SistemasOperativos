@@ -43,10 +43,16 @@ public final class SimulationSnapshot {
             com.avilaos.core.model.BlockReason blockReason,
             String targetBufferId,
             int ioInterval, int ioDuration, int cyclesPerOperation, int requiredElements,
-            int readyWaitTicks, int blockedWaitTicks, int semaphoreWaitTicks
+            int readyWaitTicks, int blockedWaitTicks, int semaphoreWaitTicks,
+            com.avilaos.core.model.IOOperationType ioOperation,
+            String targetPath,
+            int fileSizeBlocks,
+            String owner,
+            com.avilaos.core.model.ExecutionMode processMode,
+            String newFileName
     ) {
         public ProcessView(String description, int id, String name, com.avilaos.core.model.ProcessType type, int remainingTime, int memoryAddressRegister, int priority, int remainingDeadline) {
-            this(description, id, name, type, remainingTime, remainingTime, memoryAddressRegister, 0, priority, remainingDeadline, remainingDeadline, 0, com.avilaos.core.model.BlockReason.NONE, null, 0, 0, 0, 0, 0, 0, 0);
+            this(description, id, name, type, remainingTime, remainingTime, memoryAddressRegister, 0, priority, remainingDeadline, remainingDeadline, 0, com.avilaos.core.model.BlockReason.NONE, null, 0, 0, 0, 0, 0, 0, 0, null, null, 0, null, null, null);
         }
         public String getDescription() { return description; }
         public int getId() { return id; }
@@ -62,6 +68,12 @@ public final class SimulationSnapshot {
         public int getAssignedMemory() { return assignedMemory; }
         public com.avilaos.core.model.BlockReason getBlockReason() { return blockReason; }
         public String getTargetBufferId() { return targetBufferId; }
+        public com.avilaos.core.model.IOOperationType getIoOperation() { return ioOperation; }
+        public String getTargetPath() { return targetPath; }
+        public int getFileSizeBlocks() { return fileSizeBlocks; }
+        public String getOwner() { return owner; }
+        public com.avilaos.core.model.ExecutionMode getProcessMode() { return processMode; }
+        public String getNewFileName() { return newFileName; }
         @Override public String toString() { return description; }
     }
     public record CpuView(ProcessView PCB, ExecutionMode mode, int PC) {
@@ -166,7 +178,13 @@ public final class SimulationSnapshot {
                 p.getBlockReason() != null ? p.getBlockReason() : BlockReason.NONE,
                 p.getTargetBufferId(),
                 p.getIoInterval(), p.getIoDuration(), p.getCyclesPerOperation(), p.getRequiredElements(),
-                p.getReadyWaitTicks(), p.getBlockedWaitTicks(), p.getSemaphoreWaitTicks()
+                p.getReadyWaitTicks(), p.getBlockedWaitTicks(), p.getSemaphoreWaitTicks(),
+                p.getIoOperation(),
+                p.getTargetPath(),
+                p.getFileSizeBlocks(),
+                p.getOwner(),
+                p.getMode(),
+                p.getNewFileName()
         );
     }
 
