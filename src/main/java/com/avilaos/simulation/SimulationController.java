@@ -214,6 +214,8 @@ public class SimulationController implements IClockTickable {
                 new MyQueue<>(),
                 new MyQueue<>(),
                 new MyQueue<>(),
+                new MyQueue<>(),
+                new MyQueue<>(),
                 this.clock
         );
         kernel.setEventListener(this::logEvent);

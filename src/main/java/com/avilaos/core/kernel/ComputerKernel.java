@@ -27,8 +27,9 @@ public class ComputerKernel {
     private final MyQueue<ProcessControlBlock> newQueue;
     private final MyQueue<ProcessControlBlock> readyQueue;
     private final MyQueue<ProcessControlBlock> endedQueue;
+    private final MyQueue<ProcessControlBlock> suspendedBlockedQueue;
+    private final MyQueue<ProcessControlBlock> suspendedReadyQueue;
     private final GlobalClock clock;
-
     private IScheduler activeScheduler;
     private SchedulingPolicyType currentPolicy;
     public interface IEventListener { void accept(String message); }
@@ -59,12 +60,16 @@ public class ComputerKernel {
                           MyQueue<ProcessControlBlock> newQueue,
                           MyQueue<ProcessControlBlock> readyQueue,
                           MyQueue<ProcessControlBlock> endedQueue,
+                          MyQueue<ProcessControlBlock> suspendedBlockedQueue,
+                          MyQueue<ProcessControlBlock> suspendedReadyQueue,
                           GlobalClock clock) {
         this.processList = (processList != null) ? processList : new MyLinkedList<>();
         this.blockedQueue = (blockedQueue != null) ? blockedQueue : new MyQueue<>();
         this.newQueue = (newQueue != null) ? newQueue : new MyQueue<>();
         this.readyQueue = (readyQueue != null) ? readyQueue : new MyQueue<>();
         this.endedQueue = (endedQueue != null) ? endedQueue : new MyQueue<>();
+        this.suspendedBlockedQueue = (suspendedBlockedQueue != null) ? suspendedBlockedQueue : new MyQueue<>();
+        this.suspendedReadyQueue = (suspendedReadyQueue != null) ? suspendedReadyQueue : new MyQueue<>();
         this.clock = clock;
     }
 
