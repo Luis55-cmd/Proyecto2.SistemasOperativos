@@ -183,4 +183,12 @@ public class Computer {
     public void setDeadlinesCumplidos(int deadlinesCumplidos) {
         this.deadlinesCumplidos = deadlinesCumplidos;
     }
+
+    public int getSuspensionCount() {
+        return kernel != null ? kernel.getSuspensionCount() : 0;
+    }
+
+    public int getReactivationCount() {
+        return kernel != null ? kernel.getReactivationCount() : 0;
+    }
 }

@@ -86,16 +86,29 @@ public final class SimulationSnapshot {
         public Values<ProcessView> getProcesses() { return processes; }
         @Override public String toString() { return text; }
     }
-    public record KernelView(QueueView newQueue, QueueView readyQueue, QueueView blockedQueue, QueueView endedQueue) {
+    public record KernelView(QueueView newQueue, QueueView readyQueue, QueueView blockedQueue, QueueView endedQueue,
+                             QueueView readySuspendedQueue, QueueView blockedSuspendedQueue) {
+        public KernelView(QueueView newQueue, QueueView readyQueue, QueueView blockedQueue, QueueView endedQueue) {
+            this(newQueue, readyQueue, blockedQueue, endedQueue,
+                 new QueueView(0, "[]", new Values<>(new Object[0])),
+                 new QueueView(0, "[]", new Values<>(new Object[0])));
+        }
         public QueueView getNewQueue() { return newQueue; }
         public QueueView getReadyQueue() { return readyQueue; }
         public QueueView getBlockedQueue() { return blockedQueue; }
         public QueueView getEndedQueue() { return endedQueue; }
+        public QueueView getReadySuspendedQueue() { return readySuspendedQueue; }
+        public QueueView getBlockedSuspendedQueue() { return blockedSuspendedQueue; }
     }
-    public record Node(int id, String name, SchedulingPolicyType politica, int quantum, CpuView cpu, MemoryView memoryManager, RamView ram, KernelView kernel, int ciclosActivos, int ciclosObservados, int procesosCompletados, int procesosFinalizados, int deadlinesCumplidos, int totalTiempoRespuesta, int totalTiempoEspera) {
-        public Node(int id, String name, SchedulingPolicyType politica, int quantum, CpuView cpu, MemoryView memoryManager, RamView ram, KernelView kernel, int ciclosActivos, int ciclosObservados, int procesosCompletados, int procesosFinalizados, int deadlinesCumplidos, int totalTiempoRespuesta) {
-            this(id, name, politica, quantum, cpu, memoryManager, ram, kernel, ciclosActivos, ciclosObservados, procesosCompletados, procesosFinalizados, deadlinesCumplidos, totalTiempoRespuesta, 0);
+    public record Node(int id, String name, SchedulingPolicyType politica, int quantum, CpuView cpu, MemoryView memoryManager, RamView ram, KernelView kernel, int ciclosActivos, int ciclosObservados, int procesosCompletados, int procesosFinalizados, int deadlinesCumplidos, int totalTiempoRespuesta, int totalTiempoEspera, int suspensionCount, int reactivationCount) {
+        public Node(int id, String name, SchedulingPolicyType politica, int quantum, CpuView cpu, MemoryView memoryManager, RamView ram, KernelView kernel, int ciclosActivos, int ciclosObservados, int procesosCompletados, int procesosFinalizados, int deadlinesCumplidos, int totalTiempoRespuesta, int totalTiempoEspera) {
+            this(id, name, politica, quantum, cpu, memoryManager, ram, kernel, ciclosActivos, ciclosObservados, procesosCompletados, procesosFinalizados, deadlinesCumplidos, totalTiempoRespuesta, totalTiempoEspera, 0, 0);
         }
+        public Node(int id, String name, SchedulingPolicyType politica, int quantum, CpuView cpu, MemoryView memoryManager, RamView ram, KernelView kernel, int ciclosActivos, int ciclosObservados, int procesosCompletados, int procesosFinalizados, int deadlinesCumplidos, int totalTiempoRespuesta) {
+            this(id, name, politica, quantum, cpu, memoryManager, ram, kernel, ciclosActivos, ciclosObservados, procesosCompletados, procesosFinalizados, deadlinesCumplidos, totalTiempoRespuesta, 0, 0, 0);
+        }
+        public int getSuspensionCount() { return suspensionCount; }
+        public int getReactivationCount() { return reactivationCount; }
         public int getTotalTiempoEspera() { return totalTiempoEspera; }
         public int getId() { return id; }
         public String getName() { return name; }
@@ -179,11 +192,14 @@ public final class SimulationSnapshot {
                     toQueueView(k.getNewQueue()),
                     toQueueView(k.getReadyQueue()),
                     toQueueView(k.getBlockedQueue()),
-                    toQueueView(k.getEndedQueue()));
+                    toQueueView(k.getEndedQueue()),
+                    toQueueView(k.getSuspendedReadyQueue()),
+                    toQueueView(k.getSuspendedBlockedQueue()));
             copiedNodes[i]=new Node(c.getId(),c.getName(),c.getPolitica(),c.getQuantum(),cpu,
                     new MemoryView(c.getMemoryManager().getTotalMemory(),c.getMemoryManager().getUsedMemory()),
                     new RamView(c.getRam().getTotalSize()),kernel,c.getCiclosActivos(),c.getCiclosObservados(),
-                    c.getProcesosCompletados(),c.getProcesosFinalizados(),c.getDeadlinesCumplidos(),c.getTotalTiempoRespuesta(),c.getTotalTiempoEspera());
+                    c.getProcesosCompletados(),c.getProcesosFinalizados(),c.getDeadlinesCumplidos(),c.getTotalTiempoRespuesta(),c.getTotalTiempoEspera(),
+                    c.getSuspensionCount(),c.getReactivationCount());
         }
 // [P2-LEGACY]         Object[] copiedBuffers=new Object[sources.size()];
 // [P2-LEGACY]         for(int i=0;i<sources.size();i++) {

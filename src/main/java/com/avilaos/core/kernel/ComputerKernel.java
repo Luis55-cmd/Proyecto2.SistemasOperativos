@@ -9,7 +9,10 @@ import com.avilaos.core.model.ProcessControlBlock;
 import com.avilaos.core.model.ProcessState;
 import com.avilaos.core.model.ProcessType;
 import com.avilaos.core.model.SchedulingPolicyType;
+import com.avilaos.core.model.IOOperationType;
 import com.avilaos.core.scheduler.*;
+import com.avilaos.disk.IORequest;
+import com.avilaos.disk.SimulatedDisk;
 // [P2-LEGACY] import com.avilaos.sync.Buffer;
 // [P2-LEGACY] import com.avilaos.sync.ProducerConsumerDriver;
 
@@ -35,6 +38,13 @@ public class ComputerKernel {
     public interface IEventListener { void accept(String message); }
     private IEventListener eventListener;
 
+    // [P2] Planificador a mediano plazo y disco
+    private SimulatedDisk disk;
+    private final MidTermScheduler midTermScheduler = new MidTermScheduler();
+    private int suspensionCount = 0;
+    private int reactivationCount = 0;
+    private int nextSwapRequestId = 50000;
+
     public void setEventListener(IEventListener listener) { this.eventListener = listener; }
     private void event(String message) { if (eventListener != null) eventListener.accept(message); }
     private String proceso(ProcessControlBlock p) { return p.getName() + " (ID " + p.getId() + ", computador " + p.getComputerId() + ")"; }
@@ -51,6 +61,9 @@ public class ComputerKernel {
             case WAITING_FULL_BUFFER -> "en el sem\u00e1foro 'vac\u00edo' del buffer " + formatBuffer(p) + " (sin espacios (sem\u00e1foro vac\u00edos))";
             case NETWORK_LATENCY -> "latencia de red para buffer " + formatBuffer(p);
             case WAITING_IO -> "espera de E/S";
+            case WAITING_DISK -> "espera de disco";
+            case SWAPPING_OUT -> "transferencia a swap (swap-out)";
+            case SWAPPING_IN -> "transferencia desde swap (swap-in)";
             default -> "motivo no especificado";
         };
     }
@@ -96,6 +109,8 @@ public class ComputerKernel {
         } else {
             p.setState(ProcessState.NUEVO);
             this.newQueue.enqueue(p);
+            // [P2] Si la RAM no alcanza, el planificador a mediano plazo intenta suspender un proceso
+            evaluateMidTermSuspension(com, p);
             return false;
         }
     }
@@ -124,7 +139,8 @@ public class ComputerKernel {
                 event(proceso(nextNew) + " admitido desde nuevos tras liberarse RAM");
                 admittedCount++;
             } else {
-                // FIFO estricto: si el primer proceso en espera no cabe, se detiene la admisión
+                // FIFO estricto: si el primer proceso en espera no cabe, intentar suspender para hacer espacio
+                evaluateMidTermSuspension(com, nextNew);
                 break;
             }
         }
@@ -197,6 +213,12 @@ public class ComputerKernel {
                 break;
             case TERMINADO:
                 this.endedQueue.enqueue(p);
+                break;
+            case SUSPENDIDO_LISTO:
+                this.suspendedReadyQueue.enqueue(p);
+                break;
+            case SUSPENDIDO_BLOQUEADO:
+                this.suspendedBlockedQueue.enqueue(p);
                 break;
             case NUEVO:
             default:
@@ -364,6 +386,10 @@ public class ComputerKernel {
                     this.readyQueue.removeElement(proceso);
                 } else if (estadoActual == ProcessState.NUEVO) {
                     this.newQueue.removeElement(proceso);
+                } else if (estadoActual == ProcessState.SUSPENDIDO_LISTO) {
+                    this.suspendedReadyQueue.removeElement(proceso);
+                } else if (estadoActual == ProcessState.SUSPENDIDO_BLOQUEADO) {
+                    this.suspendedBlockedQueue.removeElement(proceso);
                 }
 
                 proceso.setState(ProcessState.TERMINADO);
@@ -396,6 +422,8 @@ public class ComputerKernel {
         this.blockedQueue.removeElement(p);
         this.readyQueue.removeElement(p);
         this.newQueue.removeElement(p);
+        this.suspendedReadyQueue.removeElement(p);
+        this.suspendedBlockedQueue.removeElement(p);
 
         this.endedQueue.removeElement(p); // Prevenir duplicados
         this.endedQueue.enqueue(p);
@@ -407,6 +435,11 @@ public class ComputerKernel {
             com.getCpu().setPCB(null);
         }
 
+        // [P2] Liberar bloques de swap si el proceso ocupaba el área de intercambio
+        if (disk != null) {
+            disk.freeSwapBlocksByProcess(p.getId());
+        }
+
         // Liberar la memoria RAM asignada al proceso (idempotente)
         int memToFree = p.getAssignedMemory();
         if (com != null && com.getMemoryManager() != null && memToFree > 0) {
@@ -414,6 +447,8 @@ public class ComputerKernel {
             p.setAssignedMemory(0); // Evitar doble liberación
             // Disparar admisión automática de la cola de NUEVOS
             evaluateNewQueueAdmission(com);
+            // Intentar reactivar procesos suspendidos
+            evaluateMidTermReactivation(com);
         } else {
             p.setAssignedMemory(0);
         }
@@ -642,19 +677,27 @@ public class ComputerKernel {
             }
         }
 
-        // 5.5 Tiempo de espera: todo proceso admitido que no ejecutó en este ciclo (listo o bloqueado)
+        // 5.5 Tiempo de espera: todo proceso admitido que no ejecutó en este ciclo (listo, bloqueado o suspendido)
         for (int i = 0; i < this.processList.size(); i++) {
             ProcessControlBlock w = this.processList.get(i);
             if (w != null && w != executedThisCycle
-                    && (w.getState() == ProcessState.LISTO || w.getState() == ProcessState.BLOQUEADO)) {
+                    && (w.getState() == ProcessState.LISTO || w.getState() == ProcessState.BLOQUEADO
+                    || w.getState() == ProcessState.SUSPENDIDO_LISTO || w.getState() == ProcessState.SUSPENDIDO_BLOQUEADO)) {
                 w.incrementWaitingTime();
-                w.sampleReadyWait(currentCycle);
+                if (w.getState() == ProcessState.LISTO || w.getState() == ProcessState.SUSPENDIDO_LISTO) {
+                    w.sampleReadyWait(currentCycle);
+                }
             }
         }
 
         // 6. Avanzar componentes de hardware auxiliares que reaccionan al reloj (ARC-22)
         if (comp.getDma() != null) {
             comp.getDma().tick(currentCycle);
+        }
+
+        // 6.5 [P2] Revisar si hay procesos en SUSPENDIDO_LISTO que puedan reactivarse a RAM
+        if (!this.suspendedReadyQueue.isEmpty()) {
+            evaluateMidTermReactivation(comp);
         }
     }
 
@@ -664,7 +707,9 @@ public class ComputerKernel {
             ProcessControlBlock p = this.processList.get(i);
             if (p != null
                     && p.getState() != ProcessState.TERMINADO
-                    && p.getState() != ProcessState.NUEVO) {
+                    && p.getState() != ProcessState.NUEVO
+                    && p.getState() != ProcessState.SUSPENDIDO_LISTO
+                    && p.getState() != ProcessState.SUSPENDIDO_BLOQUEADO) {
                 p.updateDeadlineOnTick(currentCycle);
                 if (p.getRemainingDeadline() <= 0) {
                     // [P2-LEGACY] cleanupProcessResources(p, buffers);
@@ -701,15 +746,28 @@ public class ComputerKernel {
     private void advanceIOBlocks() {
         for (int i = 0; i < this.processList.size(); i++) {
             ProcessControlBlock p = this.processList.get(i);
-            if (p != null
-                    && p.getState() == ProcessState.BLOQUEADO
+            if (p == null || p.getState() == ProcessState.TERMINADO) continue;
+
+            if (p.getState() == ProcessState.BLOQUEADO
                     && p.getBlockReason() == BlockReason.WAITING_IO) {
                 int countdown = p.getIoCycleCountdown() - 1;
                 p.setIoCycleCountdown(countdown);
-                if (countdown <= 0 && p.getState() != ProcessState.TERMINADO) {
+                if (countdown <= 0) {
                     // Desbloquear: volver a READY y preparar countdown para el próximo IO
                     p.setIoCycleCountdown(p.getIoInterval());
                     blockedToReady(p);
+                }
+            } else if (p.getState() == ProcessState.SUSPENDIDO_BLOQUEADO
+                    && p.getBlockReason() == BlockReason.WAITING_IO) {
+                int countdown = p.getIoCycleCountdown() - 1;
+                p.setIoCycleCountdown(countdown);
+                if (countdown <= 0) {
+                    p.setIoCycleCountdown(p.getIoInterval());
+                    this.suspendedBlockedQueue.removeElement(p);
+                    p.setState(ProcessState.SUSPENDIDO_LISTO);
+                    p.setBlockReason(BlockReason.NONE);
+                    this.suspendedReadyQueue.enqueue(p);
+                    event("Evento completado para " + p.getName() + ": pasa de Bloqueado/Suspendido a Listo/Suspendido");
                 }
             }
         }
@@ -786,11 +844,190 @@ public class ComputerKernel {
         return endedQueue;
     }
 
+    /** [P2] Cola de procesos en estado SUSPENDIDO_LISTO. */
+    public MyQueue<ProcessControlBlock> getSuspendedReadyQueue() {
+        return suspendedReadyQueue;
+    }
+
+    /** [P2] Cola de procesos en estado SUSPENDIDO_BLOQUEADO. */
+    public MyQueue<ProcessControlBlock> getSuspendedBlockedQueue() {
+        return suspendedBlockedQueue;
+    }
+
     public GlobalClock getClock() {
         return clock;
     }
 
     public IScheduler getActiveScheduler() {
         return activeScheduler;
+    }
+
+    // --- [P2] GETTERS/SETTERS DEL DISCO Y PLANIFICADOR A MEDIANO PLAZO ---
+
+    public SimulatedDisk getDisk() { return disk; }
+    public void setDisk(SimulatedDisk disk) { this.disk = disk; }
+    public MidTermScheduler getMidTermScheduler() { return midTermScheduler; }
+    public int getSuspensionCount() { return suspensionCount; }
+    public int getReactivationCount() { return reactivationCount; }
+
+    // =========================================================================
+    // [P2] LÓGICA DEL PLANIFICADOR A MEDIANO PLAZO Y REGISTRO DE EVENTOS
+    // =========================================================================
+
+    /**
+     * Intenta liberar RAM suspendiendo un proceso Bloqueado cuando un proceso nuevo
+     * no puede ser admitido por falta de espacio en memoria principal.
+     */
+    public void evaluateMidTermSuspension(Computer com, ProcessControlBlock targetNew) {
+        if (com == null || disk == null) return;
+
+        int neededMem = (targetNew != null)
+                ? (targetNew.getAssignedMemory() > 0 ? targetNew.getAssignedMemory() : targetNew.getRequiredMemory())
+                : 1;
+        if (com.getMemoryManager() != null && com.getMemoryManager().hasAvailableMemory(neededMem)) return;
+
+        ProcessControlBlock victim = midTermScheduler.selectVictimToSuspend(this.blockedQueue, disk);
+        if (victim == null) return;
+
+        int mem = victim.getAssignedMemory() > 0 ? victim.getAssignedMemory() : victim.getRequiredMemory();
+        if (mem <= 0) return;
+
+        int startSwapBlock = disk.allocateSwapBlocks(victim.getId(), victim.getName(), mem);
+        if (startSwapBlock < 0) return;
+
+        victim.setPreSuspensionBlockReason(victim.getBlockReason());
+        victim.setBlockReason(BlockReason.SWAPPING_OUT);
+
+        // Registro del evento exigido: "Se suspende al proceso P7 para admitir a P9"
+        String nuevoProcName = (targetNew != null) ? targetNew.getName() : "nuevos procesos";
+        event("Se suspende al proceso " + victim.getName() + " para admitir a " + nuevoProcName);
+        event("Iniciando swap-out de " + victim.getName() + " al área de intercambio (bloque " + startSwapBlock + ")");
+
+        int reqId = nextSwapRequestId++;
+        IORequest req = new IORequest(reqId, victim, IOOperationType.SUSPEND,
+                "SWAP:" + victim.getName(), startSwapBlock, mem, clock != null ? clock.getCycleCounter() : 0);
+        disk.enqueueRequest(req);
+        suspensionCount++;
+    }
+
+    /**
+     * Invocado por el disco al completar una solicitud SUSPEND (swap-out).
+     * Libera la RAM de la víctima y la traslada formalmente a SUSPENDIDO_BLOQUEADO.
+     */
+    public void onSwapOutCompleted(Computer com, IORequest request) {
+        if (request == null || request.getPcb() == null) return;
+        ProcessControlBlock p = request.getPcb();
+        if (p.isTerminated()) return;
+
+        int mem = p.getAssignedMemory() > 0 ? p.getAssignedMemory() : p.getRequiredMemory();
+        if (com != null && com.getMemoryManager() != null && p.getAssignedMemory() > 0) {
+            com.getMemoryManager().freeMemory(p.getAssignedMemory());
+            p.setAssignedMemory(0);
+        }
+
+        this.blockedQueue.removeElement(p);
+        p.setState(ProcessState.SUSPENDIDO_BLOQUEADO);
+        p.setBlockReason(p.getPreSuspensionBlockReason() != BlockReason.NONE ? p.getPreSuspensionBlockReason() : BlockReason.WAITING_IO);
+        this.suspendedBlockedQueue.enqueue(p);
+
+        event("Swap-out completado: el proceso " + p.getName() + " pasa a Bloqueado/Suspendido (liberada RAM: " + mem + ")");
+
+        if (com != null) {
+            evaluateNewQueueAdmission(com);
+            evaluateMidTermReactivation(com);
+        }
+    }
+
+    /**
+     * Evalúa si puede reactivar un proceso Listo/Suspendido (swap-in), trayéndolo de vuelta a RAM.
+     */
+    public void evaluateMidTermReactivation(Computer com) {
+        if (com == null || disk == null) return;
+
+        ProcessControlBlock candidate = midTermScheduler.selectProcessToReactivate(
+                this.suspendedReadyQueue, com.getMemoryManager());
+        if (candidate == null) return;
+
+        int mem = candidate.getRequiredMemory() > 0 ? candidate.getRequiredMemory() : candidate.getAssignedMemory();
+        if (mem <= 0) return;
+
+        if (com.getMemoryManager() != null) {
+            if (!com.getMemoryManager().hasAvailableMemory(mem)) return;
+            com.getMemoryManager().allocateMemory(mem);
+        }
+        candidate.setAssignedMemory(mem);
+        candidate.setBlockReason(BlockReason.SWAPPING_IN);
+
+        int swapBlock = findSwapStartBlock(candidate.getId());
+
+        event("Se reactiva al proceso " + candidate.getName() + ": iniciando swap-in desde área de intercambio (bloque " + swapBlock + ")");
+
+        int reqId = nextSwapRequestId++;
+        IORequest req = new IORequest(reqId, candidate, IOOperationType.REACTIVATE,
+                "SWAP:" + candidate.getName(), swapBlock, mem, clock != null ? clock.getCycleCounter() : 0);
+        disk.enqueueRequest(req);
+        reactivationCount++;
+    }
+
+    /**
+     * Invocado por el disco al completar una solicitud REACTIVATE (swap-in).
+     * Libera los bloques del área de swap y traslada el proceso a la cola de listos (READY).
+     */
+    public void onSwapInCompleted(Computer com, IORequest request) {
+        if (request == null || request.getPcb() == null) return;
+        ProcessControlBlock p = request.getPcb();
+        if (p.isTerminated()) return;
+
+        if (disk != null) {
+            disk.freeSwapBlocksByProcess(p.getId());
+        }
+
+        this.suspendedReadyQueue.removeElement(p);
+        p.setState(ProcessState.LISTO);
+        p.setBlockReason(BlockReason.NONE);
+        this.readyQueue.enqueue(p);
+        reorderReadyQueue(this.currentPolicy, false);
+
+        event("Swap-in completado: el proceso " + p.getName() + " pasa a Listo (RAM asignada: " + p.getAssignedMemory() + ")");
+    }
+
+    /**
+     * Maneja la finalización de solicitudes de E/S del disco enrutando según la operación.
+     */
+    public void handleDiskCompletion(Computer com, IORequest request, int cycle) {
+        if (request == null) return;
+        switch (request.getOperation()) {
+            case SUSPEND -> onSwapOutCompleted(com, request);
+            case REACTIVATE -> onSwapInCompleted(com, request);
+            default -> {
+                ProcessControlBlock p = request.getPcb();
+                if (p != null && !p.isTerminated()) {
+                    if (p.getState() == ProcessState.BLOQUEADO && p.getBlockReason() == BlockReason.WAITING_DISK) {
+                        blockedToReady(p);
+                        event("Disco completó " + request.getOperation() + " para " + proceso(p) + " → LISTO");
+                    } else if (p.getState() == ProcessState.SUSPENDIDO_BLOQUEADO) {
+                        this.suspendedBlockedQueue.removeElement(p);
+                        p.setState(ProcessState.SUSPENDIDO_LISTO);
+                        p.setBlockReason(BlockReason.NONE);
+                        this.suspendedReadyQueue.enqueue(p);
+                        event("Evento completado para " + p.getName() + ": pasa de Bloqueado/Suspendido a Listo/Suspendido");
+                        if (com != null) evaluateMidTermReactivation(com);
+                    }
+                }
+            }
+        }
+    }
+
+    private int findSwapStartBlock(int processId) {
+        if (disk == null) return 0;
+        int total = disk.getTotalBlocks();
+        int limit = total + disk.getSwapSizeBlocks();
+        for (int i = total; i < limit; i++) {
+            com.avilaos.disk.DiskBlock b = disk.getBlock(i);
+            if (b != null && b.isOccupied() && b.getOwnerProcessId() == processId) {
+                return i;
+            }
+        }
+        return total;
     }
 }

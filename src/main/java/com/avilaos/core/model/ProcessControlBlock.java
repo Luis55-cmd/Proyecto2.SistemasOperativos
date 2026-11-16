@@ -38,6 +38,7 @@ public class ProcessControlBlock {
     private ProcessType type;
     private ExecutionMode mode;
     private BlockReason blockReason;
+    private BlockReason preSuspensionBlockReason = BlockReason.NONE;
     private int priority;
     private int assignedMemory;
     /** Memoria solicitada al crear el proceso, incluso después de liberarla. */
@@ -444,6 +445,14 @@ public class ProcessControlBlock {
         this.blockReason = blockReason;
     }
 
+    public BlockReason getPreSuspensionBlockReason() {
+        return preSuspensionBlockReason != null ? preSuspensionBlockReason : BlockReason.NONE;
+    }
+
+    public void setPreSuspensionBlockReason(BlockReason preSuspensionBlockReason) {
+        this.preSuspensionBlockReason = preSuspensionBlockReason;
+    }
+
     public int getPriority() {
         return priority;
     }
@@ -457,7 +466,11 @@ public class ProcessControlBlock {
     }
 
     public int getRequiredMemory() {
-        return requiredMemory;
+        return requiredMemory > 0 ? requiredMemory : assignedMemory;
+    }
+
+    public void setRequiredMemory(int requiredMemory) {
+        this.requiredMemory = requiredMemory;
     }
 
     public void setAssignedMemory(int assignedMemory) {

@@ -74,6 +74,17 @@ public class MyQueue<T> {
         }
         return this.pFirst.data;
     }
+
+    public T get(int index) {
+        if (index < 0 || index >= this.size) {
+            throw new IndexOutOfBoundsException("Índice fuera de rango: " + index);
+        }
+        Node<T> current = this.pFirst;
+        for (int i = 0; i < index; i++) {
+            current = current.pNext;
+        }
+        return current.data;
+    }
     
     public boolean removeElement(T data) {
         if (isEmpty()) {

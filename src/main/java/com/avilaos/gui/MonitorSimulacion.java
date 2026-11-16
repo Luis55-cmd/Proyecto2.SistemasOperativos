@@ -88,6 +88,23 @@ public final class MonitorSimulacion extends JPanel {
     private final JScrollPane scrollTerminados = new JScrollPane(tablaTerminados);
     private final JLabel tituloTerminados = texto("COLA DE TERMINADOS (TERMINATED) · 0 procesos", 12, TINTA, true);
 
+    // [P2] Colas de Procesos Suspendidos (Swap)
+    private final DefaultTableModel modeloListosSuspendidos = new DefaultTableModel(
+            new Object[]{"ID", "Nombre", "Tipo", "Prioridad", "T. Restante", "Deadline Rest.", "PC", "Memoria Requerida"}, 0) {
+        @Override public boolean isCellEditable(int row, int column) { return false; }
+    };
+    private final JTable tablaListosSuspendidos = new JTable(modeloListosSuspendidos);
+    private final JScrollPane scrollListosSuspendidos = new JScrollPane(tablaListosSuspendidos);
+    private final JLabel tituloListosSuspendidos = texto("COLA DE LISTOS / SUSPENDIDOS (SWAP) · 0 procesos", 12, TINTA, true);
+
+    private final DefaultTableModel modeloBloqueadosSuspendidos = new DefaultTableModel(
+            new Object[]{"ID", "Nombre", "Tipo", "Motivo", "Prioridad", "T. Restante", "Deadline Rest.", "Memoria Requerida"}, 0) {
+        @Override public boolean isCellEditable(int row, int column) { return false; }
+    };
+    private final JTable tablaBloqueadosSuspendidos = new JTable(modeloBloqueadosSuspendidos);
+    private final JScrollPane scrollBloqueadosSuspendidos = new JScrollPane(tablaBloqueadosSuspendidos);
+    private final JLabel tituloBloqueadosSuspendidos = texto("COLA DE BLOQUEADOS / SUSPENDIDOS (SWAP) · 0 procesos", 12, TINTA, true);
+
     private final JPanel panelDetalleColas = new JPanel();
 
 // [P2-LEGACY]     // --- Componentes para visualizar los Buffers Globales ---
@@ -149,6 +166,10 @@ public final class MonitorSimulacion extends JPanel {
         panelDetalleColas.add(crearSeccionCola(tituloListos, scrollListos, tablaListos));
         panelDetalleColas.add(Box.createVerticalStrut(12));
         panelDetalleColas.add(crearSeccionCola(tituloBloqueados, scrollBloqueados, tablaBloqueados));
+        panelDetalleColas.add(Box.createVerticalStrut(12));
+        panelDetalleColas.add(crearSeccionCola(tituloListosSuspendidos, scrollListosSuspendidos, tablaListosSuspendidos));
+        panelDetalleColas.add(Box.createVerticalStrut(12));
+        panelDetalleColas.add(crearSeccionCola(tituloBloqueadosSuspendidos, scrollBloqueadosSuspendidos, tablaBloqueadosSuspendidos));
         panelDetalleColas.add(Box.createVerticalStrut(12));
         panelDetalleColas.add(crearSeccionCola(tituloTerminados, scrollTerminados, tablaTerminados));
         panelDetalleColas.setVisible(false);
@@ -298,6 +319,7 @@ public final class MonitorSimulacion extends JPanel {
         
         this.controller.addLogListener(mensaje -> {
             areaLog.append(mensaje + "\n");
+            areaLog.setCaretPosition(areaLog.getDocument().getLength());
         });
 
         this.controller.addGUIListener(() -> {
@@ -702,6 +724,42 @@ public final class MonitorSimulacion extends JPanel {
             });
         }
         tituloBloqueados.setText("COLA DE BLOQUEADOS (BLOCKED) - " + bloqueados.size() + " procesos");
+
+        // 3.5 [P2] Listos Suspendidos
+        modeloListosSuspendidos.setRowCount(0);
+        var listosSusp = kernel.getReadySuspendedQueue().getProcesses();
+        for (int i = 0; i < listosSusp.size(); i++) {
+            var p = listosSusp.get(i);
+            modeloListosSuspendidos.addRow(new Object[]{
+                p.getId(),
+                p.getName() != null ? p.getName() : "P" + p.getId(),
+                formatoTipo(p.getType()),
+                p.getPriority(),
+                p.getRemainingTime(),
+                p.getRemainingDeadline(),
+                p.getProgramCounter(),
+                p.getAssignedMemory()
+            });
+        }
+        tituloListosSuspendidos.setText("COLA DE LISTOS / SUSPENDIDOS (SWAP) - " + listosSusp.size() + " procesos");
+
+        // 3.6 [P2] Bloqueados Suspendidos
+        modeloBloqueadosSuspendidos.setRowCount(0);
+        var bloqueadosSusp = kernel.getBlockedSuspendedQueue().getProcesses();
+        for (int i = 0; i < bloqueadosSusp.size(); i++) {
+            var p = bloqueadosSusp.get(i);
+            modeloBloqueadosSuspendidos.addRow(new Object[]{
+                p.getId(),
+                p.getName() != null ? p.getName() : "P" + p.getId(),
+                formatoTipo(p.getType()),
+                formatoMotivoBloqueo(p.getBlockReason()),
+                p.getPriority(),
+                p.getRemainingTime(),
+                p.getRemainingDeadline(),
+                p.getAssignedMemory()
+            });
+        }
+        tituloBloqueadosSuspendidos.setText("COLA DE BLOQUEADOS / SUSPENDIDOS (SWAP) - " + bloqueadosSusp.size() + " procesos");
 
         // 4. Terminados
         modeloTerminados.setRowCount(0);
