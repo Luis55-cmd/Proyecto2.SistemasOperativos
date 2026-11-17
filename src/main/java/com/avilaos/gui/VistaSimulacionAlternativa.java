@@ -66,6 +66,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
             long sesionActual = controller.session();
             if (session != sesionActual) { eventos.setText(""); session = sesionActual; }
             eventos.append(texto + "\n");
+            eventos.setCaretPosition(eventos.getDocument().getLength());
         });
         actualizar();
     }
@@ -266,8 +267,8 @@ public final class VistaSimulacionAlternativa extends JPanel {
         private final JLabel ram = texto("", 13, GRIS, false);
         private final JComboBox<SchedulingPolicyType> politica = new JComboBox<>(SchedulingPolicyType.values());
         private final JSpinner quantum = new JSpinner(new SpinnerNumberModel(3, 1, 99, 1));
-        private final DefaultTableModel[] modelos = new DefaultTableModel[4];
-        private final JScrollPane[] tablasColas = new JScrollPane[4];
+        private final DefaultTableModel[] modelos = new DefaultTableModel[6];
+        private final JScrollPane[] tablasColas = new JScrollPane[6];
         private boolean actualizandoDetalle;
         DetalleComputador(int id) {
             this.id = id; setLayout(new BoxLayout(this, BoxLayout.Y_AXIS)); setBackground(FONDO);
@@ -281,8 +282,8 @@ public final class VistaSimulacionAlternativa extends JPanel {
             politica.addActionListener(e -> { if (!actualizandoDetalle && politica.getSelectedItem() != null) { var seleccion=(SchedulingPolicyType) politica.getSelectedItem(); GuiRequest.control(controller, () -> controller.setComputerPolicy(id, seleccion)); } });
             quantum.addChangeListener(e -> { if (!actualizandoDetalle) { int q=(Integer) quantum.getValue(); GuiRequest.control(controller, () -> controller.setComputerQuantum(id, q)); } });
             add(tarjetaCPU); add(Box.createVerticalStrut(18));
-            String[] nombres={"Nuevos", "Listos", "Bloqueados", "Terminados"};
-            for(int i=0;i<4;i++) {
+            String[] nombres={"Nuevos", "Listos", "Bloqueados", "Listos / Suspendidos (Swap)", "Bloqueados / Suspendidos (Swap)", "Terminados"};
+            for(int i=0;i<6;i++) {
                 modelos[i]=tabla("ID", "Nombre", "Tipo", "Prioridad", "RAM requerida", "T. Restante", "Deadline", "PC", "Motivo");
                 add(texto(nombres[i], 15, TINTA, true)); add(Box.createVerticalStrut(6));
                 JTable t=new JTable(modelos[i]); t.setRowHeight(28); t.setBackground(PAPEL); t.setForeground(TINTA);
@@ -295,10 +296,10 @@ public final class VistaSimulacionAlternativa extends JPanel {
             actualizandoDetalle = true;
             var p=c.cpu().PCB();
             cpu.setText(p==null ? "CPU libre · " + c.cpu().mode() : "Ejecuta " + p.name() + " (ID " + p.id() + ") · PC " + c.cpu().PC() + " · " + c.cpu().mode() + " · Prioridad " + p.priority() + " · Deadline " + p.remainingDeadline());
-            ram.setText("RAM: " + c.memoryManager().usedMemory() + " usada · " + (c.memoryManager().totalMemory()-c.memoryManager().usedMemory()) + " libre · " + c.memoryManager().totalMemory() + " total");
+            ram.setText("RAM: " + c.memoryManager().usedMemory() + " usada · " + (c.memoryManager().totalMemory()-c.memoryManager().usedMemory()) + " libre · " + c.memoryManager().totalMemory() + " total  |  Swap: " + c.suspensionCount() + " suspensiones · " + c.reactivationCount() + " reactivaciones");
             politica.setSelectedItem(c.politica()); if (!((JSpinner.DefaultEditor) quantum.getEditor()).getTextField().hasFocus()) quantum.setValue(c.quantum());
             quantum.setEnabled(c.politica()==SchedulingPolicyType.ROUND_ROBIN);
-            var k=c.kernel(); var colas=new SimulationSnapshot.QueueView[]{k.newQueue(),k.readyQueue(),k.blockedQueue(),k.endedQueue()};
+            var k=c.kernel(); var colas=new SimulationSnapshot.QueueView[]{k.newQueue(),k.readyQueue(),k.blockedQueue(),k.readySuspendedQueue(),k.blockedSuspendedQueue(),k.endedQueue()};
             for(int i=0;i<colas.length;i++) { modelos[i].setRowCount(0); for(int j=0;j<colas[i].processes().size();j++) {
                 ProcessView pcola=colas[i].processes().get(j);
                 modelos[i].addRow(new Object[]{pcola.id(),pcola.name(),pcola.type(),pcola.priority(),pcola.assignedMemory(),pcola.remainingTime(),pcola.remainingDeadline(),pcola.programCounter(),motivo(pcola)});

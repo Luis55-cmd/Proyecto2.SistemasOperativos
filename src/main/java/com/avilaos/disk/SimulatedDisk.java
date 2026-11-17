@@ -403,7 +403,7 @@ public class SimulatedDisk implements IClockTickable {
             }
             String policyName = schedulingPolicy != null ? schedulingPolicy.getPolicyType().name() : "FIFO";
             String procName = finished.getPcb() != null ? finished.getPcb().getName() : ("Req#" + finished.getId());
-            emitEvent("El disco atiende la solicitud de " + procName + " en el bloque "
+            emitEvent("El disco completó la solicitud de " + procName + " en el bloque "
                     + finished.getTargetBlock() + " (" + policyName + ")");
             if (completionListener != null) {
                 completionListener.onRequestCompleted(finished, currentCycle);
@@ -487,8 +487,8 @@ public class SimulatedDisk implements IClockTickable {
 
             String policyName = schedulingPolicy != null ? schedulingPolicy.getPolicyType().name() : "FIFO";
             String procName = selected.getPcb() != null ? selected.getPcb().getName() : ("Req#" + selected.getId());
-            emitEvent("El disco selecciona la solicitud de " + procName + " hacia el bloque "
-                    + selected.getTargetBlock() + " (" + policyName + ", dir " + headDirection.getSymbol() + ")");
+            emitEvent("El disco atiende la solicitud de " + procName + " en el bloque "
+                    + selected.getTargetBlock() + " (" + policyName + ")");
         }
     }
 
