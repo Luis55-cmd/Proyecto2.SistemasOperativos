@@ -17,6 +17,7 @@ import com.avilaos.hardware.CPU;
 import com.avilaos.hardware.Computer;
 import com.avilaos.hardware.DMA;
 import com.avilaos.hardware.RAM;
+import com.avilaos.core.model.UserMode;
 
 import javax.swing.SwingUtilities;
 import com.avilaos.concurrency.StateAccess;
@@ -50,6 +51,7 @@ public class SimulationController implements IClockTickable {
     private volatile SimulationSnapshot snapshot;
     private volatile long session;
     private boolean refreshPending;
+    private UserMode currentMode = UserMode.ADMIN;
     public SimulationSnapshot snapshot() { return snapshot; }
     public long session() { return session; }
     public void requireSession(long expected) {
@@ -512,58 +514,6 @@ public class SimulationController implements IClockTickable {
         } finally { StateAccess.exit(); }
     }
 
-// [P2-LEGACY]     public Buffer createBuffer(int hostComputerId, int storage) {
-// [P2-LEGACY]         StateAccess.enter();
-// [P2-LEGACY]         try {
-// [P2-LEGACY]         return createBuffer(hostComputerId, storage, storage, getNetworkLatency());
-// [P2-LEGACY] 
-// [P2-LEGACY]         } finally { StateAccess.exit(); }
-// [P2-LEGACY]     }
-// [P2-LEGACY] 
-// [P2-LEGACY]     /** Compatibilidad con cargas anteriores: la RAM se deriva de capacidad, no del campo legacy memory. */
-// [P2-LEGACY]     public Buffer createBuffer(int hostComputerId, int storage, int latency) {
-// [P2-LEGACY]         StateAccess.enter();
-// [P2-LEGACY]         try {
-// [P2-LEGACY]         return createBuffer(hostComputerId, storage, storage, latency);
-// [P2-LEGACY] 
-// [P2-LEGACY]         } finally { StateAccess.exit(); }
-// [P2-LEGACY]     }
-// [P2-LEGACY] 
-// [P2-LEGACY] 
-// [P2-LEGACY]     public Buffer createBuffer(int hostComputerId, int storage, int memory, int latency) {
-// [P2-LEGACY]         StateAccess.enter();
-// [P2-LEGACY]         try {
-// [P2-LEGACY]         if (storage <= 0) {
-// [P2-LEGACY]             return null;
-// [P2-LEGACY]         }
-// [P2-LEGACY]         Computer host = getComputerById(hostComputerId);
-// [P2-LEGACY]         if (host == null || host.getKernel() == null) {
-// [P2-LEGACY]             logEvent("Error: Computador anfitrión inválido para crear Buffer");
-// [P2-LEGACY]             return null;
-// [P2-LEGACY]         }
-// [P2-LEGACY] 
-// [P2-LEGACY]         int id = nextBufferId;
-// [P2-LEGACY]         Buffer buffer = new Buffer(null, null, null, hostComputerId, storage, id, new MyQueue<>(), storage, latency);
-// [P2-LEGACY]         boolean success = host.getKernel().placeBufferRAM(buffer, host);
-// [P2-LEGACY]         if (!success) {
-// [P2-LEGACY]             logEvent("Error: Memoria RAM insuficiente en " + host.getName() + " para crear el Buffer " + id);
-// [P2-LEGACY]             return null;
-// [P2-LEGACY]         }
-// [P2-LEGACY] 
-// [P2-LEGACY]         nextBufferId++;
-// [P2-LEGACY]         this.buffers.append(buffer);
-// [P2-LEGACY] 
-// [P2-LEGACY]         logEvent("Buffer " + id + " creado en " + host.getName() + " con capacidad " + storage + " y latencia " + latency + " ticks");
-// [P2-LEGACY]         notifyGUI();
-// [P2-LEGACY]         return buffer;
-// [P2-LEGACY] 
-// [P2-LEGACY]         } finally { StateAccess.exit(); }
-// [P2-LEGACY]     }
-
-    // =========================================================================
-    // CONTROL DEL RELOJ GLOBAL (Play, Pausa, Step, Velocidad)
-    // =========================================================================
-
     public void startSimulation() {
         StateAccess.enter();
         try {
@@ -622,63 +572,6 @@ public class SimulationController implements IClockTickable {
     public boolean isPaused() {
         return this.clock.isPaused();
     }
-
-// [P2-LEGACY]     public void setNetworkLatency(int latencyCycles) {
-// [P2-LEGACY]         StateAccess.enter();
-// [P2-LEGACY]         try { 
-// [P2-LEGACY]             this.syncDriver.setLatencia(latencyCycles);
-// [P2-LEGACY]             for (int i = 0; i < this.buffers.size(); i++) {
-// [P2-LEGACY]                 Buffer b = this.buffers.get(i);
-// [P2-LEGACY]                 if (b != null) {
-// [P2-LEGACY]                     b.setLatency(latencyCycles);
-// [P2-LEGACY]                 }
-// [P2-LEGACY]             }
-// [P2-LEGACY]             logEvent("Latencia de red actualizada a " + latencyCycles + " ciclos");
-// [P2-LEGACY]         } finally { StateAccess.exit(); }
-// [P2-LEGACY]     }
-// [P2-LEGACY] 
-// [P2-LEGACY]     public int getNetworkLatency() {
-// [P2-LEGACY]         return this.syncDriver.getLatencia();
-// [P2-LEGACY]     }
-// [P2-LEGACY] 
-// [P2-LEGACY]     public void setBufferLatency(int bufferId, int latency) {
-// [P2-LEGACY]         StateAccess.enter();
-// [P2-LEGACY]         try {
-// [P2-LEGACY]             Buffer b = getBufferById(bufferId);
-// [P2-LEGACY]             if (b != null) {
-// [P2-LEGACY]                 b.setLatency(latency);
-// [P2-LEGACY]                 int nuevaLat = b.getLatency();
-// [P2-LEGACY]                 MyLinkedList<ProcessControlBlock> procs = getAllProcesses();
-// [P2-LEGACY]                 for (int i = 0; i < procs.size(); i++) {
-// [P2-LEGACY]                     ProcessControlBlock p = procs.get(i);
-// [P2-LEGACY]                     if (p != null && p.getState() == ProcessState.BLOQUEADO && p.getBlockReason() == BlockReason.NETWORK_LATENCY) {
-// [P2-LEGACY]                         int pBufId = p.getPermitBufferId();
-// [P2-LEGACY]                         if (pBufId <= 0 && p.getTargetBufferId() != null) {
-// [P2-LEGACY]                             try {
-// [P2-LEGACY]                                 pBufId = Integer.parseInt(p.getTargetBufferId().replaceAll("[^0-9]", ""));
-// [P2-LEGACY]                             } catch (Exception ignored) {}
-// [P2-LEGACY]                         }
-// [P2-LEGACY]                         if (pBufId == bufferId) {
-// [P2-LEGACY]                             if (p.getNetworkDelayRemaining() > nuevaLat) {
-// [P2-LEGACY]                                 p.setNetworkDelayRemaining(nuevaLat);
-// [P2-LEGACY]                                 if (nuevaLat <= 0) {
-// [P2-LEGACY]                                     p.setNetworkDelayDone(true);
-// [P2-LEGACY]                                 }
-// [P2-LEGACY]                             }
-// [P2-LEGACY]                         }
-// [P2-LEGACY]                     }
-// [P2-LEGACY]                 }
-// [P2-LEGACY]                 logEvent("Latencia del Buffer " + bufferId + " actualizada a " + nuevaLat + " ticks");
-// [P2-LEGACY]                 notifyGUI();
-// [P2-LEGACY]             } else {
-// [P2-LEGACY]                 logEvent("Error: No se encontrÃ³ el Buffer con ID " + bufferId);
-// [P2-LEGACY]             }
-// [P2-LEGACY]         } finally { StateAccess.exit(); }
-// [P2-LEGACY]     }
-
-    // =========================================================================
-    // AVANCE SINCRONIZADO POR CICLO (IClockTickable) Y REPORTE DE LOGS
-    // =========================================================================
 
     @Override
     public void tick(int currentCycle) {
@@ -740,18 +633,10 @@ public class SimulationController implements IClockTickable {
 
         } finally { StateAccess.exit(); }
     }
-
-    // =========================================================================
-    // GETTERS PARA CONSULTA DE ESTADO DESDE LA GUI (Observabilidad)
-    // =========================================================================
-
     public MyLinkedList<Computer> getComputers() {
         return computers;
     }
 
-// [P2-LEGACY]     public MyLinkedList<Buffer> getBuffers() {
-// [P2-LEGACY]         return buffers;
-// [P2-LEGACY]     }
 
     public Computer getComputerById(int id) {
         for (int i = 0; i < this.computers.size(); i++) {
@@ -762,16 +647,6 @@ public class SimulationController implements IClockTickable {
         }
         return null;
     }
-
-// [P2-LEGACY]     public Buffer getBufferById(int id) {
-// [P2-LEGACY]         for (int i = 0; i < this.buffers.size(); i++) {
-// [P2-LEGACY]             Buffer b = this.buffers.get(i);
-// [P2-LEGACY]             if (b != null && b.getId() == id) {
-// [P2-LEGACY]                 return b;
-// [P2-LEGACY]             }
-// [P2-LEGACY]         }
-// [P2-LEGACY]         return null;
-// [P2-LEGACY]     }
 
     public MyLinkedList<ProcessControlBlock> getAllProcesses() {
         MyLinkedList<ProcessControlBlock> all = new MyLinkedList<>();
@@ -1079,5 +954,20 @@ public class SimulationController implements IClockTickable {
         } finally {
             com.avilaos.concurrency.StateAccess.exit();
         }
+    }
+    
+    public UserMode getMode() {
+        return currentMode;
+    }
+
+    /**
+     * Cambia el modo de usuario del sistema.
+     * @param mode El nuevo modo (ADMIN o USER).
+     */
+    public void setMode(UserMode mode) {
+        this.currentMode = mode;
+        
+        // Opcional: Registrar el cambio en la consola de eventos de la interfaz
+        logEvent("Cambio de sesión: Ahora operando en modo " + mode.name());
     }
 }

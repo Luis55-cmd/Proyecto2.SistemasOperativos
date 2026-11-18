@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import static com.avilaos.gui.PanelPrincipal.*;
+import com.avilaos.core.model.UserMode;
 
 /** Vista de simulación y sus controles. */
 public final class VistaSimulacionAlternativa extends JPanel {
@@ -25,6 +26,8 @@ public final class VistaSimulacionAlternativa extends JPanel {
     private final JButton paso = accion("+1 ciclo", false);
     private final JComboBox<Integer> intervalo = new JComboBox<>(new Integer[]{100, 250, 500, 1000});
     private final JTabbedPane vistas = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
+    private UserMode modoUsuario = UserMode.ADMIN; // Modo por defecto
+    private final JButton botonModoUsuario = accion("Modo: ADMIN", false);
     private final JPanel resumenEquipos = new JPanel();
 // [P2-LEGACY]     private final DefaultTableModel modeloBuffers = tabla("Buffer", "Computador", "Elementos", "Capacidad", "Latencia", "Mutex", "Llenos", "Vacíos");
 // [P2-LEGACY]     private final JTable buffers = new JTable(modeloBuffers);
@@ -89,6 +92,16 @@ public final class VistaSimulacionAlternativa extends JPanel {
         JButton aplicar = accion("Aplicar", false);
         aplicar.addActionListener(e -> { Integer ms = (Integer) intervalo.getSelectedItem(); if (ms != null) GuiRequest.control(controller, () -> controller.setCycleDurationMs(ms)); });
         controles.add(aplicar);
+        botonModoUsuario.addActionListener(e -> {
+            // Alternar entre ADMIN y USER
+            modoUsuario = (modoUsuario == UserMode.ADMIN) ? UserMode.USER : UserMode.ADMIN;
+            botonModoUsuario.setText("Modo: " + modoUsuario.name());
+            
+            GuiRequest.control(controller, () -> controller.setMode(modoUsuario));
+            
+            actualizar(); 
+        });
+        controles.add(botonModoUsuario);
         principal.add(controles);
         principal.add(Box.createVerticalStrut(8));
         JPanel archivos = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
