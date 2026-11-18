@@ -16,7 +16,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 |---|---|---|
 | T01 | ✅ | Compilar y abrir en NetBeans; comprobar arranque de la simulación con un computador. |
 | T02 | ✅ | Ejecutar las pruebas existentes de disco y registrar resultados y fallos. |
-| T03 | ✅ | Verificar límites de configuración: bloques totales, swap, cabezal y velocidad. |
+| T03 | 🟨 | Verificar límites de configuración: bloques totales, swap, cabezal y velocidad. |
 | T04 | ✅ | Comprobar que las zonas de archivos y swap no se solapen. |
 | T05 | ✅ | Asignar un archivo de varios bloques y recorrer la cadena hasta su fin. |
 | T06 | ✅ | Eliminarlo y comprobar que todos sus bloques vuelven a quedar libres. |
@@ -25,8 +25,8 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T09 | ✅ | Comprobar tiempos de desplazamiento y lectura/escritura por ciclo. |
 | T10 | ✅ | Ejecutar FIFO y SSTF con los casos del enunciado; registrar orden y desplazamiento. |
 | T11 | ✅ | Ejecutar SCAN y C-SCAN en dirección creciente; registrar extremos, retorno y convención del salto. |
-| T12 | ✅ | Verificar cambio de política con solicitudes pendientes y pausa/reanudación. |
-| T13 | ✅ | Comprobar que CPU, memoria y métricas anteriores siguen funcionando con un computador. |
+| T12 | 🟨 | Verificar cambio de política con solicitudes pendientes y pausa/reanudación. |
+| T13 | 🟨 | Comprobar que CPU, memoria y métricas anteriores siguen funcionando con un computador. |
 
 ## Árbol y operaciones — #3, #10, #11
 
@@ -44,24 +44,24 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T23 | ✅ | Comprobar permisos de administrador para cada operación. |
 | T24 | ✅ | Comprobar lectura de archivos propios y públicos y rechazo de privados ajenos. |
 | T25 | ✅ | Comprobar creación de usuario solo en directorio propio y rechazo de modificaciones no autorizadas. |
-| T26 | ✅ | Mostrar el motivo de un rechazo sin interrumpir la simulación. |
+| T26 | 🟨 | Mostrar el motivo de un rechazo sin interrumpir la simulación. |
 
 ## Procesos y disco — #13, #14, #15
 
 | ID | Estado | Acción y comprobación de terminado |
 |---|---|---|
-| T27 | ⬜ | Registrar operación y ruta en el PCB de E/S y validar sus datos de entrada. |
-| T28 | ⬜ | Crear proceso desde interfaz sin ejecutar directamente el CRUD. |
+| T27 | 🟨 | Registrar operación y ruta en el PCB de E/S y validar sus datos de entrada. |
+| T28 | 🟨 | Crear proceso desde interfaz sin ejecutar directamente el CRUD. |
 | T29 | ⬜ | Recorrer admisión, listo y ejecución hasta generar solicitud de disco. |
 | T30 | ⬜ | Comprobar bloqueo por E/S, liberación de CPU y entrada a cola única. |
 | T31 | ⬜ | Completar solicitud y verificar que el proceso vuelve a listo. |
 | T32 | ⬜ | Registrar la operación como instrucción en modo sistema operativo. |
-| T33 | ⬜ | Verificar las siete transiciones y colas, incluyendo bloqueado/suspendido a listo/suspendido al ocurrir su evento. |
+| T33 | 🟨 | Verificar las siete transiciones y colas, incluyendo bloqueado/suspendido a listo/suspendido al ocurrir su evento. |
 | T34 | ⬜ | Probar falta de RAM: proceso nuevo queda en cola de largo plazo. |
-| T35 | ⬜ | Acordar y justificar criterio para seleccionar un proceso bloqueado a suspender. |
-| T36 | ⬜ | Solicitar suspensión por cola de disco y verificar ocupación de swap y liberación de RAM al completarse. |
+| T35 | 🟨 | Acordar y justificar criterio para seleccionar un proceso bloqueado a suspender. |
+| T36 | 🟨 | Solicitar suspensión por cola de disco y verificar ocupación de swap y liberación de RAM al completarse. |
 | T37 | ⬜ | Manejar falta de espacio en swap sin perder proceso ni memoria. |
-| T38 | ⬜ | Solicitar reactivación cuando haya RAM y comprobar liberación de swap y retorno a listo. |
+| T38 | 🟨 | Solicitar reactivación cuando haya RAM y comprobar liberación de swap y retorno a listo. |
 
 ## Persistencia y configuración — #12
 
@@ -81,20 +81,33 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T45 | ⬜ | Mostrar JTree y detalle del elemento seleccionado. |
 | T46 | 🟨 | Mostrar bloques libres, ocupados y de swap con propietario; mostrar cabezal y dirección. |
 | T47 | ⬜ | Mostrar tabla de asignación y actualizarla tras CRUD. |
-| T48 | ⬜ | Mostrar cola de E/S con operación y colas suspendidas con motivo de bloqueo. |
+| T48 | 🟨 | Mostrar cola de E/S con operación y colas suspendidas con motivo de bloqueo. |
 | T49 | 🟨 | Mostrar modo activo y permitir cambiar política de disco durante la ejecución. |
 | T50 | ⬜ | Validar tipo y rango en cada entrada sin detener la simulación. |
-| T51 | ⬜ | Registrar decisiones del disco y del planificador a mediano plazo en el log. |
+| T51 | 🟨 | Registrar decisiones del disco y del planificador a mediano plazo en el log. |
 | T52 | ⬜ | Medir desplazamiento acumulado, espera media y solicitudes atendidas por política. |
 | T53 | ⬜ | Contar suspensiones y reactivaciones y mostrar gráfico de desplazamiento por tiempo. |
 | T54 | ⬜ | Ejecutar un escenario integrado de CRUD mediante proceso de E/S. |
-| T55 | ⬜ | Ejecutar un escenario integrado de suspensión y reactivación. |
+| T55 | 🟨 | Ejecutar un escenario integrado de suspensión y reactivación. |
 | T56 | ⬜ | Documentar clases, métodos, enums e interfaces principales en el informe. |
 | T57 | ⬜ | Actualizar el primer diagrama UML. |
 | T58 | ⬜ | Actualizar el segundo diagrama UML. |
 | T59 | ⬜ | Comparar políticas de disco con las métricas obtenidas y escribir conclusiones. |
 | T60 | ⬜ | Evaluar y documentar el efecto de la suspensión. |
 | T61 | ⬜ | Preparar y practicar la defensa individual de cada integrante. |
+
+## Gestión manual de disco y sesión — seguimiento posterior
+
+| ID | Estado | Acción y comprobación de terminado |
+|---|---|---|
+| T62 | ⬜ | Diseñar e implementar estado inicial sin disco configurado, creación manual o carga JSON y presentación de la vista vacía; impedir arranque sin disco válido. |
+| T63 | ⬜ | Configurar capacidad, swap, velocidad, política y cabezal inicial 0 por defecto; mantener opción para elegir posición inicial y respetar la posición del JSON. |
+| T64 | ⬜ | Definir y probar cambio de tamaño y swap, incluida preservación o pérdida explícita de datos y el caso de procesos suspendidos. |
+| T65 | ⬜ | Permitir ajustar velocidad del cabezal; validar rango, permisos, efecto durante ejecución y registro en log. |
+| T66 | ⬜ | Diseñar e implementar eliminación del disco con confirmación de pérdida, incluso con procesos en swap; determinar y probar el destino de esos procesos, E/S activa y pendientes, sin dejar referencias huérfanas. |
+| T67 | ⬜ | Diseñar control de sesión ADMIN/USER y nombre en Simulación, con ADMIN/admin inicial y reglas de acceso comprobadas en interfaz y backend. Persistencia de sesión entre ejecuciones pendiente de decidir. |
+
+Los criterios son propuestas a precisar función por función, no afirmaciones de implementación. T62 depende de conciliar con el requisito literal de cargar ambos JSON; el equipo no ha confirmado aquí la alternativa manual. La eliminación del computador que conserva el disco es un flujo distinto de T66.
 
 ## Dependencias entre áreas
 
@@ -119,7 +132,7 @@ El [enunciado original convertido a Markdown](instrucciones/enunciado-proyecto-2
 |---|---|---|
 | T01 | 14-11-2026 | NetBeans compiló 64 archivos con destino Java 25 y abrió la interfaz; responde y permite configurar. El usuario confirmó que la simulación arranca tras corregir la condición de dos computadores. |
 
-| T02–T13 | 15-11-2026 | Ejecutadas y aprobadas `SimulatedDiskTest` y `DiskSchedulingPoliciesTest` (`COMPILE 0`): límites, partición datos/swap sin solapamiento, cadenas multibloque, liberación, Casos P1–P4 y Anexo (518, 208, 332, 192 bloques) y cambio de política en caliente en 0 ticks. |
+| Evidencia parcial T02–T13 | 15-11-2026 | Ejecutadas y aprobadas `SimulatedDiskTest` y `DiskSchedulingPoliciesTest` (`COMPILE 0`): límites, partición datos/swap sin solapamiento, cadenas multibloque, liberación, Casos P1–P4 y Anexo (518, 208, 332, 192 bloques) y cambio de política en caliente en 0 ticks. |
 | T14–T22 | 15-11-2026 | Ejecutadas y aprobadas `FileSystemTreeTest` y `FileSystemManagerTest` (`COMPILE 0`): CRUD en `FileSystemManager` protegido con `Semaphore`, vinculación con asignación encadenada en `SimulatedDisk`, rechazo atómico cuando no hay espacio libre y eliminación recursiva de directorios liberando sus bloques en el SD. |
 | T23–T26 | 15-11-2026 | Ejecutada y aprobada `AccessControlManagerTest` (`COMPILE 0`): permisos completos en modo `ADMIN`, restricciones en modo `USER` (lectura de estructura y propios/públicos, creación solo en directorio propio, prohibición de modificar/eliminar recursos del sistema o ajenos) y retorno de `AccessDecision` con motivo claro sin interrumpir la simulación. |
 
@@ -130,7 +143,7 @@ PR [#29](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/29), pe
 - **T39 y T41 en curso:** el estudiante probó desde la interfaz los ejemplos del enunciado, el disco vacío, la lista de procesos vacía y los casos de cabezal inválido, sección faltante y JSON malformado. El log reportó las cargas y rechazos esperados. No se han cubierto todas las validaciones de jerarquía, políticas y rutas, ni se ha demostrado desde la interfaz que el estado anterior permanece intacto después de todos los rechazos.
 - La prueba existente `Module2FileSystemAndPersistenceTest` pasó ejecutada directamente; no se agregaron pruebas automatizadas de integración para los botones. La carga de cero procesos actualmente se acepta; falta decidir si debe permitir arrancar.
 - **T40, T42–T44 y T45–T61 siguen pendientes:** no se ha completado su comprobación integral, la creación manual ni el guardado desde el nuevo Inicio. La propuesta de arranque manual sigue pendiente de validación por el equipo y difiere de la redacción literal del enunciado.
-- **Siguiente propuesta:** diseñar una nueva pantalla de Computador que muestre y configure el único computador y permita contrastar los datos cargados, sin alterar la pantalla anterior durante su revisión. Revisar la diferencia del log entre «Computador 1» y «AvilaOS-PC».
+- **Continuación posterior:** la vista existente de Computador fue modificada en el PR #31. Revisar la diferencia del log entre «Computador 1» y «AvilaOS-PC».
 
 ## Vista de Computador — 15 de noviembre de 2026
 
@@ -140,12 +153,35 @@ El estudiante comprobó desde la interfaz el escenario `09-cambio-fcfs-prioridad
 
 ## Vista de Disco — 15 de noviembre de 2026
 
-Se agregó la navegación a Disco y una vista de consulta con estado, ocupación agrupada, marcas de rango, área de swap diferenciada y posición del cabezal, además de los controles de política FIFO, SSTF, SCAN y C-SCAN. La prueba visual del usuario confirmó el mapa con configuraciones vacía, agrupada, llena y dispersa; los ajustes posteriores de ancho, rayado de swap y botones todavía requieren comprobación visual y funcional en NetBeans. La prueba existente `DiskSchedulingPoliciesTest` pasó directamente; no cubre la nueva interfaz.
+Se agregó la navegación a Disco y una vista de consulta con estado, ocupación agrupada, marcas de rango, área de swap diferenciada y posición del cabezal, además de los controles de política FIFO, SSTF, SCAN y C-SCAN. El estudiante revisó visualmente el mapa con configuraciones agrupada, llena y dispersa; los ajustes posteriores de ancho, rayado de swap y botones todavía requieren comprobación visual y funcional en NetBeans. La prueba existente `DiskSchedulingPoliciesTest` pasó directamente; no cubre la nueva interfaz.
 
 - **T08 en curso:** las pruebas del componente disco demuestran sus propios ticks, pero no su conexión con el reloj global de la aplicación; esa integración está en [#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30). T12 también debe releerse con el límite de que no se ha comprobado pausa/reanudación integrada.
 - **T46 en curso:** el mapa agrupa bloques y muestra libre, ocupado o mixto; todavía no permite inspeccionar cada bloque ni su propietario. La interpretación de capacidad y swap sigue pendiente de aclaración.
-- **T49 en curso:** hay controles de política de disco con comprobación de permisos, pendientes de prueba de interfaz; aún no existe un selector global visible de modo ADMIN/USER. Se propone colocarlo en un control global con identidad y modo activo.
+- **T49 en curso:** hay controles de política de disco con comprobación de permisos, pendientes de prueba de interfaz; aún no existe un selector global visible de modo ADMIN/USER. Propuesta posterior: comenzar con ADMIN/admin sin formulario en Inicio y gestionar modo e identidad en Simulación; aún no implementado.
 - Los escenarios `10` a `12` en `escenarios/carga-json` corresponden a 110, 200 y 20 bloques de datos ocupados; las cantidades se verificaron con el cargador del proyecto. No demuestran el avance del disco con el reloj.
+
+## Cierre y auditoría — 15 de noviembre de 2026
+
+- PR [#28](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/28) de enunciado y [#29](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/29) de Inicio/cargas integrados; [#31](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/31) de Computador y [#32](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/32) de Disco siguen abiertos. #32 parte de #31. El issue [#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30), asignado a Luis, sigue abierto.
+- Revisadas contra las pruebas y el código: T03 queda en curso (las pruebas identificadas comprueban configuración válida, no todos los límites); T12 queda en curso (cambio de política aislado comprobado; pausa/reanudación integrada pendiente); T13 queda en curso (las regresiones de GUI/reloj requieren resolución); T26 queda en curso (motivo retornado, presentación visual pendiente). T08 ya estaba en curso. La prueba de `FileSystemManagerTest` sí comprueba rechazo sin cambios en árbol y bloques libres, respaldando T07 a nivel de componente.
+- Los JSON de sistema de archivos y procesos se probaron manualmente desde la interfaz con resultados registrados en el chat y el log. El escenario 09 confirmó FCFS → prioridades y sus ciclos esperados; eso no verifica Round Robin, quantum, CRUD de E/S ni el disco bajo reloj global. Las pruebas de persistencia y políticas se ejecutaron directamente; `mvn test` no descubre los programas `main`.
+- La vista de Disco de #32 muestra un modelo predeterminado, no creación manual. Su mapa muestra rangos agrupados y no identifica propietarios individuales. Falta que el usuario compruebe los últimos cambios de ancho, rayado y botones en NetBeans; la compilación y las pruebas del componente no los validan visualmente.
+- Decisión del estudiante: se debe poder eliminar un disco aunque tenga procesos en swap. Conservar procesos y registrar fallos de acceso donde corresponda; el destino concreto de procesos suspendidos, solicitud activa y cola sigue por diseñar. No implementar sustitución destructiva sin reglas y confirmación explícita en la GUI.
+- Próximo trabajo: revisar el estado de #31/#32 y comenzar T62 con el mapa de la función, distinguiendo ausencia de disco y disco predeterminado actual. Acordar la validación de creación manual y su compatibilidad con el enunciado antes de tocar código. Aplicar `AGENTS.md` en modo aprendizaje.
+
+## Conciliación con develop — 17 de noviembre de 2026
+
+Base examinada: `develop` en `aa221bb`. Los PR #31 y #32 ya están integrados, al igual que #34; las referencias anteriores que los describen como abiertos son históricas. Esta conciliación conserva las notas y cambios locales.
+
+Se compiló una copia aislada de `develop` con `javac --release 25`, Java 26 y las dependencias locales. Maven no estaba disponible. Se ejecutaron directamente las pruebas activas con método `main`, en modo sin pantalla: pasaron `DiskAndSwapLogTest`, las pruebas de disco, árbol, CRUD, permisos y persistencia, y las pruebas activas de reloj y controles. `ControlesRelojGuiTest` y `LogCompletoYRelojTest`, antes fallidas, pasaron en esta ejecución; no sustituyen una comprobación visual en NetBeans. `CreacionComputadoresGuiTest` sigue fallando por «Faltan instancias» y `MonitorSimulacionTest` por «Métricas con tres secciones»; revisar sus expectativas frente a la interfaz actual. `CargaDuplicadosTest` y `EventosLogTest` no se validaron: requieren argumentos. Muchos archivos de pruebas heredadas están comentados y no producen clases ejecutables; no contarlos como fallos del producto ni como pruebas aprobadas.
+
+- **T08 y T12 siguen en curso:** el controlador llama `disk.tick` por ciclo; `DiskAndSwapLogTest` completa swap-out y swap-in avanzando el controlador paso a paso, y comprueba una decisión de política de disco por tick directo. Falta demostrar la atención única y pausa/reanudación integrada en un escenario de solicitudes de archivos.
+- **T27 y T28 en curso:** el PCB almacena operación, ruta y otros datos; el controlador valida nombre, operación, ruta absoluta, tamaño CREATE y nombre UPDATE, y existe formulario de creación. Falta probar sus validaciones y el recorrido real desde la interfaz. El código consultado no consume `getIoOperation` ni `getTargetPath` para ejecutar CRUD: no considerar completadas T29–T32 ni T54.
+- **T33, T36, T38 y T55 en curso:** `DiskAndSwapLogTest` comprueba, en un escenario preparado manualmente, la decisión de suspender, finalización de swap-out, admisión de otro proceso, transición bloqueado/suspendido a listo/suspendido y finalización de swap-in. No comprueba todas las transiciones, integridad de RAM y bloques en cada paso, falta de swap ni E/S real de archivos. Los ciclos de espera y el bloqueo del proceso se preparan manualmente en la prueba.
+- **T35 en curso:** existe criterio documentado: menor prioridad para suspensión, con desempates por tiempo bloqueado y espera; para reactivar, mayor prioridad entre los que caben en RAM. Falta acordarlo y probar selección entre candidatos y casos límite.
+- **T48 en curso:** existen estructuras para colas suspendidas y datos en instantáneas; falta verificar en la interfaz la cola de E/S con operación y el motivo de bloqueo.
+- **T51 en curso:** `DiskAndSwapLogTest` verifica eventos de decisión del disco y de suspensión/reactivación; falta comprobar su presentación integrada y cobertura de decisiones y errores.
+- T34, T37, T39–T47 y T49–T50 conservan sus estados: esta revisión no verificó todos sus criterios. La interpretación de capacidad y swap sigue pendiente. La revisión de GUI se realizó sin pantalla y no valida los ajustes visuales ni el formulario.
 
 ## Resultados de pruebas — 14 de noviembre de 2026
 
