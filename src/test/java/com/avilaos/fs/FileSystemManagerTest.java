@@ -1,5 +1,8 @@
 package com.avilaos.fs;
 
+import com.avilaos.filesystem.FilePermission;
+import com.avilaos.filesystem.FileSystemManager;
+import com.avilaos.filesystem.FSNode;
 import com.avilaos.disk.SimulatedDisk;
 
 /**

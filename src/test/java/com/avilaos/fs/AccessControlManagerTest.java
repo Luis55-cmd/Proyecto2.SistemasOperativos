@@ -1,5 +1,9 @@
 package com.avilaos.fs;
 
+import com.avilaos.filesystem.FsNodeType;
+import com.avilaos.filesystem.FilePermission;
+import com.avilaos.filesystem.FileSystemManager;
+import com.avilaos.filesystem.AccessControlManager;
 import com.avilaos.core.model.IOOperationType;
 import com.avilaos.core.model.UserMode;
 import com.avilaos.disk.SimulatedDisk;

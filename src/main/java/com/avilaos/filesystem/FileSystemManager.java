@@ -1,4 +1,4 @@
-package com.avilaos.fs;
+package com.avilaos.filesystem;
 
 import com.avilaos.core.structures.MyLinkedList;
 import com.avilaos.disk.DiskBlock;

@@ -1,5 +1,12 @@
 package com.avilaos.disk;
 
+import com.avilaos.disk.policies.FIFODiskPolicy;
+import com.avilaos.disk.policies.SCANDiskPolicy;
+import com.avilaos.disk.policies.SSTFDiskPolicy;
+import com.avilaos.disk.policies.LOOKDiskPolicy;
+import com.avilaos.disk.policies.CSCANDiskPolicy;
+import com.avilaos.disk.policies.CLOOKDiskPolicy;
+
 /**
  * Fábrica de políticas de planificación de disco a partir de {@link DiskSchedulingPolicyType}.
  */

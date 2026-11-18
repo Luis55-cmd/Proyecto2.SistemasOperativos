@@ -1,5 +1,9 @@
 package com.avilaos.fs;
 
+import com.avilaos.filesystem.FilePermission;
+import com.avilaos.filesystem.FsNodeType;
+import com.avilaos.filesystem.FSNode;
+import com.avilaos.filesystem.FileSystemTree;
 import com.avilaos.core.structures.MyLinkedList;
 
 /** Pruebas del árbol N-ario del sistema de archivos (ejecutar con main). */

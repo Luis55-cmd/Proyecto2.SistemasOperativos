@@ -1,4 +1,4 @@
-package com.avilaos.fs;
+package com.avilaos.filesystem;
 
 /** Visibilidad de un archivo o directorio (en el JSON: "public" / "private"). */
 public enum FilePermission {

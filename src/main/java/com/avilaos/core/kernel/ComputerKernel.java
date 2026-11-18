@@ -13,16 +13,7 @@ import com.avilaos.core.model.IOOperationType;
 import com.avilaos.core.scheduler.*;
 import com.avilaos.disk.IORequest;
 import com.avilaos.disk.SimulatedDisk;
-// [P2-LEGACY] import com.avilaos.sync.Buffer;
-// [P2-LEGACY] import com.avilaos.sync.ProducerConsumerDriver;
 
-/**
- * Núcleo del computador simulado (Capa 1: Kernel).
- * Administra las colas de estados de procesos, admisión a largo plazo,
- * despacho a CPU según política de planificación y control de ciclo de vida.
- * 
- * Requisitos: ARC-06 a ARC-10, PLA-01 a PLA-10, MEM-03 a MEM-07, Issues #19, #20, #21.
- */
 public class ComputerKernel {
 
     private final MyLinkedList<ProcessControlBlock> processList;
