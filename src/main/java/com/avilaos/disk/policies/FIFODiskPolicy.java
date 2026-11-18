@@ -1,6 +1,9 @@
-package com.avilaos.disk;
+package com.avilaos.disk.policies;
 
 import com.avilaos.core.structures.MyLinkedList;
+import com.avilaos.disk.DiskSchedulingPolicy;
+import com.avilaos.disk.DiskSchedulingPolicyType;
+import com.avilaos.disk.IORequest;
 
 /**
  * Política de planificación de disco FIFO (First-In, First-Out) — Issue #7.

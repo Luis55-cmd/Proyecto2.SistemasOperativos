@@ -1,5 +1,10 @@
 package com.avilaos.disk;
 
+import com.avilaos.disk.policies.FIFODiskPolicy;
+import com.avilaos.disk.policies.SCANDiskPolicy;
+import com.avilaos.disk.policies.LOOKDiskPolicy;
+import com.avilaos.disk.policies.CSCANDiskPolicy;
+import com.avilaos.disk.policies.CLOOKDiskPolicy;
 import com.avilaos.core.kernel.IClockTickable;
 import com.avilaos.core.model.IOOperationType;
 import com.avilaos.core.model.ProcessControlBlock;

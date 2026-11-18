@@ -93,8 +93,8 @@ public class SimulationController implements IClockTickable {
 
     // --- Componentes Proyecto 2: Disco, Sistema de Archivos, Permisos y Carga Dual JSON ---
     private com.avilaos.disk.SimulatedDisk disk = new com.avilaos.disk.SimulatedDisk(200, 100, 50, 10);
-    private com.avilaos.fs.FileSystemManager fileSystemManager = new com.avilaos.fs.FileSystemManager(disk);
-    private final com.avilaos.fs.AccessControlManager accessControl = new com.avilaos.fs.AccessControlManager();
+    private com.avilaos.filesystem.FileSystemManager fileSystemManager = new com.avilaos.filesystem.FileSystemManager(disk);
+    private final com.avilaos.filesystem.AccessControlManager accessControl = new com.avilaos.filesystem.AccessControlManager();
     private int configuredSwapSizeBlocks = 100;
     private boolean fileSystemJsonLoaded = false;
     private boolean processesJsonLoaded = false;
@@ -824,7 +824,7 @@ public class SimulationController implements IClockTickable {
         this.disk = new com.avilaos.disk.SimulatedDisk(200, 100, 50, 10);
         this.disk.setEventListener(this::logEvent);
         this.disk.setCompletionListener(this::onDiskRequestCompleted);
-        this.fileSystemManager = new com.avilaos.fs.FileSystemManager(this.disk);
+        this.fileSystemManager = new com.avilaos.filesystem.FileSystemManager(this.disk);
         this.accessControl.setSession(com.avilaos.core.model.UserMode.ADMIN, "admin");
         ProcessControlBlock.resetIdGenerator(1);
 
@@ -842,11 +842,11 @@ public class SimulationController implements IClockTickable {
         return disk;
     }
 
-    public com.avilaos.fs.FileSystemManager getFileSystemManager() {
+    public com.avilaos.filesystem.FileSystemManager getFileSystemManager() {
         return fileSystemManager;
     }
 
-    public com.avilaos.fs.AccessControlManager getAccessControl() {
+    public com.avilaos.filesystem.AccessControlManager getAccessControl() {
         return accessControl;
     }
 
@@ -1070,7 +1070,7 @@ public class SimulationController implements IClockTickable {
             this.disk.setEventListener(this::logEvent);
             this.disk.setCompletionListener(this::onDiskRequestCompleted);
             
-            this.fileSystemManager = new com.avilaos.fs.FileSystemManager(this.disk);
+            this.fileSystemManager = new com.avilaos.filesystem.FileSystemManager(this.disk);
             
             updateComputersDiskReference();
             

@@ -8,7 +8,7 @@ import com.avilaos.core.model.ProcessType;
 import com.avilaos.core.model.SchedulingPolicyType;
 import com.avilaos.disk.IORequest;
 import com.avilaos.disk.SimulatedDisk;
-import com.avilaos.disk.SSTFDiskPolicy;
+import com.avilaos.disk.policies.SSTFDiskPolicy;
 import com.avilaos.hardware.Computer;
 
 import java.util.ArrayList;
