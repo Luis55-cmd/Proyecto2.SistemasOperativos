@@ -445,6 +445,8 @@ public class PanelPrincipal extends JPanel {
         @Override public boolean getScrollableTracksViewportWidth() { return true; }
         @Override public boolean getScrollableTracksViewportHeight() { return false; }
     }
+    
+    
 
     /** Vista de consulta; el mapa de bloques aún está pendiente. */
     private JPanel disco() {
@@ -458,8 +460,9 @@ public class PanelPrincipal extends JPanel {
         panel.add(Box.createVerticalStrut(10));
         panel.add(texto("Observa el disco de la simulación.", 13, GRIS, false));
         panel.add(Box.createVerticalStrut(28));
+        
         JPanel configuracion = tarjeta();
-        configuracion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 340));
+        configuracion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 420));
         configuracion.add(texto("ESTADO DEL DISCO", 11, ACENTO, true));
         configuracion.add(Box.createVerticalStrut(8));
         configuracion.add(discoOrigen);
@@ -472,6 +475,35 @@ public class PanelPrincipal extends JPanel {
         configuracion.add(Box.createVerticalStrut(6));
         configuracion.add(discoPolitica);
         configuracion.add(Box.createVerticalStrut(12));
+        
+        // --- NUEVA SECCIÓN: CONFIGURACIÓN DE TAMAÑO ---
+        configuracion.add(texto("CONFIGURACIÓN DE CAPACIDAD", 11, ACENTO, true));
+        configuracion.add(Box.createVerticalStrut(6));
+        
+        JPanel panelTamanos = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        panelTamanos.setOpaque(false);
+        panelTamanos.setAlignmentX(LEFT_ALIGNMENT);
+        
+        panelTamanos.add(texto("Bloques:", 12, TINTA, false));
+        JSpinner spinBloques = new JSpinner(new SpinnerNumberModel(100, 10, 500, 10)); 
+        panelTamanos.add(spinBloques);
+        
+        panelTamanos.add(texto("Swap:", 12, TINTA, false));
+        JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(50, 0, 200, 10));
+        panelTamanos.add(spinSwap);
+        
+        JButton btnAplicarTamano = new JButton("Aplicar");
+        btnAplicarTamano.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+        btnAplicarTamano.addActionListener(e -> {
+            int nuevosBloques = (Integer) spinBloques.getValue();
+            int nuevoSwap = (Integer) spinSwap.getValue();
+            cambiarCapacidadDisco(nuevosBloques, nuevoSwap);
+        });
+        panelTamanos.add(btnAplicarTamano);
+        configuracion.add(panelTamanos);
+        configuracion.add(Box.createVerticalStrut(12));
+        // ----------------------------------------------
+
         configuracion.add(texto("POLÍTICA DE DISCO", 11, ACENTO, true));
         configuracion.add(Box.createVerticalStrut(6));
         JPanel selectorDisco = new JPanel(new GridLayout(1, 4, 6, 0));
@@ -492,12 +524,14 @@ public class PanelPrincipal extends JPanel {
             selectorDisco.add(boton);
         }
         configuracion.add(selectorDisco);
+        
         JPanel columnaIzquierda = new JPanel();
         columnaIzquierda.setOpaque(false);
         columnaIzquierda.setMinimumSize(new Dimension(0, 0));
         columnaIzquierda.setLayout(new BoxLayout(columnaIzquierda, BoxLayout.Y_AXIS));
         columnaIzquierda.add(configuracion);
         columnaIzquierda.add(Box.createVerticalStrut(20));
+        
         JPanel mapa = tarjeta();
         mapa.setMinimumSize(new Dimension(0, 0));
         mapa.setMaximumSize(new Dimension(Integer.MAX_VALUE, 520));
@@ -515,6 +549,7 @@ public class PanelPrincipal extends JPanel {
         mapaDisco.setMaximumSize(new Dimension(Integer.MAX_VALUE, 380));
         mapaDisco.setToolTipText("Pasa el cursor por un rango para ver su ocupación");
         mapa.add(mapaDisco);
+        
         JPanel cita = new JPanel(new BorderLayout(16, 0));
         cita.setBackground(PAPEL);
         cita.setAlignmentX(LEFT_ALIGNMENT);
@@ -539,6 +574,7 @@ public class PanelPrincipal extends JPanel {
             cita.add(retratoLabel, BorderLayout.EAST);
         }
         columnaIzquierda.add(cita);
+        
         JPanel contenido = new JPanel(new GridBagLayout());
         contenido.setOpaque(false);
         contenido.setAlignmentX(LEFT_ALIGNMENT);
@@ -558,64 +594,135 @@ public class PanelPrincipal extends JPanel {
         panel.add(contenido);
         return panel;
     }
-
+    
     private void actualizarVistaDisco() {
-        if (consultaDiscoPendiente) return;
-        consultaDiscoPendiente = true;
-        GuiRequest.model(controller, () -> {
-            var disco = controller.getDisk();
-            int datos = disco.getTotalBlocks();
-            int swap = disco.getSwapSizeBlocks();
-            boolean[] ocupados = new boolean[disco.getTotalPhysicalBlocks()];
-            for (int i = 0; i < ocupados.length; i++) ocupados[i] = disco.getBlock(i).isOccupied();
-            String[] resumen = new String[]{
-                controller.isFileSystemJsonLoaded() ? "Sistema de archivos cargado desde JSON" : "Disco inicial del simulador; no se ha cargado un JSON",
-                "Bloques de datos: " + datos + " · Swap: " + swap + " · Total físico: " + disco.getTotalPhysicalBlocks(),
-                "Datos libres: " + disco.getFreeDataBlocks() + " / " + datos + " · Swap libre: " + disco.getFreeSwapBlocks() + " / " + swap,
-                "Cabezal: bloque " + disco.getHeadPosition() + " · Dirección: " + (disco.getHeadDirection() == com.avilaos.disk.HeadDirection.UP ? "creciente ↑" : "decreciente ↓"),
-                "Política: " + disco.getPolicyType() + " · Velocidad: " + disco.getHeadSpeedPerTick() + " posiciones por ciclo"
-            };
-            return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType()};
-        }, datos -> {
-            consultaDiscoPendiente = false;
-            String[] resumen = (String[]) datos[0];
-            bloquesOcupados = (boolean[]) datos[1];
-            cabezalMapa = (Integer) datos[2];
-            limiteDatosMapa = (Integer) datos[3];
-            discoOrigen.setText(resumen[0]);
-            discoCapacidad.setText(resumen[1]);
-            discoOcupacion.setText(resumen[2]);
-            discoCabezal.setText(resumen[3]);
-            discoPolitica.setText(resumen[4]);
-            for (int i = 0; i < botonesPoliticaDisco.length; i++) {
-                JToggleButton boton = botonesPoliticaDisco[i];
-                if (boton == null) continue;
-                boolean seleccionada = politicasDisco[i] == datos[4];
-                boton.setSelected(seleccionada);
-                boton.setBackground(seleccionada ? ACENTO : PAPEL);
-                boton.setForeground(seleccionada ? Color.WHITE : TINTA);
-            }
-            mapaDisco.repaint();
-        }, error -> {
-            consultaDiscoPendiente = false;
-            discoOrigen.setText("No se pudo consultar el disco: " + error.getMessage());
-        });
-    }
 
-    private void cambiarPoliticaDisco(com.avilaos.disk.DiskSchedulingPolicyType politica) {
+if (consultaDiscoPendiente) return;
+
+consultaDiscoPendiente = true;
+
+GuiRequest.model(controller, () -> {
+
+var disco = controller.getDisk();
+
+int datos = disco.getTotalBlocks();
+
+int swap = disco.getSwapSizeBlocks();
+boolean[] ocupados = new boolean[disco.getTotalPhysicalBlocks()];
+for (int i = 0; i < ocupados.length; i++) ocupados[i] = disco.getBlock(i).isOccupied();
+    String[] resumen = new String[]{
+    controller.isFileSystemJsonLoaded() ? "Sistema de archivos cargado desde JSON" : "Disco inicial del simulador; no se ha cargado un JSON",
+    "Bloques de datos: " + datos + " · Swap: " + swap + " · Total físico: " + disco.getTotalPhysicalBlocks(),
+    "Datos libres: " + disco.getFreeDataBlocks() + " / " + datos + " · Swap libre: " + disco.getFreeSwapBlocks() + " / " + swap,
+    "Cabezal: bloque " + disco.getHeadPosition() + " · Dirección: " + (disco.getHeadDirection() == com.avilaos.disk.HeadDirection.UP ? "creciente ↑" : "decreciente ↓"),
+    "Política: " + disco.getPolicyType() + " · Velocidad: " + disco.getHeadSpeedPerTick() + " posiciones por ciclo"
+};
+
+return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType()};
+
+}, datos -> {
+
+consultaDiscoPendiente = false;
+
+String[] resumen = (String[]) datos[0];
+
+bloquesOcupados = (boolean[]) datos[1];
+
+cabezalMapa = (Integer) datos[2];
+
+limiteDatosMapa = (Integer) datos[3];
+
+discoOrigen.setText(resumen[0]);
+
+discoCapacidad.setText(resumen[1]);
+
+discoOcupacion.setText(resumen[2]);
+
+discoCabezal.setText(resumen[3]);
+
+discoPolitica.setText(resumen[4]);
+
+for (int i = 0; i < botonesPoliticaDisco.length; i++) {
+
+JToggleButton boton = botonesPoliticaDisco[i];
+
+if (boton == null) continue;
+
+boolean seleccionada = politicasDisco[i] == datos[4];
+
+boton.setSelected(seleccionada);
+
+boton.setBackground(seleccionada ? ACENTO : PAPEL);
+
+boton.setForeground(seleccionada ? Color.WHITE : TINTA);
+
+}
+
+mapaDisco.repaint();
+
+}, error -> {
+
+consultaDiscoPendiente = false;
+
+discoOrigen.setText("No se pudo consultar el disco: " + error.getMessage());
+
+});
+
+}
+
+
+
+private void cambiarPoliticaDisco(com.avilaos.disk.DiskSchedulingPolicyType politica) {
+
+GuiRequest.model(controller, () -> {
+
+var permiso = controller.getAccessControl().canChangePolicy();
+
+if (!permiso.allowed()) throw new IllegalStateException(permiso.message());
+
+var disco = controller.getDisk();
+
+if (disco.getPolicyType() != politica) {
+
+controller.logEvent("Solicitud de cambio de política de disco a " + politica);
+
+disco.setSchedulingPolicy(politica);
+
+}
+
+return true;
+
+}, ok -> actualizarVistaDisco(), error -> {
+
+String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+
+controller.logEvent("Error al cambiar política de disco: " + motivo);
+
+JOptionPane.showMessageDialog(this, motivo, "No se pudo cambiar la política", JOptionPane.ERROR_MESSAGE);
+
+actualizarVistaDisco();
+
+});
+
+}
+    
+    private void cambiarCapacidadDisco(int nuevosBloques, int nuevoSwap) {
         GuiRequest.model(controller, () -> {
-            var permiso = controller.getAccessControl().canChangePolicy();
-            if (!permiso.allowed()) throw new IllegalStateException(permiso.message());
-            var disco = controller.getDisk();
-            if (disco.getPolicyType() != politica) {
-                controller.logEvent("Solicitud de cambio de política de disco a " + politica);
-                disco.setSchedulingPolicy(politica);
-            }
+            controller.logEvent("Solicitud de cambio de capacidad: " + nuevosBloques + " bloques, " + nuevoSwap + " swap");
+            
+            // Asume que el controlador expone un método para recrear/reconfigurar el disco.
+            // Si el controlador no tiene este método aún, deberás implementarlo allí para
+            // instanciar un nuevo SimulatedDisk(nuevosBloques, nuevoSwap, initialHead).
+            controller.reconfigurarDisco(nuevosBloques, nuevoSwap); 
+            
             return true;
-        }, ok -> actualizarVistaDisco(), error -> {
+        }, ok -> {
+            actualizarVistaDisco();
+            JOptionPane.showMessageDialog(this, "Capacidad del disco actualizada.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+        }, error -> {
             String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
-            controller.logEvent("Error al cambiar política de disco: " + motivo);
-            JOptionPane.showMessageDialog(this, motivo, "No se pudo cambiar la política", JOptionPane.ERROR_MESSAGE);
+            controller.logEvent("Error al cambiar capacidad: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo cambiar la capacidad", JOptionPane.ERROR_MESSAGE);
             actualizarVistaDisco();
         });
     }

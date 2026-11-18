@@ -6,20 +6,6 @@ import com.avilaos.core.model.ProcessControlBlock;
 import com.avilaos.core.structures.MyLinkedList;
 import java.util.concurrent.Semaphore;
 
-/**
- * Hardware del Disco Simulado (SD) sincronizado con el reloj global (Issues #4, #5, #6, #7 y #8).
- * <ul>
- *   <li>Issue #4: Bloques numerados de datos [0 .. totalBlocks - 1] y partición lógica de Swap
- *       [totalBlocks .. totalBlocks + swapSizeBlocks - 1], protegidos con {@link Semaphore}.</li>
- *   <li>Issue #5: Asignación encadenada de archivos (lista enlazada de bloques con {@code nextBlock})
- *       y reserva/liberación de bloques en el área de Swap (1 unidad de RAM = 1 bloque).</li>
- *   <li>Issue #6: Cola única de E/S ({@link IORequest}) protegida con {@link Semaphore},
- *       implementación de {@link IClockTickable}, avance configurable del cabezal por tick,
- *       1 ciclo por bloque leído/escrito, atención de una solicitud a la vez y dirección (↑ / ↓).</li>
- *   <li>Issues #7 y #8: Políticas FIFO, SSTF, SCAN, C-SCAN (y LOOK/C-LOOK) con cambio en caliente
- *       instantáneo (0 ticks) y reordenamiento inmediato de la cola sin perder solicitudes.</li>
- * </ul>
- */
 public class SimulatedDisk implements IClockTickable {
 
     public interface IDiskCompletionListener {

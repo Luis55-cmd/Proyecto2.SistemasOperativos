@@ -17,8 +17,6 @@ import com.avilaos.hardware.CPU;
 import com.avilaos.hardware.Computer;
 import com.avilaos.hardware.DMA;
 import com.avilaos.hardware.RAM;
-// [P2-LEGACY] import com.avilaos.sync.Buffer;
-// [P2-LEGACY] import com.avilaos.sync.ProducerConsumerDriver;
 
 import javax.swing.SwingUtilities;
 import com.avilaos.concurrency.StateAccess;
@@ -1049,5 +1047,37 @@ public class SimulationController implements IClockTickable {
             }
         }
         notifyGUI();
+    }
+    
+    public void reconfigurarDisco(int totalBlocks, int swapSizeBlocks) {
+        com.avilaos.concurrency.StateAccess.enter();
+        try {
+            int headInicial = 0; 
+            com.avilaos.disk.DiskSchedulingPolicy currentPolicy = null;
+            
+            if (this.disk != null) {
+                currentPolicy = this.disk.getSchedulingPolicy();
+                // Mantener la posición del cabezal si cabe en el nuevo tamaño
+                if (this.disk.getHeadPosition() < totalBlocks) {
+                    headInicial = this.disk.getHeadPosition();
+                }
+            }
+            this.disk = new com.avilaos.disk.SimulatedDisk(totalBlocks, swapSizeBlocks, headInicial, 10);
+            this.configuredSwapSizeBlocks = swapSizeBlocks;
+            if (currentPolicy != null) {
+                this.disk.setSchedulingPolicy(currentPolicy);
+            }
+            this.disk.setEventListener(this::logEvent);
+            this.disk.setCompletionListener(this::onDiskRequestCompleted);
+            
+            this.fileSystemManager = new com.avilaos.fs.FileSystemManager(this.disk);
+            
+            updateComputersDiskReference();
+            
+            logEvent("Disco reconfigurado manualmente: " + totalBlocks + " bloques de datos, " + swapSizeBlocks + " bloques de swap.");
+            notifyGUI();
+        } finally {
+            com.avilaos.concurrency.StateAccess.exit();
+        }
     }
 }
