@@ -223,6 +223,8 @@ public class SimulationController implements IClockTickable {
         );
         kernel.setEventListener(this::logEvent);
         kernel.setDisk(this.disk);
+        kernel.setFileSystemManager(this.fileSystemManager);
+        kernel.setAccessControl(this.accessControl);
 
         Computer comp = new Computer(id, cpu, ram, dma, kernel, policy != null ? policy : SchedulingPolicyType.FCFS, quantum);
         this.computers.append(comp);
@@ -909,6 +911,8 @@ public class SimulationController implements IClockTickable {
             Computer c = computers.get(i);
             if (c != null && c.getKernel() != null) {
                 c.getKernel().setDisk(this.disk);
+                c.getKernel().setFileSystemManager(this.fileSystemManager);
+                c.getKernel().setAccessControl(this.accessControl);
             }
         }
     }
@@ -965,9 +969,9 @@ public class SimulationController implements IClockTickable {
      * @param mode El nuevo modo (ADMIN o USER).
      */
     public void setMode(UserMode mode) {
+        if (mode == null) return;
         this.currentMode = mode;
-        
-        // Opcional: Registrar el cambio en la consola de eventos de la interfaz
+        this.accessControl.setSession(mode, mode == UserMode.ADMIN ? "admin" : "user1");
         logEvent("Cambio de sesión: Ahora operando en modo " + mode.name());
     }
 }

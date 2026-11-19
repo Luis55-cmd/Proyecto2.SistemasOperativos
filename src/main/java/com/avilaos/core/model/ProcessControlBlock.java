@@ -647,6 +647,7 @@ public class ProcessControlBlock {
     private int fileSizeBlocks;
     private String owner = "admin";
     private int swapStartBlock = -1;
+    private boolean diskRequestIssued = false;
 
     public IOOperationType getIoOperation() { return ioOperation; }
     public void setIoOperation(IOOperationType ioOperation) { this.ioOperation = ioOperation; }
@@ -660,6 +661,8 @@ public class ProcessControlBlock {
     public void setOwner(String owner) { this.owner = owner != null ? owner : "admin"; }
     public int getSwapStartBlock() { return swapStartBlock; }
     public void setSwapStartBlock(int swapStartBlock) { this.swapStartBlock = swapStartBlock; }
+    public boolean isDiskRequestIssued() { return diskRequestIssued; }
+    public void setDiskRequestIssued(boolean diskRequestIssued) { this.diskRequestIssued = diskRequestIssued; }
 
     @Override
 public String toString() {
