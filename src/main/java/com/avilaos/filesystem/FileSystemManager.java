@@ -23,6 +23,10 @@ public class FileSystemManager {
     public FileSystemManager(SimulatedDisk disk) {
         this.tree = new FileSystemTree();
         this.disk = disk;
+        if (disk == null || disk.allocateChainedBlocksFrom(0, "/", 1, -1) != 0)
+            throw new IllegalStateException("No se pudo asignar el bloque de la raíz.");
+        tree.getRoot().setFirstBlock(0);
+        tree.getRoot().setSizeBlocks(1);
     }
 
     public void setDisk(SimulatedDisk disk) {
@@ -42,18 +46,82 @@ public class FileSystemManager {
         return tree;
     }
 
+    /** Copia coherente para visualización, sin compartir nodos vivos con Swing. */
+    public FSNode snapshotTree() {
+        fsMutex.acquireUninterruptibly();
+        try { return copyNode(tree.getRoot()); }
+        finally { fsMutex.release(); }
+    }
+
+    private FSNode copyNode(FSNode original) {
+        FSNode copy = new FSNode(original.getName(), original.getType(), original.getOwner(),
+                original.getPermission(), original.getFirstBlock(), original.getSizeBlocks(),
+                original.getCreatorProcess(), original.getColorHex());
+        for (int i = 0; i < original.getChildren().size(); i++) {
+            copy.addChild(copyNode(original.getChildren().get(i)));
+        }
+        return copy;
+    }
+
     /**
      * Crea un directorio en {@code fullPath}.
      */
     public FSNode createDirectory(String fullPath, String owner, FilePermission permission, String creatorProcess) {
+        return createDirectoryAtBlock(fullPath, owner, permission, creatorProcess, -1);
+    }
+
+    public FSNode createDirectoryAtBlock(String fullPath, String owner, FilePermission permission, String creatorProcess, int block) {
         fsMutex.acquireUninterruptibly();
         try {
-            FSNode node = tree.insertAtPath(fullPath, FsNodeType.DIRECTORY, owner, permission, -1, 0);
-            node.setCreatorProcess(creatorProcess != null ? creatorProcess : "SYSTEM");
-            return node;
+            validateNewPathUnlocked(fullPath);
+            int allocated = block < 0 ? disk.allocateChainedBlocks(fullPath, 1, -1)
+                    : disk.allocateChainedBlocksFrom(block, fullPath, 1, -1);
+            if (allocated < 0) throw new IllegalStateException("No hay bloque disponible para el directorio: " + fullPath);
+            try {
+                FSNode node = tree.insertAtPath(fullPath, FsNodeType.DIRECTORY, owner, permission, allocated, 1);
+                node.setCreatorProcess(creatorProcess != null ? creatorProcess : "SYSTEM");
+                return node;
+            } catch (RuntimeException ex) {
+                disk.freeChainedBlocks(allocated);
+                throw ex;
+            }
         } finally {
             fsMutex.release();
         }
+    }
+
+    public int reserveCreation(com.avilaos.core.model.ProcessControlBlock p) {
+        fsMutex.acquireUninterruptibly();
+        try {
+            validateNewPathUnlocked(p.getTargetPath());
+            var decision = new AccessControlManager(p.getRequesterMode(), p.getRequesterName())
+                    .checkOperation(tree, com.avilaos.core.model.IOOperationType.CREATE, p.getTargetPath(), p.getCreationType());
+            if (!decision.allowed()) throw new IllegalArgumentException(decision.message());
+            int start = disk.reserveChainedBlocks(p.getTargetPath(), p.getFileSizeBlocks(), p.getId());
+            if (start < 0) throw new IllegalStateException("No hay bloques suficientes para " + p.getTargetPath());
+            return start;
+        } finally { fsMutex.release(); }
+    }
+
+    public void completeCreation(com.avilaos.core.model.ProcessControlBlock p) {
+        fsMutex.acquireUninterruptibly();
+        try {
+            validateNewPathUnlocked(p.getTargetPath());
+            var decision = new AccessControlManager(p.getRequesterMode(), p.getRequesterName())
+                    .checkOperation(tree, com.avilaos.core.model.IOOperationType.CREATE, p.getTargetPath(), p.getCreationType());
+            if (!decision.allowed()) throw new IllegalArgumentException(decision.message());
+            if (!disk.finishReservation(p.getReservedStart(), p.getId(), true)) throw new IllegalStateException("Reserva inválida");
+            try {
+                FSNode node = tree.insertAtPath(p.getTargetPath(), p.getCreationType(), p.getOwner(),
+                        p.getCreationPermission(), p.getReservedStart(), p.getFileSizeBlocks());
+                node.setCreatorProcess(p.getName());
+            } catch (RuntimeException ex) {
+                disk.freeChainedBlocks(p.getReservedStart());
+                throw ex;
+            }
+            p.setReservedStart(-1);
+            p.setCreationCompleted(true);
+        } finally { fsMutex.release(); }
     }
 
     /**
@@ -225,7 +293,12 @@ public class FileSystemManager {
             MyLinkedList<FSNode> rootChildren = tree.getRoot().getChildren();
             while (!rootChildren.isEmpty()) {
                 FSNode child = rootChildren.get(0);
-                tree.getRoot().removeChild(child);
+                MyLinkedList<FSNode> removed = tree.remove(child.getPath());
+                if (disk != null) {
+                    for (int i = 0; i < removed.size(); i++) {
+                        if (removed.get(i).getFirstBlock() >= 0) disk.freeChainedBlocks(removed.get(i).getFirstBlock());
+                    }
+                }
             }
             FSNode.resetColorPalette();
         } finally {
@@ -245,7 +318,7 @@ public class FileSystemManager {
     }
 
     private void syncOccupiedByRecursiveUnlocked(FSNode node) {
-        if (node.isFile()) {
+        if (node.getFirstBlock() >= 0) {
             String newPath = node.getPath();
             MyLinkedList<Integer> chain = disk.getChainBlocks(node.getFirstBlock());
             for (int i = 0; i < chain.size(); i++) {
@@ -254,7 +327,6 @@ public class FileSystemManager {
                     b.setOccupiedBy(newPath);
                 }
             }
-            return;
         }
         MyLinkedList<FSNode> children = node.getChildren();
         for (int i = 0; i < children.size(); i++) {

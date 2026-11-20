@@ -65,9 +65,14 @@ public class FileSystemTree {
         if (node == null) throw new IllegalArgumentException("No existe: " + path);
         if (node == root) throw new IllegalArgumentException("No se puede eliminar la raíz");
         MyLinkedList<FSNode> files = new MyLinkedList<>();
-        collectFiles(node, files);
+        collectNodes(node, files);
         node.getParent().removeChild(node);
         return files;
+    }
+
+    private void collectNodes(FSNode node, MyLinkedList<FSNode> out) {
+        out.append(node);
+        for (int i = 0; i < node.getChildren().size(); i++) collectNodes(node.getChildren().get(i), out);
     }
 
     /** Cambia el nombre de un nodo (no de la raíz) evitando duplicados. */

@@ -11,8 +11,9 @@ import com.avilaos.disk.SimulatedDisk;
 import com.avilaos.disk.policies.SSTFDiskPolicy;
 import com.avilaos.hardware.Computer;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import javax.swing.SwingUtilities;
 
 /**
  * Prueba unitaria que valida el registro de eventos exigidos en el enunciado:
@@ -29,7 +30,7 @@ public class DiskAndSwapLogTest {
     }
 
     public static void testDiskSchedulerDecisionLog() {
-        List<String> logs = new ArrayList<>();
+        List<String> logs = new CopyOnWriteArrayList<>();
         SimulatedDisk disk = new SimulatedDisk(200, 100, 50, 10);
         disk.setSchedulingPolicy(new SSTFDiskPolicy());
         disk.setEventListener(logs::add);
@@ -59,7 +60,7 @@ public class DiskAndSwapLogTest {
         SimulationController controller = SimulationController.getInstance();
         controller.reset();
 
-        List<String> logs = new ArrayList<>();
+        List<String> logs = new CopyOnWriteArrayList<>();
         controller.addLogListener(logs::add);
 
         // Crear computador con RAM limitada (32 unidades)
@@ -77,6 +78,7 @@ public class DiskAndSwapLogTest {
         // El planificador a mediano plazo debe seleccionar a P7 (bloqueado) y suspenderlo
         ProcessControlBlock p9 = controller.createProcess("P9", comp.getId(), ProcessType.CPU_BOUND, 20, 20, 2, 200);
 
+        waitForLogDelivery();
         boolean foundSuspensionDecision = false;
         String expectedSuspension = "Se suspende al proceso P7 para admitir a P9";
         for (String log : logs) {
@@ -95,6 +97,7 @@ public class DiskAndSwapLogTest {
             controller.stepSimulation();
         }
 
+        waitForLogDelivery();
         boolean foundSwapOutCompleted = false;
         for (String log : logs) {
             if (log.contains("Swap-out completado: el proceso P7 pasa a Bloqueado/Suspendido")) {
@@ -115,6 +118,7 @@ public class DiskAndSwapLogTest {
         p7.setIoCycleCountdown(1);
         controller.stepSimulation();
 
+        waitForLogDelivery();
         boolean foundTransicionListoSusp = false;
         for (String log : logs) {
             if (log.contains("Evento completado para P7: pasa de Bloqueado/Suspendido a Listo/Suspendido")) {
@@ -130,6 +134,7 @@ public class DiskAndSwapLogTest {
         comp.getKernel().terminateProcess(comp, p9);
 
         // Se evalúa reactivación: swap-in de P7
+        waitForLogDelivery();
         boolean foundReactivation = false;
         for (String log : logs) {
             if (log.contains("Se reactiva al proceso P7: iniciando swap-in")) {
@@ -146,6 +151,7 @@ public class DiskAndSwapLogTest {
             controller.stepSimulation();
         }
 
+        waitForLogDelivery();
         boolean foundSwapInCompleted = false;
         for (String log : logs) {
             if (log.contains("Swap-in completado: el proceso P7 pasa a Listo")) {
@@ -158,5 +164,10 @@ public class DiskAndSwapLogTest {
         }
 
         System.out.println("PASS: testMidTermSuspensionAndReactivationLogs");
+    }
+
+    private static void waitForLogDelivery() {
+        try { SwingUtilities.invokeAndWait(() -> { }); }
+        catch (Exception ex) { throw new AssertionError("No se pudo esperar la entrega de logs", ex); }
     }
 }

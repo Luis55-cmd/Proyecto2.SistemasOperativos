@@ -34,13 +34,13 @@ public class FileSystemManagerTest {
 
         FSNode file = fs.createFile("/sistema/kernel.bin", 4, "admin", FilePermission.PUBLIC, "Proc_1", 1);
         check(file.isFile(), "es archivo");
-        check(file.getFirstBlock() == 0, "startBlock = 0");
+        check(file.getFirstBlock() == 2, "startBlock = 2, después de raíz y directorio");
         check(file.getSizeBlocks() == 4, "sizeBlocks = 4");
         check("admin".equals(file.getOwner()), "owner = admin");
         check(file.getPermission() == FilePermission.PUBLIC, "permission = PUBLIC");
         check("Proc_1".equals(file.getCreatorProcess()), "creatorProcess = Proc_1");
         check(file.getColorHex() != null && file.getColorHex().startsWith("#"), "color identificador asignado");
-        check(disk.getFreeDataBlocks() == 46, "46 bloques libres en SD");
+        check(disk.getFreeDataBlocks() == 44, "44 bloques libres en SD");
         check(disk.getChainBlocks(file.getFirstBlock()).size() == 4, "cadena de 4 bloques enlazados en SD");
     }
 
@@ -49,7 +49,7 @@ public class FileSystemManagerTest {
         FileSystemManager fs = new FileSystemManager(disk);
         fs.createDirectory("/datos", "admin", FilePermission.PUBLIC, "Init");
         fs.createFile("/datos/a.bin", 6, "admin", FilePermission.PUBLIC, "P1", 1);
-        check(disk.getFreeDataBlocks() == 4, "quedan 4 bloques libres");
+        check(disk.getFreeDataBlocks() == 2, "quedan 2 bloques libres");
 
         boolean failed = false;
         try {
@@ -59,7 +59,7 @@ public class FileSystemManagerTest {
         }
         check(failed, "debe rechazar archivo cuando faltan bloques libres");
         check(fs.findNode("/datos/grande.bin") == null, "árbol sin cambios tras fallo");
-        check(disk.getFreeDataBlocks() == 4, "disco sin asignación parcial tras fallo");
+        check(disk.getFreeDataBlocks() == 2, "disco sin asignación parcial tras fallo");
     }
 
     private static void testReadAndRenameSyncsDiskBlocks() {
@@ -91,16 +91,16 @@ public class FileSystemManagerTest {
         fs.createFile("/raiz/f1.bin", 3, "admin", FilePermission.PUBLIC, "P1", 1);
         fs.createFile("/raiz/sub1/f2.bin", 4, "admin", FilePermission.PUBLIC, "P2", 2);
         fs.createFile("/raiz/sub1/sub2/f3.bin", 5, "admin", FilePermission.PUBLIC, "P3", 3);
-        check(disk.getFreeDataBlocks() == 40 - 12, "12 bloques ocupados en total");
+        check(disk.getFreeDataBlocks() == 40 - 16, "12 bloques de archivos y cuatro directorios incluida raíz");
 
         // Eliminar un archivo individual (3 bloques)
         int freedFile = fs.deleteNode("/raiz/f1.bin");
-        check(freedFile == 3 && disk.getFreeDataBlocks() == 40 - 9, "3 bloques liberados al borrar f1.bin");
+        check(freedFile == 3 && disk.getFreeDataBlocks() == 40 - 13, "3 bloques liberados al borrar f1.bin");
 
         // Eliminar directorio /raiz recursivamente (debe borrar sub1, sub2, f2.bin y f3.bin y liberar 9 bloques)
         int freedDir = fs.deleteNode("/raiz");
-        check(freedDir == 9, "9 bloques liberados al eliminar /raiz recursivamente");
-        check(disk.getFreeDataBlocks() == 40, "los 40 bloques del disco volvieron a quedar libres");
+        check(freedDir == 12, "liberados 9 bloques de archivos y 3 directorios");
+        check(disk.getFreeDataBlocks() == 39, "solo la raíz permanece ocupada");
         check(fs.findNode("/raiz") == null, "/raiz eliminado del árbol");
     }
 
@@ -121,7 +121,7 @@ public class FileSystemManagerTest {
             t.join();
         }
         check(fs.getAllFiles().size() == 6, "6 archivos creados concurrentemente");
-        check(disk.getFreeDataBlocks() == 100 - 18, "18 bloques ocupados de forma consistente");
+        check(disk.getFreeDataBlocks() == 100 - 20, "18 bloques de archivos más raíz y directorio");
     }
 
     private static void check(boolean ok, String msg) {
