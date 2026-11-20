@@ -58,8 +58,8 @@ public class SimulatedDisk implements IClockTickable {
         if (swapSizeBlocks < 0) {
             throw new IllegalArgumentException("swapSizeBlocks no puede ser negativo");
         }
-        if (initialHead < 0 || initialHead >= totalBlocks) {
-            throw new IllegalArgumentException("initialHead fuera de rango [0, " + (totalBlocks - 1) + "]");
+        if (initialHead < 0 || initialHead >= totalBlocks + swapSizeBlocks) {
+            throw new IllegalArgumentException("initialHead fuera del disco físico");
         }
         if (headSpeedPerTick <= 0) {
             throw new IllegalArgumentException("headSpeedPerTick debe ser mayor que 0");
@@ -439,7 +439,7 @@ public class SimulatedDisk implements IClockTickable {
                 }
                 if (headPosition == pendingBoundaryBlock) {
                     if (pendingWrapJumpToZero) {
-                        // C-SCAN: llega a totalBlocks - 1 y salta a 0 sin contar el salto de regreso
+                        // C-SCAN: llega al extremo físico y salta a 0 sin contar el salto de regreso
                         headPosition = 0;
                         headDirection = HeadDirection.UP;
                         pendingWrapJumpToZero = false;
@@ -497,22 +497,22 @@ public class SimulatedDisk implements IClockTickable {
             if (schedulingPolicy != null) {
                 if (schedulingPolicy instanceof SCANDiskPolicy scan) {
                     scan.setDirection(headDirection);
-                    selected = scan.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = scan.selectNext(ioQueue, headPosition, blocks.length);
                     scanBounced = scan.didBounceOnLastSelect();
                     scanBoundary = scan.getLastBounceBoundary();
                 } else if (schedulingPolicy instanceof CSCANDiskPolicy cscan) {
-                    selected = cscan.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = cscan.selectNext(ioQueue, headPosition, blocks.length);
                     cscanWrapped = cscan.didWrapOnLastSelect();
                 } else if (schedulingPolicy instanceof LOOKDiskPolicy look) {
                     look.setDirection(headDirection);
-                    selected = look.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = look.selectNext(ioQueue, headPosition, blocks.length);
                 } else if (schedulingPolicy instanceof CLOOKDiskPolicy clook) {
-                    selected = clook.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = clook.selectNext(ioQueue, headPosition, blocks.length);
                     if (selected != null && selected.getTargetBlock() < headPosition) {
                         clookWrapped = true;
                     }
                 } else {
-                    selected = schedulingPolicy.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = schedulingPolicy.selectNext(ioQueue, headPosition, blocks.length);
                 }
             }
             if (selected == null) {
@@ -536,7 +536,7 @@ public class SimulatedDisk implements IClockTickable {
                 pendingBoundaryBlock = scanBoundary;
                 headDirection = scanBoundary >= headPosition ? HeadDirection.UP : HeadDirection.DOWN;
             } else if (cscanWrapped) {
-                pendingBoundaryBlock = totalBlocks - 1;
+                pendingBoundaryBlock = blocks.length - 1;
                 pendingWrapJumpToZero = true;
                 headDirection = HeadDirection.UP;
             } else if (clookWrapped) {
@@ -594,7 +594,7 @@ public class SimulatedDisk implements IClockTickable {
 
         int simulatedHead = anchorHead;
         while (!remaining.isEmpty()) {
-            IORequest next = tempPolicy.selectNext(remaining, simulatedHead, totalBlocks);
+            IORequest next = tempPolicy.selectNext(remaining, simulatedHead, blocks.length);
             if (next == null) {
                 next = remaining.get(0);
             }
@@ -606,7 +606,7 @@ public class SimulatedDisk implements IClockTickable {
 
     private int normalizeTargetPosition(int targetBlock) {
         if (targetBlock < 0) return 0;
-        if (targetBlock >= totalBlocks) return totalBlocks - 1;
+        if (targetBlock >= blocks.length) return blocks.length - 1;
         return targetBlock;
     }
 
@@ -697,7 +697,7 @@ public class SimulatedDisk implements IClockTickable {
     }
 
     public void setHeadPosition(int headPosition) {
-        if (headPosition < 0 || headPosition >= totalBlocks) {
+        if (headPosition < 0 || headPosition >= blocks.length) {
             throw new IllegalArgumentException("headPosition fuera de rango");
         }
         this.headPosition = headPosition;
