@@ -379,11 +379,9 @@ public class SimulatedDisk implements IClockTickable {
     public IORequest enqueueRequest(ProcessControlBlock pcb, IOOperationType operation,
                                     String path, int targetBlock, int blockCount, int arrivalCycle) {
         int[] transferBlocks = null;
-        if (operation == IOOperationType.CREATE && pcb != null && pcb.getCreationType() != null) {
-            MyLinkedList<Integer> chain = getChainBlocks(targetBlock);
-            if (chain.size() != blockCount) throw new IllegalStateException("La cadena reservada no coincide con la solicitud.");
-            transferBlocks = new int[chain.size()];
-            for (int i = 0; i < chain.size(); i++) transferBlocks[i] = chain.get(i);
+        if ((operation == IOOperationType.CREATE && pcb != null && pcb.getCreationType() != null)
+                || operation == IOOperationType.SUSPEND || operation == IOOperationType.REACTIVATE) {
+            transferBlocks = copyTransferBlocks(targetBlock, blockCount);
         }
         queueMutex.acquireUninterruptibly();
         try {
@@ -405,6 +403,10 @@ public class SimulatedDisk implements IClockTickable {
 
     public void enqueueRequest(IORequest request) {
         if (request == null) return;
+        if (request.getOperation() == IOOperationType.SUSPEND
+                || request.getOperation() == IOOperationType.REACTIVATE) {
+            request.setTransferBlocks(copyTransferBlocks(request.getTargetBlock(), request.getBlockCount()));
+        }
         queueMutex.acquireUninterruptibly();
         try {
             ioQueue.append(request);
@@ -412,6 +414,14 @@ public class SimulatedDisk implements IClockTickable {
         } finally {
             queueMutex.release();
         }
+    }
+
+    private int[] copyTransferBlocks(int targetBlock, int blockCount) {
+        MyLinkedList<Integer> chain = getChainBlocks(targetBlock);
+        if (chain.size() != blockCount) throw new IllegalStateException("La cadena reservada no coincide con la solicitud.");
+        int[] result = new int[chain.size()];
+        for (int i = 0; i < chain.size(); i++) result[i] = chain.get(i);
+        return result;
     }
 
     @Override
@@ -458,7 +468,12 @@ public class SimulatedDisk implements IClockTickable {
                 headPosition += (headDirection == HeadDirection.UP ? step2 : -step2);
                 totalHeadMovement += step2;
             }
-            return;
+            boolean swapTransfer = activeRequest.getOperation() == IOOperationType.SUSPEND
+                    || activeRequest.getOperation() == IOOperationType.REACTIVATE;
+            // En una transferencia de swap ya iniciada, alcanzar el siguiente bloque
+            // y transferirlo pueden ocurrir en el mismo ciclo.
+            if (!swapTransfer || activeTransferIndex == 0 || pendingBoundaryBlock >= 0
+                    || headPosition != targetPos) return;
         }
 
         // El cabezal está sobre el bloque objetivo: 1 ciclo de reloj por bloque leído/escrito
