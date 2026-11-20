@@ -646,7 +646,30 @@ public class ProcessControlBlock {
     private String newFileName;
     private int fileSizeBlocks;
     private String owner = "admin";
+    private com.avilaos.filesystem.FsNodeType creationType;
+    private com.avilaos.filesystem.FilePermission creationPermission = com.avilaos.filesystem.FilePermission.PUBLIC;
+    private UserMode requesterMode = UserMode.ADMIN;
+    private String requesterName = "admin";
+    private int reservedStart = -1;
+    private boolean creationIssued;
+    private boolean creationCompleted;
+
+    public com.avilaos.filesystem.FsNodeType getCreationType() { return creationType; }
+    public void setCreationType(com.avilaos.filesystem.FsNodeType type) { creationType = type; }
+    public com.avilaos.filesystem.FilePermission getCreationPermission() { return creationPermission; }
+    public void setCreationPermission(com.avilaos.filesystem.FilePermission permission) { creationPermission = permission; }
+    public UserMode getRequesterMode() { return requesterMode; }
+    public void setRequesterMode(UserMode mode) { requesterMode = mode; }
+    public String getRequesterName() { return requesterName; }
+    public void setRequesterName(String name) { requesterName = name; }
+    public int getReservedStart() { return reservedStart; }
+    public void setReservedStart(int start) { reservedStart = start; }
+    public boolean isCreationIssued() { return creationIssued; }
+    public void setCreationIssued(boolean issued) { creationIssued = issued; }
+    public boolean isCreationCompleted() { return creationCompleted; }
+    public void setCreationCompleted(boolean completed) { creationCompleted = completed; }
     private int swapStartBlock = -1;
+    private boolean diskRequestIssued = false;
 
     public IOOperationType getIoOperation() { return ioOperation; }
     public void setIoOperation(IOOperationType ioOperation) { this.ioOperation = ioOperation; }
@@ -660,6 +683,8 @@ public class ProcessControlBlock {
     public void setOwner(String owner) { this.owner = owner != null ? owner : "admin"; }
     public int getSwapStartBlock() { return swapStartBlock; }
     public void setSwapStartBlock(int swapStartBlock) { this.swapStartBlock = swapStartBlock; }
+    public boolean isDiskRequestIssued() { return diskRequestIssued; }
+    public void setDiskRequestIssued(boolean diskRequestIssued) { this.diskRequestIssued = diskRequestIssued; }
 
     @Override
 public String toString() {

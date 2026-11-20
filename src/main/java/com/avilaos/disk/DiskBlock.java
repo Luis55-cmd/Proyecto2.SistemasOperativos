@@ -12,6 +12,7 @@ public class DiskBlock {
     private final int blockNumber;
     private final boolean swapBlock;
     private boolean occupied;
+    private boolean reserved;
     private int nextBlock;
     private String occupiedBy;
     private int ownerProcessId;
@@ -34,6 +35,7 @@ public class DiskBlock {
      */
     public void allocate(String occupiedBy, int ownerProcessId, int nextBlock) {
         this.occupied = true;
+        this.reserved = false;
         this.occupiedBy = occupiedBy;
         this.ownerProcessId = ownerProcessId;
         this.nextBlock = nextBlock;
@@ -44,6 +46,7 @@ public class DiskBlock {
      */
     public void free() {
         this.occupied = false;
+        this.reserved = false;
         this.nextBlock = END_OF_CHAIN;
         this.occupiedBy = null;
         this.ownerProcessId = -1;
@@ -64,6 +67,16 @@ public class DiskBlock {
     public boolean isFree() {
         return !occupied;
     }
+
+    /** Una reserva no está libre, pero aún no representa un archivo publicado. */
+    public boolean isReserved() { return reserved; }
+
+    void reserve(String path, int processId, int nextBlock) {
+        allocate(path, processId, nextBlock);
+        reserved = true;
+    }
+
+    void confirmReservation() { reserved = false; }
 
     public int getNextBlock() {
         return nextBlock;
@@ -94,6 +107,7 @@ public class DiskBlock {
         if (!occupied) {
             return "[" + blockNumber + (swapBlock ? ":SWAP:FREE]" : ":FREE]");
         }
+        if (reserved) return "[" + blockNumber + ":RESERVED:" + occupiedBy + " -> " + nextBlock + "]";
         return "[" + blockNumber + (swapBlock ? ":SWAP:" : ":") + occupiedBy + " -> " + nextBlock + "]";
     }
 }

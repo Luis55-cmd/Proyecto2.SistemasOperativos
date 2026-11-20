@@ -160,38 +160,38 @@ public class Module2FileSystemAndPersistenceTest {
         fs.createDirectory("/sistema/sub", "admin", FilePermission.PUBLIC, "Init");
 
         FSNode f1 = fs.createFile("/sistema/kernel.bin", 4, "admin", FilePermission.PUBLIC, "Proc_1", 1);
-        check(f1.getFirstBlock() == 0, "kernel.bin empieza en bloque 0");
+        check(f1.getFirstBlock() == 3, "kernel.bin empieza después de raíz y directorios");
         check(f1.getSizeBlocks() == 4, "tamaño 4 bloques");
         check("Proc_1".equals(f1.getCreatorProcess()), "proceso creador registrado");
         check(f1.getColorHex() != null && f1.getColorHex().startsWith("#"), "color identificador asignado");
-        check(disk.getFreeDataBlocks() == 46, "quedan 46 bloques libres");
+        check(disk.getFreeDataBlocks() == 43, "quedan 43 bloques libres");
 
         FSNode f2 = fs.createFile("/sistema/sub/driver.sys", 3, "admin", FilePermission.PRIVATE, "Proc_2", 2);
-        check(f2.getFirstBlock() == 4, "driver.sys empieza en bloque 4");
-        check(disk.getFreeDataBlocks() == 43, "quedan 43 bloques libres");
+        check(f2.getFirstBlock() == 7, "driver.sys empieza en bloque 7");
+        check(disk.getFreeDataBlocks() == 40, "quedan 40 bloques libres");
 
         // T18: Rechazar creación sin espacio suficiente sin alterar árbol ni disco
         expectFail(() -> fs.createFile("/sistema/huge.iso", 100, "admin", FilePermission.PUBLIC, "Proc_3", 3),
                 "debe rechazar archivo cuando no hay bloques libres suficientes");
         check(fs.findNode("/sistema/huge.iso") == null, "árbol intacto tras rechazo por espacio");
-        check(disk.getFreeDataBlocks() == 43, "disco intacto tras rechazo por espacio");
+        check(disk.getFreeDataBlocks() == 40, "disco intacto tras rechazo por espacio");
 
         // T19 & T20: Leer y renombrar archivo actualizando ruta en los bloques del disco
         FSNode readF1 = fs.readNode("/sistema/kernel.bin");
         check(readF1 == f1, "readNode encuentra kernel.bin");
         fs.renameNode("/sistema/kernel.bin", "vmlinuz.bin");
         check(fs.findNode("/sistema/vmlinuz.bin") != null, "archivo renombrado en árbol");
-        check("/sistema/vmlinuz.bin".equals(disk.getBlock(0).getOccupiedBy()), "occupiedBy actualizado en disco");
+        check("/sistema/vmlinuz.bin".equals(disk.getBlock(f1.getFirstBlock()).getOccupiedBy()), "occupiedBy actualizado en disco");
 
         // T21: Eliminar archivo individual y liberar sus 4 bloques
         int freed1 = fs.deleteNode("/sistema/vmlinuz.bin");
         check(freed1 == 4, "se liberaron los 4 bloques de vmlinuz.bin");
-        check(disk.getFreeDataBlocks() == 47, "47 bloques libres tras borrar vmlinuz.bin");
+        check(disk.getFreeDataBlocks() == 44, "44 bloques libres tras borrar vmlinuz.bin");
 
         // T22: Eliminar directorio anidado recursivamente y liberar los bloques de sus archivos hijos
         int freedDir = fs.deleteNode("/sistema");
-        check(freedDir == 3, "se liberaron los 3 bloques de /sistema/sub/driver.sys");
-        check(disk.getFreeDataBlocks() == 50, "todos los 50 bloques de datos quedaron libres");
+        check(freedDir == 5, "se liberaron los 3 bloques de archivo y 2 directorios");
+        check(disk.getFreeDataBlocks() == 49, "solo la raíz sigue ocupada");
         check(fs.findNode("/sistema") == null, "directorio /sistema eliminado");
     }
 

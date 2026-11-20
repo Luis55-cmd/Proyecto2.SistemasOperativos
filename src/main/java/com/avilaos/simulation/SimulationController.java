@@ -223,6 +223,8 @@ public class SimulationController implements IClockTickable {
         );
         kernel.setEventListener(this::logEvent);
         kernel.setDisk(this.disk);
+        kernel.setFileSystemManager(this.fileSystemManager);
+        kernel.setAccessControl(this.accessControl);
 
         Computer comp = new Computer(id, cpu, ram, dma, kernel, policy != null ? policy : SchedulingPolicyType.FCFS, quantum);
         this.computers.append(comp);
@@ -335,11 +337,44 @@ public class SimulationController implements IClockTickable {
             pcb.setOwner(owner != null && !owner.trim().isEmpty() ? owner.trim() : "admin");
             pcb.setMode(mode != null ? mode : ExecutionMode.USER);
             pcb.setNewFileName(newFileName != null ? newFileName.trim() : "");
+            pcb.setRequesterMode(currentMode);
+            pcb.setRequesterName(accessControl.getActiveUsername());
+            if (currentMode == UserMode.USER) pcb.setOwner(accessControl.getActiveUsername());
             logEvent("Proceso FILE_IO creado: " + pcb.getName() + " (ID " + pcb.getId() + ") op=" + operation
                     + " ruta=" + targetPath + (operation == IOOperationType.CREATE ? " bloques=" + fileSizeBlocks : "")
                     + " dueño=" + pcb.getOwner() + " modo=" + mode);
             notifyGUI();
             return pcb;
+        } finally { StateAccess.exit(); }
+    }
+
+    public ProcessControlBlock requestCreation(String path, com.avilaos.filesystem.FsNodeType type,
+            int blocks, String owner, com.avilaos.filesystem.FilePermission permission) {
+        StateAccess.enter();
+        try {
+            if (computers.isEmpty()) throw new IllegalStateException("Crea primero un computador.");
+            if (path == null || !path.startsWith("/") || path.length() < 2 || path.endsWith("/"))
+                throw new IllegalArgumentException("Indica una ruta absoluta y un nombre válido.");
+            if (type == null || permission == null || blocks < 1 || (type == com.avilaos.filesystem.FsNodeType.DIRECTORY && blocks != 1))
+                throw new IllegalArgumentException("Tipo, permiso o tamaño inválido.");
+            UserMode mode = currentMode;
+            String actor = mode == UserMode.ADMIN ? "admin" : accessControl.getActiveUsername();
+            String effectiveOwner = mode == UserMode.ADMIN ? owner : actor;
+            if (effectiveOwner == null || effectiveOwner.trim().isEmpty()) throw new IllegalArgumentException("Indica el dueño.");
+            var decision = new com.avilaos.filesystem.AccessControlManager(mode, actor).checkOperation(
+                    fileSystemManager.getTree(), IOOperationType.CREATE, path, type);
+            if (!decision.allowed()) throw new IllegalArgumentException(decision.message());
+            ProcessControlBlock p = createProcess("Crear " + path, computers.get(0).getId(), ProcessType.FILE_IO, 2, 2, 5, 10000);
+            if (p == null) throw new IllegalStateException("No se pudo crear el proceso; revisa RAM y log.");
+            p.setIoOperation(IOOperationType.CREATE);
+            p.setTargetPath(path);
+            p.setFileSizeBlocks(blocks);
+            p.setOwner(effectiveOwner.trim());
+            p.setCreationType(type);
+            p.setCreationPermission(permission);
+            p.setRequesterMode(mode);
+            p.setRequesterName(actor);
+            return p;
         } finally { StateAccess.exit(); }
     }
 
@@ -518,7 +553,7 @@ public class SimulationController implements IClockTickable {
         StateAccess.enter();
         try {
             if (dualJsonGateActive && !isReadyToStartClock()) {
-                String msg = "Error: Debes cargar ambos archivos JSON (Sistema de Archivos y Procesos/Configuración) antes de iniciar el reloj global.";
+                String msg = "Error: Carga el sistema de archivos y prepara un computador con procesos, o carga el JSON de procesos y configuración.";
                 logEvent(msg);
                 throw new IllegalStateException(msg);
             }
@@ -538,7 +573,7 @@ public class SimulationController implements IClockTickable {
         StateAccess.enter();
         try {
             if (dualJsonGateActive && !isReadyToStartClock()) {
-                String msg = "Error: Debes cargar ambos archivos JSON (Sistema de Archivos y Procesos/Configuración) antes de avanzar el reloj global.";
+                String msg = "Error: Carga el sistema de archivos y prepara un computador con procesos, o carga el JSON de procesos y configuración.";
                 logEvent(msg);
                 throw new IllegalStateException(msg);
             }
@@ -700,6 +735,7 @@ public class SimulationController implements IClockTickable {
         this.disk.setEventListener(this::logEvent);
         this.disk.setCompletionListener(this::onDiskRequestCompleted);
         this.fileSystemManager = new com.avilaos.filesystem.FileSystemManager(this.disk);
+        this.currentMode = UserMode.ADMIN;
         this.accessControl.setSession(com.avilaos.core.model.UserMode.ADMIN, "admin");
         ProcessControlBlock.resetIdGenerator(1);
 
@@ -734,7 +770,13 @@ public class SimulationController implements IClockTickable {
     }
 
     public boolean isReadyToStartClock() {
-        return fileSystemJsonLoaded && processesJsonLoaded;
+        if (!fileSystemJsonLoaded) return false;
+        if (processesJsonLoaded) return true;
+        for (int i = 0; i < computers.size(); i++) {
+            Computer computer = computers.get(i);
+            if (computer != null && computer.getKernel() != null && !computer.getKernel().getProcessList().isEmpty()) return true;
+        }
+        return false;
     }
 
     public void setDualJsonGateActive(boolean active) {
@@ -842,6 +884,8 @@ public class SimulationController implements IClockTickable {
                     pcb.setFileSizeBlocks(p.fileSizeBlocks());
                     pcb.setOwner(p.owner());
                     pcb.setNewFileName(p.newFileName());
+                    pcb.setRequesterMode(currentMode);
+                    pcb.setRequesterName(accessControl.getActiveUsername());
                 }
             }
 
@@ -909,6 +953,8 @@ public class SimulationController implements IClockTickable {
             Computer c = computers.get(i);
             if (c != null && c.getKernel() != null) {
                 c.getKernel().setDisk(this.disk);
+                c.getKernel().setFileSystemManager(this.fileSystemManager);
+                c.getKernel().setAccessControl(this.accessControl);
             }
         }
     }
@@ -925,35 +971,7 @@ public class SimulationController implements IClockTickable {
     }
     
     public void reconfigurarDisco(int totalBlocks, int swapSizeBlocks) {
-        com.avilaos.concurrency.StateAccess.enter();
-        try {
-            int headInicial = 0; 
-            com.avilaos.disk.DiskSchedulingPolicy currentPolicy = null;
-            
-            if (this.disk != null) {
-                currentPolicy = this.disk.getSchedulingPolicy();
-                // Mantener la posición del cabezal si cabe en el nuevo tamaño
-                if (this.disk.getHeadPosition() < totalBlocks) {
-                    headInicial = this.disk.getHeadPosition();
-                }
-            }
-            this.disk = new com.avilaos.disk.SimulatedDisk(totalBlocks, swapSizeBlocks, headInicial, 10);
-            this.configuredSwapSizeBlocks = swapSizeBlocks;
-            if (currentPolicy != null) {
-                this.disk.setSchedulingPolicy(currentPolicy);
-            }
-            this.disk.setEventListener(this::logEvent);
-            this.disk.setCompletionListener(this::onDiskRequestCompleted);
-            
-            this.fileSystemManager = new com.avilaos.filesystem.FileSystemManager(this.disk);
-            
-            updateComputersDiskReference();
-            
-            logEvent("Disco reconfigurado manualmente: " + totalBlocks + " bloques de datos, " + swapSizeBlocks + " bloques de swap.");
-            notifyGUI();
-        } finally {
-            com.avilaos.concurrency.StateAccess.exit();
-        }
+        throw new IllegalStateException("Cambio de capacidad deshabilitado hasta proteger archivos, E/S y swap.");
     }
     
     public UserMode getMode() {
@@ -965,9 +983,9 @@ public class SimulationController implements IClockTickable {
      * @param mode El nuevo modo (ADMIN o USER).
      */
     public void setMode(UserMode mode) {
+        if (mode == null) return;
         this.currentMode = mode;
-        
-        // Opcional: Registrar el cambio en la consola de eventos de la interfaz
+        this.accessControl.setActiveMode(mode);
         logEvent("Cambio de sesión: Ahora operando en modo " + mode.name());
     }
 }

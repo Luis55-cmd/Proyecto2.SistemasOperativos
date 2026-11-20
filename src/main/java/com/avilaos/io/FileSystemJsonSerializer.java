@@ -112,7 +112,7 @@ public final class FileSystemJsonSerializer {
         for (int i = 0; i < entries.size(); i++) {
             EntrySpec e = entries.get(i);
             if (e.type() == FsNodeType.DIRECTORY) {
-                fsManager.createDirectory(e.path(), e.owner(), e.permission(), "JSON");
+                fsManager.createDirectoryAtBlock(e.path(), e.owner(), e.permission(), "JSON", e.startBlock());
             } else {
                 if (e.blocks() <= 0) {
                     throw new IllegalArgumentException("El archivo '" + e.path() + "' debe tener blocks >= 1.");
@@ -171,6 +171,7 @@ public final class FileSystemJsonSerializer {
                 writer.beginObject();
                 writer.name("path").value(node.getPath());
                 writer.name("type").value(node.getType().name());
+                if (node.isDirectory()) writer.name("startBlock").value(node.getFirstBlock());
                 if (node.isFile()) {
                     writer.name("startBlock").value(node.getFirstBlock());
                     writer.name("blocks").value(node.getSizeBlocks());
@@ -269,17 +270,8 @@ public final class FileSystemJsonSerializer {
                 throw new IllegalArgumentException("Bloque inválido o ya ocupado (" + blk + ") en " + e.path());
             }
         }
-        // Reservar usando allocateChainedBlocksFrom si es contiguo o enlazar directamente sobre los bloques validados
-        int start = disk.allocateChainedBlocksFrom(e.startBlock(), e.path(), e.blocks(), -1);
-        if (start < 0) {
+        if (!disk.allocateExactChain(chain, e.path(), -1)) {
             throw new IllegalArgumentException("No se pudo restaurar la cadena de " + e.path());
-        }
-        // Si la cadena explícita difería del barrido contiguo, liberar y enlazar exactamente chain
-        disk.freeChainedBlocks(start);
-        for (int i = 0; i < chain.size(); i++) {
-            int curr = chain.get(i);
-            int next = (i + 1 < chain.size()) ? chain.get(i + 1) : DiskBlock.END_OF_CHAIN;
-            disk.getBlock(curr).allocate(e.path(), -1, next);
         }
         FSNode node = fsManager.getTree().insertAtPath(
                 e.path(), FsNodeType.FILE, e.owner(), e.permission(), e.startBlock(), e.blocks());

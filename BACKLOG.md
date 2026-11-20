@@ -1,5 +1,13 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
+## Avances locales — 20 de noviembre de 2026
+
+Base: `develop` en `4e60324`. En la rama de trabajo se incorporaron la vista de Archivos (árbol, detalles y tabla), la creación de archivos y directorios mediante proceso y solicitud de disco, bloques reservados y consulta del mapa por clic. La raíz y cada directorio ocupan un bloque; los JSON anteriores pueden necesitar cambios si sus bloques entran en conflicto. El cambio destructivo de capacidad está deshabilitado en interfaz y controlador.
+
+El estudiante comprobó visualmente carga de JSON, creación, política C-SCAN, actualización de la tabla y consulta del mapa. Se ejecutaron directamente los programas activos de prueba: 29 pasaron y dos pruebas de interfaz heredadas fallaron (`CreacionComputadoresGuiTest`, espera varias instancias, y `MonitorSimulacionTest`, espera entradas antiguas del menú). Las pruebas que requieren argumentos no se ejecutaron. Las pruebas de directorios se actualizaron para la nueva contabilidad; la prueba de logs espera su entrega en el hilo de Swing.
+
+Pendientes: integrar lectura, renombrado y eliminación por E/S; completar sesión y selector de identidad; pruebas adicionales de reservas, cancelación y suspensión; cola de E/S y métricas; guardado desde Inicio. El arranque manual cuando ya existe un proceso difiere de la exigencia literal de cargar ambos JSON y está pendiente de aclaración con el equipo. El PR #37 de swap y FILE_IO toca las mismas clases de kernel y procesos: conciliar explícitamente antes de integrar ambos.
+
 Corte: 14 de noviembre de 2026, `develop` en `edde1ec`. Los estados son una fotografía: **pendiente** significa que todavía no se ha verificado o completado aquí; no implica que no exista código. Los issues cerrados no certifican integración. NetBeans compiló y abrió la interfaz; el usuario confirmó que la simulación arranca después de corregir el requisito de dos computadores. Se ejecutaron directamente pruebas existentes el 14-11-2026; ver resultados y límites al final.
 
 **Cómo usarlo:** atender una tarea por vez en el orden indicado. El orden es sugerido; las dependencias entre áreas se indican debajo. Al terminar, registrar evidencia y actualizar estado. Antes de programar, elaborar y explicar el mapa de la función según la regla pedagógica del proyecto.
@@ -199,3 +207,51 @@ Estos resultados corresponden a una revisión anterior; los estados actualizados
 Base: `develop` 110536e. Compilar con Maven pasó, pero Surefire sigue ejecutando cero pruebas; se ejecutaron los programas de prueba directamente con Java 25 y modo sin pantalla. Pasaron 20 programas, incluidos los tres nuevos de CRUD, permisos y persistencia. Dos de los programas que habían pasado ahora fallan: `ControlesRelojGuiTest` (aserción Paso) y `LogCompletoYRelojTest` (se exige cargar ambos JSON antes de iniciar). La nueva condición de JSON está en el enunciado; hay que revisar y adaptar los escenarios antes de determinar si existe una regresión funcional. También siguen fallando las pruebas heredadas `CreacionComputadoresGuiTest` y `MonitorSimulacionTest`. `CargaDuplicadosTest` y `EventosLogTest` requieren archivos de entrada y no se ejecutaron en esta revisión.
 
 Las pruebas nuevas verifican operaciones CRUD, permisos y carga/guardado de ambos JSON a nivel de componentes y controlador. Esto no demuestra integración completa con la interfaz ni que CRUD se ejecute mediante procesos de E/S. La marca T26 del remoto se refiere a la devolución de un motivo en el control de permisos; mostrarlo correctamente en la interfaz sigue pendiente de validación. Mantener abierta la duda sobre si swap debe formar parte de `totalBlocks`.
+
+## Rúbrica Oficial de Evaluación (Transcripción Exacta y Textual)
+
+### 1. RA: Aplicación de Metodologías de Desarrollo (2 pts)
+
+| Criterios | Estado |
+|---|---|
+| Commits descriptivos y de tamaño limitado | ⬜ |
+| Ramas por funcionalidad, rama develop y Pull Requests comentados | ⬜ |
+| Uso de Issues para tareas y errores | ⬜ |
+| Contribución equitativa en el repositorio | ⬜ |
+| Aplicación de Metodologías de Desarrollo | ⬜ |
+
+### 2. RA: Uso de Técnicas y Herramientas Computacionales (7 pts)
+
+| Criterios | Estado |
+|---|---|
+| Dominio del tema (defensa) | ⬜ |
+| Uso adecuado de herramientas: Java 21 y NetBeans, JTree/JTable, JSON, librería de gráficas y estructuras de datos propias | ⬜ |
+| Uso de Técnicas y Herramientas Computacionales | ⬜ |
+
+### 3. RA: Aseguramiento de la Calidad (8 pts)
+
+| Criterios | Estado |
+|---|---|
+| Integración con ÁvilaOS: procesos de E/S en las colas, bloqueo por E/S y reloj global | ⬜ |
+| Disco y asignación encadenada: mapa de bloques, liberación y área de intercambio | ⬜ |
+| Sistema de archivos con JTree, CRUD y tabla de asignación | ⬜ |
+| Planificación de disco: FIFO, SSTF, SCAN, C-SCAN, cambio en ejecución e interfaz | ⬜ |
+| Suspensión de procesos: modelo de 7 estados y planificador a mediano plazo | ⬜ |
+| No existen fallos en el sistema, se consideran casos borde | ⬜ |
+| Aseguramiento de la Calidad | ⬜ |
+
+### 4. RA: Garantía de la Seguridad y fiabilidad (3 pts)
+
+| Criterios | Estado |
+|---|---|
+| Modo administrador / usuario y permisos de archivos | ⬜ |
+| Validaciones de entrada sin interrumpir la simulación | ⬜ |
+| Persistencia y recarga del estado del sistema de archivos | ⬜ |
+| Informe con diagramas UML, métricas con gráfica y conclusiones | ⬜ |
+| Garantía de la Seguridad y fiabilidad | ⬜ |
+
+### 5. Extras / Consideraciones adicionales
+
+| Criterios | Estado |
+|---|---|
+| Extras o consideraciones (caché de bloques u otros) | ⬜ |
