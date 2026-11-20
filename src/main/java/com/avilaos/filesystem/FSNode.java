@@ -33,8 +33,8 @@ public class FSNode {
         this.type = type;
         this.owner = (owner != null && !owner.isEmpty()) ? owner : "admin";
         this.permission = permission != null ? permission : FilePermission.PUBLIC;
-        this.firstBlock = type == FsNodeType.DIRECTORY ? -1 : firstBlock;
-        this.sizeBlocks = type == FsNodeType.DIRECTORY ? 0 : Math.max(0, sizeBlocks);
+        this.firstBlock = firstBlock;
+        this.sizeBlocks = Math.max(0, sizeBlocks);
         this.creatorProcess = (creatorProcess != null && !creatorProcess.isEmpty()) ? creatorProcess : "SYSTEM";
         if (type == FsNodeType.DIRECTORY) {
             this.colorHex = "#64748B";

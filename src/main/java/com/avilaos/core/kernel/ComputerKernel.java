@@ -401,6 +401,10 @@ public class ComputerKernel {
             return;
         }
 
+        if (disk != null && p.getReservedStart() >= 0) {
+            disk.finishReservation(p.getReservedStart(), p.getId(), false);
+            p.setReservedStart(-1);
+        }
         event(proceso(p) + (p.getRemainingDeadline() <= 0 ? " terminó por vencimiento de deadline" : " terminó normalmente"));
 
         if (com != null) {
@@ -632,6 +636,25 @@ public class ComputerKernel {
 // [P2-LEGACY]                     currentRunning.executeOneCycle(currentCycle);
 // [P2-LEGACY]                 }
             { // [P2] rama unica: ya no existen PRODUCER/CONSUMER
+                if (currentRunning.getType() == ProcessType.FILE_IO && currentRunning.getCreationType() != null
+                        && !currentRunning.isCreationIssued()) {
+                    try {
+                        int inicio = fileSystemManager.reserveCreation(currentRunning);
+                        currentRunning.setReservedStart(inicio);
+                        currentRunning.setCreationIssued(true);
+                        currentRunning.setMode(com.avilaos.core.model.ExecutionMode.KERNEL);
+                        cpu.setMode(com.avilaos.core.model.ExecutionMode.KERNEL);
+                        currentRunning.executeOneCycle(currentCycle);
+                        blockProcess(comp, currentRunning);
+                        currentRunning.setBlockReason(BlockReason.WAITING_DISK);
+                        disk.enqueueRequest(currentRunning, com.avilaos.core.model.IOOperationType.CREATE,
+                                currentRunning.getTargetPath(), inicio, currentRunning.getFileSizeBlocks(), currentCycle);
+                        event("Creación pendiente: " + currentRunning.getTargetPath() + " · bloques reservados");
+                    } catch (RuntimeException ex) {
+                        event("Creación rechazada: " + ex.getMessage());
+                        terminateProcess(comp, currentRunning);
+                    }
+                } else {
                 boolean solicitudIO = currentRunning.getType() == ProcessType.IO_BOUND
                         && currentRunning.isIoRequestInstruction() && currentRunning.getIoCycleCountdown() == 0;
                 currentRunning.executeOneCycle(currentCycle);
@@ -650,6 +673,7 @@ public class ComputerKernel {
                     } else {
                         currentRunning.setIoCycleCountdown(countdown);
                     }
+                }
                 }
             }
 
@@ -855,6 +879,8 @@ public class ComputerKernel {
 
     // --- [P2] GETTERS/SETTERS DEL DISCO Y PLANIFICADOR A MEDIANO PLAZO ---
 
+    private com.avilaos.filesystem.FileSystemManager fileSystemManager;
+    public void setFileSystemManager(com.avilaos.filesystem.FileSystemManager fs) { this.fileSystemManager = fs; }
     public SimulatedDisk getDisk() { return disk; }
     public void setDisk(SimulatedDisk disk) { this.disk = disk; }
     public MidTermScheduler getMidTermScheduler() { return midTermScheduler; }
@@ -992,6 +1018,17 @@ public class ComputerKernel {
             case REACTIVATE -> onSwapInCompleted(com, request);
             default -> {
                 ProcessControlBlock p = request.getPcb();
+                if (p != null && p.getComputerId() != com.getId()) return;
+                if (p != null && p.getCreationType() != null && !p.isTerminated()) {
+                    try {
+                        fileSystemManager.completeCreation(p);
+                        event("Creación completada: " + p.getTargetPath());
+                    } catch (RuntimeException ex) {
+                        event("Creación fallida: " + ex.getMessage());
+                        terminateProcess(com, p);
+                        return;
+                    }
+                }
                 if (p != null && !p.isTerminated()) {
                     if (p.getState() == ProcessState.BLOQUEADO && p.getBlockReason() == BlockReason.WAITING_DISK) {
                         blockedToReady(p);

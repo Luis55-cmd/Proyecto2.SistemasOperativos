@@ -35,7 +35,7 @@ public class FileSystemTreeTest {
         check(t.find("/usuarios/apuntes.txt") != null && t.find("/usuarios/notas.txt") == null, "rename");
 
         MyLinkedList<FSNode> freed = t.remove("/sistema");
-        check(freed.size() == 2, "archivos liberados por eliminacion recursiva");
+        check(freed.size() == 4, "nodos de archivos y directorios retirados recursivamente");
         check(t.find("/sistema") == null && t.find("/sistema/lib/core.dll") == null, "subarbol eliminado");
         check(t.countNodes() == 2, "conteo final");
         System.out.println("TODAS LAS PRUEBAS DEL ARBOL N-ARIO PASARON.");
