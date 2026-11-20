@@ -224,6 +224,7 @@ public class SimulationController implements IClockTickable {
         kernel.setEventListener(this::logEvent);
         kernel.setDisk(this.disk);
         kernel.setFileSystemManager(this.fileSystemManager);
+        kernel.setAccessControl(this.accessControl);
 
         Computer comp = new Computer(id, cpu, ram, dma, kernel, policy != null ? policy : SchedulingPolicyType.FCFS, quantum);
         this.computers.append(comp);
@@ -336,6 +337,9 @@ public class SimulationController implements IClockTickable {
             pcb.setOwner(owner != null && !owner.trim().isEmpty() ? owner.trim() : "admin");
             pcb.setMode(mode != null ? mode : ExecutionMode.USER);
             pcb.setNewFileName(newFileName != null ? newFileName.trim() : "");
+            pcb.setRequesterMode(currentMode);
+            pcb.setRequesterName(accessControl.getActiveUsername());
+            if (currentMode == UserMode.USER) pcb.setOwner(accessControl.getActiveUsername());
             logEvent("Proceso FILE_IO creado: " + pcb.getName() + " (ID " + pcb.getId() + ") op=" + operation
                     + " ruta=" + targetPath + (operation == IOOperationType.CREATE ? " bloques=" + fileSizeBlocks : "")
                     + " dueño=" + pcb.getOwner() + " modo=" + mode);
@@ -880,6 +884,8 @@ public class SimulationController implements IClockTickable {
                     pcb.setFileSizeBlocks(p.fileSizeBlocks());
                     pcb.setOwner(p.owner());
                     pcb.setNewFileName(p.newFileName());
+                    pcb.setRequesterMode(currentMode);
+                    pcb.setRequesterName(accessControl.getActiveUsername());
                 }
             }
 
@@ -948,6 +954,7 @@ public class SimulationController implements IClockTickable {
             if (c != null && c.getKernel() != null) {
                 c.getKernel().setDisk(this.disk);
                 c.getKernel().setFileSystemManager(this.fileSystemManager);
+                c.getKernel().setAccessControl(this.accessControl);
             }
         }
     }
@@ -976,10 +983,9 @@ public class SimulationController implements IClockTickable {
      * @param mode El nuevo modo (ADMIN o USER).
      */
     public void setMode(UserMode mode) {
+        if (mode == null) return;
         this.currentMode = mode;
         this.accessControl.setActiveMode(mode);
-        
-        // Opcional: Registrar el cambio en la consola de eventos de la interfaz
         logEvent("Cambio de sesión: Ahora operando en modo " + mode.name());
     }
 }

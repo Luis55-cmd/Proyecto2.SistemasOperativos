@@ -207,3 +207,51 @@ Estos resultados corresponden a una revisión anterior; los estados actualizados
 Base: `develop` 110536e. Compilar con Maven pasó, pero Surefire sigue ejecutando cero pruebas; se ejecutaron los programas de prueba directamente con Java 25 y modo sin pantalla. Pasaron 20 programas, incluidos los tres nuevos de CRUD, permisos y persistencia. Dos de los programas que habían pasado ahora fallan: `ControlesRelojGuiTest` (aserción Paso) y `LogCompletoYRelojTest` (se exige cargar ambos JSON antes de iniciar). La nueva condición de JSON está en el enunciado; hay que revisar y adaptar los escenarios antes de determinar si existe una regresión funcional. También siguen fallando las pruebas heredadas `CreacionComputadoresGuiTest` y `MonitorSimulacionTest`. `CargaDuplicadosTest` y `EventosLogTest` requieren archivos de entrada y no se ejecutaron en esta revisión.
 
 Las pruebas nuevas verifican operaciones CRUD, permisos y carga/guardado de ambos JSON a nivel de componentes y controlador. Esto no demuestra integración completa con la interfaz ni que CRUD se ejecute mediante procesos de E/S. La marca T26 del remoto se refiere a la devolución de un motivo en el control de permisos; mostrarlo correctamente en la interfaz sigue pendiente de validación. Mantener abierta la duda sobre si swap debe formar parte de `totalBlocks`.
+
+## Rúbrica Oficial de Evaluación (Transcripción Exacta y Textual)
+
+### 1. RA: Aplicación de Metodologías de Desarrollo (2 pts)
+
+| Criterios | Estado |
+|---|---|
+| Commits descriptivos y de tamaño limitado | ⬜ |
+| Ramas por funcionalidad, rama develop y Pull Requests comentados | ⬜ |
+| Uso de Issues para tareas y errores | ⬜ |
+| Contribución equitativa en el repositorio | ⬜ |
+| Aplicación de Metodologías de Desarrollo | ⬜ |
+
+### 2. RA: Uso de Técnicas y Herramientas Computacionales (7 pts)
+
+| Criterios | Estado |
+|---|---|
+| Dominio del tema (defensa) | ⬜ |
+| Uso adecuado de herramientas: Java 21 y NetBeans, JTree/JTable, JSON, librería de gráficas y estructuras de datos propias | ⬜ |
+| Uso de Técnicas y Herramientas Computacionales | ⬜ |
+
+### 3. RA: Aseguramiento de la Calidad (8 pts)
+
+| Criterios | Estado |
+|---|---|
+| Integración con ÁvilaOS: procesos de E/S en las colas, bloqueo por E/S y reloj global | ⬜ |
+| Disco y asignación encadenada: mapa de bloques, liberación y área de intercambio | ⬜ |
+| Sistema de archivos con JTree, CRUD y tabla de asignación | ⬜ |
+| Planificación de disco: FIFO, SSTF, SCAN, C-SCAN, cambio en ejecución e interfaz | ⬜ |
+| Suspensión de procesos: modelo de 7 estados y planificador a mediano plazo | ⬜ |
+| No existen fallos en el sistema, se consideran casos borde | ⬜ |
+| Aseguramiento de la Calidad | ⬜ |
+
+### 4. RA: Garantía de la Seguridad y fiabilidad (3 pts)
+
+| Criterios | Estado |
+|---|---|
+| Modo administrador / usuario y permisos de archivos | ⬜ |
+| Validaciones de entrada sin interrumpir la simulación | ⬜ |
+| Persistencia y recarga del estado del sistema de archivos | ⬜ |
+| Informe con diagramas UML, métricas con gráfica y conclusiones | ⬜ |
+| Garantía de la Seguridad y fiabilidad | ⬜ |
+
+### 5. Extras / Consideraciones adicionales
+
+| Criterios | Estado |
+|---|---|
+| Extras o consideraciones (caché de bloques u otros) | ⬜ |
