@@ -1,5 +1,15 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
+## Procesos — propuesta en revisión (21 de noviembre de 2026)
+
+La pestaña permite crear procesos CPU-bound y procesos de lectura identificados visualmente como E/S-bound. La lectura manual usa internamente FILE_IO y dos instrucciones: solicitar lectura y terminar tras regresar del disco; requiere dos unidades de RAM. La duración de la operación depende de la cola y el recorrido del disco, no se calcula a partir de estas dos instrucciones. Esta cuenta es una decisión de implementación, no una fórmula exigida por el enunciado. Las operaciones de escritura y otras operaciones CRUD siguen en Archivos.
+
+El inicio con computador y procesos configurados manualmente puede prescindir de JSON. Esta decisión solicitada por el estudiante difiere del requisito literal de cargar ambos JSON, y sigue pendiente de acuerdo con el equipo o aclaratoria docente.
+
+Validación local: compilación con destino Java 21 y pruebas automáticas del formulario en modo sin pantalla, inicio manual, permisos y lectura fragmentada. El estudiante ejecutó desde la interfaz el escenario `13-arbol-complejo.json`: lector (RAM 2) solicitó READ en ciclo 1, disco terminó en ciclo 10, CPU de 15 instrucciones terminó en ciclo 16 y lector finalizó tras volver a CPU en ciclo 17. Este log demuestra el recorrido de lectura y concurrencia con CPU; el cambio visual de botones al crear el computador se comprobó automáticamente en modo sin pantalla, sin confirmación visual explícita posterior. El PR #45 está fusionado: su último commit es `57b8032`, base de esta rama. GitHub confirmó que develop coincide con el commit de integración `aafc8dd` al revisar.
+
+Modo entrega: la IA implementó la interfaz, integración de lectura y cálculo de instrucciones. Pendiente para defensa: explicar el recorrido del proceso por CPU y disco, identidad y permisos, justificar las dos instrucciones, y practicar la localización de una lectura fallida. Después de la entrega, reconstruir y modificar el flujo y depurarlo sin ayuda.
+
 ## Estado actual — 21 de noviembre de 2026
 
 El [PR #44](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/44) ya fue fusionado en `develop`. El [PR #45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) propone completar las operaciones de archivos y la identidad de sesión. Las secciones posteriores son históricas cuando contradicen este corte; las filas del backlog requieren conciliación individual antes de cambiar sus estados.

@@ -4,6 +4,9 @@ package com.avilaos.core.model;
 public final class ProcessSizing {
     private ProcessSizing() { }
 
+    /** Una instrucción solicita la lectura y otra completa el proceso tras volver del disco. */
+    public static int fileReadInstructions() { return 2; }
+
     public static int instructions(ProcessType type, int cpuWork, int ioInterval,
                                    int cyclesPerOperation, int elements) {
         if (type == null) throw new IllegalArgumentException("Selecciona un tipo de proceso");

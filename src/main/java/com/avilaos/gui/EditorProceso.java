@@ -28,7 +28,7 @@ public class EditorProceso extends JPanel {
     private final JTextField campoNombre = new JTextField();
     private final JComboBox<DestinoComputador> destino = new JComboBox<>();
     private final JComboBox<ProcessType> comboTipoProceso = new JComboBox<>(new ProcessType[] {
-            ProcessType.CPU_BOUND, ProcessType.IO_BOUND, ProcessType.FILE_IO });
+            ProcessType.CPU_BOUND, ProcessType.FILE_IO });
     private final JSpinner spinnerPrioridad = numero(1, 1, 10);
     private final JSpinner spinnerDeadline = numero(20, 1, 100000);
     private final JTextField memoriaCalculada = new JTextField();
@@ -40,9 +40,8 @@ public class EditorProceso extends JPanel {
     private final JSpinner spinnerCiclosOperacion = numero(1, 1, 1000);
     private final JSpinner spinnerElementos = numero(1, 1, 1000);
     // FILE_IO fields
-    private final JComboBox<IOOperationType> comboOperacion = new JComboBox<>(new IOOperationType[] {
-            IOOperationType.CREATE, IOOperationType.READ, IOOperationType.UPDATE, IOOperationType.DELETE });
-    private final JTextField campoRuta = new JTextField("/");
+    private final JComboBox<IOOperationType> comboOperacion = new JComboBox<>(new IOOperationType[] { IOOperationType.READ });
+    private final JComboBox<String> archivosLectura = new JComboBox<>();
     private final JSpinner spinnerTamanoBloques = numero(1, 1, 500);
     private final JTextField campoDueno = new JTextField("admin");
     private final JComboBox<ExecutionMode> comboModo = new JComboBox<>(ExecutionMode.values());
@@ -68,11 +67,63 @@ public class EditorProceso extends JPanel {
         return new JSpinner(new SpinnerNumberModel(valor, minimo, maximo, 1));
     }
 
+    private static final class PaginaProcesos extends JPanel implements javax.swing.Scrollable {
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle rect, int orientation, int direction) { return 20; }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle rect, int orientation, int direction) { return Math.max(20, rect.height - 20); }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
     public EditorProceso(Runnable irAComputadores) {
         super(new BorderLayout());
-        JPanel pagina = pagina("PROCESOS", "Crear proceso", "Configura los datos del proceso y selecciona su computador.");
+        JPanel pagina = new PaginaProcesos();
+        pagina.setLayout(new BoxLayout(pagina, BoxLayout.Y_AXIS));
+        pagina.setBackground(FONDO);
+        pagina.setBorder(javax.swing.BorderFactory.createEmptyBorder(24, 32, 28, 32));
+        JPanel encabezado = new JPanel(new BorderLayout(20, 0));
+        encabezado.setOpaque(false);
+        encabezado.setAlignmentX(LEFT_ALIGNMENT);
+        encabezado.setMaximumSize(new Dimension(Integer.MAX_VALUE, 125));
+        JPanel titulos = new JPanel();
+        titulos.setOpaque(false);
+        titulos.setLayout(new BoxLayout(titulos, BoxLayout.Y_AXIS));
+        titulos.add(texto("PROCESOS", 11, ACENTO, true));
+        titulos.add(Box.createVerticalStrut(8));
+        titulos.add(texto("Crear proceso", 28, TINTA, true));
+        titulos.add(Box.createVerticalStrut(6));
+        titulos.add(texto("Configura su trabajo y sus recursos.", 13, GRIS, false));
+        encabezado.add(titulos, BorderLayout.CENTER);
+        JPanel reflexion = new JPanel();
+        reflexion.setLayout(new BoxLayout(reflexion, BoxLayout.Y_AXIS));
+        reflexion.setBackground(PAPEL);
+        reflexion.setBorder(javax.swing.BorderFactory.createCompoundBorder(
+                javax.swing.BorderFactory.createLineBorder(BORDE),
+                javax.swing.BorderFactory.createEmptyBorder(10, 14, 10, 14)));
+        reflexion.add(texto("SOBRE LAS ACCIONES", 10, ACENTO, true));
+        reflexion.add(Box.createVerticalStrut(5));
+        reflexion.add(texto("<html>“En cada acción, considera lo que<br>la precede y lo que la sigue.”</html>", 14, TINTA, true));
+        reflexion.add(Box.createVerticalStrut(4));
+        reflexion.add(texto("Epicteto · Enquiridión 29 · traducción libre", 11, GRIS, false));
+        JPanel tarjetaCita = new JPanel(new BorderLayout(8, 0));
+        tarjetaCita.setBackground(PAPEL);
+        tarjetaCita.setBorder(javax.swing.BorderFactory.createLineBorder(BORDE));
+        reflexion.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 14, 10, 0));
+        tarjetaCita.add(reflexion, BorderLayout.CENTER);
+        var imagenEpicteto = getClass().getResource("/imagenes/epicteto.png");
+        if (imagenEpicteto != null) {
+            var retrato = new javax.swing.ImageIcon(new javax.swing.ImageIcon(imagenEpicteto).getImage()
+                    .getScaledInstance(80, 80, java.awt.Image.SCALE_SMOOTH));
+            JLabel imagen = new JLabel(retrato);
+            imagen.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 0, 4, 10));
+            imagen.setToolTipText("Ilustración de un filósofo");
+            tarjetaCita.add(imagen, BorderLayout.EAST);
+        }
+        encabezado.add(tarjetaCita, BorderLayout.EAST);
+        pagina.add(encabezado);
+        pagina.add(Box.createVerticalStrut(18));
         JPanel formulario = tarjeta();
-        formulario.setMaximumSize(new Dimension(Integer.MAX_VALUE, 560));
+        formulario.setMaximumSize(new Dimension(Integer.MAX_VALUE, 460));
         formulario.setLayout(new BoxLayout(formulario, BoxLayout.Y_AXIS));
         formulario.add(texto("Propiedades del proceso", 20, TINTA, true));
         formulario.add(Box.createVerticalStrut(16));
@@ -85,8 +136,34 @@ public class EditorProceso extends JPanel {
         identidad.add(campo("Computador destino", destino));
         identidad.add(campo("Tipo de proceso", comboTipoProceso));
         formulario.add(identidad);
-        formulario.add(Box.createVerticalStrut(20));
+        formulario.add(Box.createVerticalStrut(16));
 
+        panelInstrucciones.setOpaque(false);
+        panelInstrucciones.setAlignmentX(LEFT_ALIGNMENT);
+        panelInstrucciones.setMaximumSize(new Dimension(600, 62));
+        panelInstrucciones.add(campo("Instrucciones de trabajo CPU", spinnerInstrucciones));
+        panelInstrucciones.add(new JLabel());
+        formulario.add(panelInstrucciones);
+        // ── Panel FILE_IO ──
+        panelFileIO.setOpaque(false);
+        panelFileIO.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        panelFileIO.setAlignmentX(LEFT_ALIGNMENT);
+        panelFileIO.setMaximumSize(new Dimension(900, 150));
+        panelFileIO.setLayout(new BoxLayout(panelFileIO, BoxLayout.Y_AXIS));
+
+        JPanel fila1FileIO = new JPanel(new GridLayout(1, 3, 24, 0));
+        fila1FileIO.setOpaque(false);
+        fila1FileIO.setMaximumSize(new Dimension(900, 62));
+        archivosLectura.setName("archivosLectura");
+        fila1FileIO.add(campo("Archivo que leerá el proceso", archivosLectura));
+        JButton actualizarArchivos = accion("Actualizar archivos", false);
+        actualizarArchivos.addActionListener(e -> actualizarArchivosLectura());
+        fila1FileIO.add(actualizarArchivos);
+        panelFileIO.add(fila1FileIO);
+        panelFileIO.add(Box.createVerticalStrut(10));
+
+        formulario.add(panelFileIO);
+        formulario.add(Box.createVerticalStrut(20));
         JPanel recursos = new JPanel(new GridLayout(1, 3, 24, 0));
         recursos.setOpaque(false);
         recursos.setAlignmentX(LEFT_ALIGNMENT);
@@ -100,51 +177,7 @@ public class EditorProceso extends JPanel {
         detalleCalculo.setAlignmentX(LEFT_ALIGNMENT);
         formulario.add(Box.createVerticalStrut(6));
         formulario.add(detalleCalculo);
-        formulario.add(Box.createVerticalStrut(20));
-
-        panelInstrucciones.setOpaque(false);
-        panelInstrucciones.setAlignmentX(LEFT_ALIGNMENT);
-        panelInstrucciones.setMaximumSize(new Dimension(600, 62));
-        panelInstrucciones.add(campo("Instrucciones de trabajo CPU", spinnerInstrucciones));
-        panelInstrucciones.add(new JLabel());
-        formulario.add(panelInstrucciones);
-        panelIO.setOpaque(false);
-        panelIO.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 0, 0, 0));
-        panelIO.setAlignmentX(LEFT_ALIGNMENT);
-        panelIO.setMaximumSize(new Dimension(600, 74));
-        panelIO.add(campo("Ciclos de CPU entre operaciones de E/S", spinnerIoInterval));
-        panelIO.add(campo("Duración del bloqueo de E/S (ticks)", spinnerIoDuration));
-        formulario.add(panelIO);
-
-        // ── Panel FILE_IO ──
-        panelFileIO.setOpaque(false);
-        panelFileIO.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 0, 0, 0));
-        panelFileIO.setAlignmentX(LEFT_ALIGNMENT);
-        panelFileIO.setMaximumSize(new Dimension(900, 150));
-        panelFileIO.setLayout(new BoxLayout(panelFileIO, BoxLayout.Y_AXIS));
-
-        JPanel fila1FileIO = new JPanel(new GridLayout(1, 3, 24, 0));
-        fila1FileIO.setOpaque(false);
-        fila1FileIO.setMaximumSize(new Dimension(900, 62));
-        fila1FileIO.add(campo("Operación CRUD", comboOperacion));
-        campoRuta.setName("campoRuta");
-        fila1FileIO.add(campo("Ruta del archivo (targetPath)", campoRuta));
-        fila1FileIO.add(campo("Tamaño en bloques (CREATE)", spinnerTamanoBloques));
-        panelFileIO.add(fila1FileIO);
-        panelFileIO.add(Box.createVerticalStrut(10));
-
-        JPanel fila2FileIO = new JPanel(new GridLayout(1, 3, 24, 0));
-        fila2FileIO.setOpaque(false);
-        fila2FileIO.setMaximumSize(new Dimension(900, 62));
-        campoDueno.setName("campoDueno");
-        fila2FileIO.add(campo("Dueño del proceso", campoDueno));
-        fila2FileIO.add(campo("Modo de ejecución", comboModo));
-        campoNuevoNombre.setName("campoNuevoNombre");
-        fila2FileIO.add(campo("Nuevo nombre (UPDATE)", campoNuevoNombre));
-        panelFileIO.add(fila2FileIO);
-        formulario.add(panelFileIO);
-
-        formulario.add(Box.createVerticalStrut(24));
+        formulario.add(Box.createVerticalStrut(12));
 
         crearComputador.addActionListener(e -> irAComputadores.run());
         formulario.add(crearComputador);
@@ -153,8 +186,6 @@ public class EditorProceso extends JPanel {
         formulario.add(Box.createVerticalStrut(10));
         mensaje.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
         formulario.add(mensaje);
-        pagina.add(formulario);
-        pagina.add(Box.createVerticalStrut(20));
         JTable tabla = new JTable(procesosVisibles);
         tabla.setName("procesosCreados");
         tabla.setRowHeight(32);
@@ -166,12 +197,31 @@ public class EditorProceso extends JPanel {
         JScrollPane lista = new JScrollPane(tabla);
         lista.setColumnHeaderView(tabla.getTableHeader());
         lista.setAlignmentX(LEFT_ALIGNMENT);
-        lista.setPreferredSize(new Dimension(600, 160));
+        lista.setPreferredSize(new Dimension(380, 200));
         lista.getViewport().setBackground(PAPEL);
-        pagina.add(lista);
-        add(pagina);
+        JPanel tarjetaLista = tarjeta();
+        tarjetaLista.setMaximumSize(new Dimension(Integer.MAX_VALUE, 310));
+        tarjetaLista.add(texto("Procesos creados", 20, TINTA, true));
+        tarjetaLista.add(Box.createVerticalStrut(12));
+        lista.setPreferredSize(new Dimension(100, 180));
+        lista.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
+        tarjetaLista.add(lista);
+        pagina.add(formulario);
+        pagina.add(Box.createVerticalStrut(16));
+        pagina.add(tarjetaLista);
+        JScrollPane scroll = new JScrollPane(pagina);
+        scroll.setBorder(null);
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.getVerticalScrollBar().setUnitIncrement(20);
+        add(scroll);
 
-        comboTipoProceso.addActionListener(e -> { actualizarCampos(); actualizarMemoria(); });
+        comboTipoProceso.setRenderer(new javax.swing.DefaultListCellRenderer() {
+            @Override public java.awt.Component getListCellRendererComponent(javax.swing.JList<?> lista, Object valor, int indice, boolean seleccionado, boolean foco) {
+                String etiqueta = valor == ProcessType.CPU_BOUND ? "CPU-bound" : valor == ProcessType.FILE_IO ? "E/S-bound · lectura de archivo" : String.valueOf(valor);
+                return super.getListCellRendererComponent(lista, etiqueta, indice, seleccionado, foco);
+            }
+        });
+        comboTipoProceso.addActionListener(e -> { actualizarCampos(); actualizarMemoria(); if (comboTipoProceso.getSelectedItem() == ProcessType.FILE_IO) actualizarArchivosLectura(); });
         comboOperacion.addActionListener(e -> actualizarCamposFileIO());
         for (JSpinner spinner : new JSpinner[]{spinnerInstrucciones, spinnerIoInterval, spinnerIoDuration,
                 spinnerCiclosOperacion, spinnerElementos, spinnerTamanoBloques}) {
@@ -208,9 +258,9 @@ public class EditorProceso extends JPanel {
             ProcessType tipo = (ProcessType) comboTipoProceso.getSelectedItem();
             if (tipo == ProcessType.FILE_IO) {
                 IOOperationType op = (IOOperationType) comboOperacion.getSelectedItem();
-                int bloques = op == IOOperationType.CREATE ? numeroVisible(spinnerTamanoBloques) : 1;
+                int bloques = op == IOOperationType.CREATE ? numeroVisible(spinnerTamanoBloques) : ProcessSizing.fileReadInstructions();
                 memoriaCalculada.setText(Integer.toString(bloques));
-                detalleCalculo.setText("Total: " + bloques + " bloques · 1 bloque = 1 unidad de RAM");
+                detalleCalculo.setText("Lectura: 1 instrucción de solicitud + 1 de finalización · 2 unidades de RAM; la espera depende del disco");
                 return;
             }
             boolean sync = tipo == ProcessType.PRODUCER || tipo == ProcessType.CONSUMER;
@@ -241,6 +291,23 @@ public class EditorProceso extends JPanel {
         repaint();
     }
 
+    private void actualizarArchivosLectura() {
+        var controller = SimulationController.getInstance();
+        String anterior = (String) archivosLectura.getSelectedItem();
+        GuiRequest.model(controller, () -> {
+            var archivos = controller.getFileSystemManager().getAllFiles();
+            String[] rutas = new String[archivos.size()];
+            for (int i = 0; i < archivos.size(); i++) rutas[i] = archivos.get(i).getPath();
+            return rutas;
+        }, rutas -> {
+            archivosLectura.removeAllItems();
+            for (String ruta : rutas) archivosLectura.addItem(ruta);
+            if (anterior != null) archivosLectura.setSelectedItem(anterior);
+            if (archivosLectura.getSelectedIndex() < 0 && rutas.length > 0) archivosLectura.setSelectedIndex(0);
+            if (rutas.length == 0) mensaje.setText("No hay archivos disponibles. Carga o crea uno en Archivos.");
+        }, error -> mensaje.setText("No se pudieron consultar los archivos: " + error.getMessage()));
+    }
+
     /** Habilita / deshabilita campos específicos según la operación FILE_IO seleccionada. */
     private void actualizarCamposFileIO() {
         IOOperationType op = (IOOperationType) comboOperacion.getSelectedItem();
@@ -268,6 +335,7 @@ public class EditorProceso extends JPanel {
         boolean hayComputadores = destino.getItemCount() > 0;
         destino.setEnabled(hayComputadores);
         crearComputador.setVisible(!hayComputadores);
+        botonCrear.setVisible(hayComputadores);
 
         actualizarProcesos(view);
     }
@@ -289,7 +357,7 @@ public class EditorProceso extends JPanel {
                         + " ciclos · " + p.requiredElements() + " elementos";
                 default -> "—";
             };
-            procesosVisibles.addRow(new Object[]{p.id(), p.name(), fila.computerName(), p.type(), fila.state(),
+            procesosVisibles.addRow(new Object[]{p.id(), p.name(), fila.computerName(), p.type() == ProcessType.FILE_IO ? "E/S-bound" : p.type() == ProcessType.CPU_BOUND ? "CPU-bound" : p.type().toString(), fila.state(),
                     p.assignedMemory(), p.priority(), p.deadline(), p.totalInstructions(), configuracion});
         }
     }
@@ -331,13 +399,11 @@ public class EditorProceso extends JPanel {
 
         if (esFileIO) {
             IOOperationType op = (IOOperationType) comboOperacion.getSelectedItem();
-            String ruta = campoRuta.getText().trim();
-            String dueno = campoDueno.getText().trim();
-            ExecutionMode modo = (ExecutionMode) comboModo.getSelectedItem();
-            String nuevoNombre = campoNuevoNombre.getText().trim();
+            String ruta = (String) archivosLectura.getSelectedItem();
+            String nuevoNombre = "";
             int bloques = op == IOOperationType.CREATE ? (Integer) spinnerTamanoBloques.getValue() : 0;
 
-            if (!ruta.startsWith("/")) { mensaje.setText("La ruta debe comenzar con '/' (ej: /home/user/archivo.txt)."); return; }
+            if (ruta == null) { mensaje.setText("Selecciona un archivo existente para leer."); return; }
             if (op == IOOperationType.CREATE && bloques < 1) { mensaje.setText("El tamaño debe ser al menos 1 bloque para CREATE."); return; }
             if (op == IOOperationType.UPDATE && nuevoNombre.isEmpty()) { mensaje.setText("Especifica el nuevo nombre para la operación UPDATE."); return; }
 
@@ -345,16 +411,21 @@ public class EditorProceso extends JPanel {
             int deadline = (Integer) spinnerDeadline.getValue();
             final int computadorFinal = computador;
             final int bloquesFinal = bloques;
-            final String duenoCorrecto = dueno.isEmpty() ? "admin" : dueno;
 
             SimulationController controller = SimulationController.getInstance();
             botonCrear.setEnabled(false);
-            mensaje.setText("Creando proceso FILE_IO…");
+            mensaje.setText("Creando proceso E/S-bound…");
             GuiRequest.model(controller, () -> {
+                var nodo = controller.getFileSystemManager().findNode(ruta);
+                if (nodo == null || !nodo.isFile()) throw new IllegalArgumentException("El archivo ya no existe. Actualiza la lista.");
+                var actor = controller.getAccessControl().getActiveUsername();
+                var permiso = new com.avilaos.filesystem.AccessControlManager(controller.getMode(), actor)
+                        .checkOperation(controller.getFileSystemManager().getTree(), IOOperationType.READ, ruta, nodo.getType());
+                if (!permiso.allowed()) throw new IllegalArgumentException(permiso.message());
                 var pcb = controller.createConfigFileIOProcess(nombre, computadorFinal,
-                        op, ruta, bloquesFinal, duenoCorrecto, modo, nuevoNombre, prioridad, deadline);
-                if (pcb == null) return "No se pudo crear el proceso FILE_IO; revisa los parámetros y el log.";
-                return "Proceso FILE_IO '" + nombre + "' creado: " + pcb.getState() + " · op=" + op + " · ruta=" + ruta;
+                        IOOperationType.READ, ruta, 0, actor, ExecutionMode.USER, nuevoNombre, prioridad, deadline);
+                if (pcb == null) return "No se pudo crear el proceso de E/S; revisa los parámetros y el log.";
+                return "Proceso E/S-bound '" + nombre + "' creado: " + pcb.getState() + " · op=" + op + " · ruta=" + ruta;
             }, resultado -> { mensaje.setText(resultado); botonCrear.setEnabled(true); },
                error -> { mensaje.setText(error.getMessage()); botonCrear.setEnabled(true); });
             return;
