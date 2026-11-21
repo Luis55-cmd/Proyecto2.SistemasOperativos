@@ -131,7 +131,8 @@ public class DiskSchedulingPoliciesTest {
     }
 
     private static SimulatedDisk runScenario(DiskSchedulingPolicyType policyType, int[] requests, int[] expectedOrder) {
-        SimulatedDisk disk = new SimulatedDisk(200, 100, 50, 30);
+        // Los ejemplos del enunciado usan un disco físico de 200 posiciones.
+        SimulatedDisk disk = new SimulatedDisk(200, 0, 50, 30);
         disk.setSchedulingPolicy(policyType);
         for (int b : requests) {
             disk.enqueueRequest(null, IOOperationType.READ, "/file_" + b, b, 1, 0);

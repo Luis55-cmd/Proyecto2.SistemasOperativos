@@ -1,0 +1,22 @@
+{
+  "diskConfig": { "totalBlocks": 200, "initialHead": 50 },
+  "fileSystem": [
+    { "path": "/sistema", "type": "DIRECTORY", "owner": "admin", "permissions": "public" },
+    { "path": "/sistema/config", "type": "DIRECTORY", "owner": "admin", "permissions": "public" },
+    { "path": "/sistema/logs", "type": "DIRECTORY", "owner": "admin", "permissions": "private" },
+    { "path": "/usuarios", "type": "DIRECTORY", "owner": "admin", "permissions": "public" },
+    { "path": "/usuarios/cesar", "type": "DIRECTORY", "owner": "cesar", "permissions": "private" },
+    { "path": "/usuarios/cesar/proyectos", "type": "DIRECTORY", "owner": "cesar", "permissions": "private" },
+    { "path": "/usuarios/ana", "type": "DIRECTORY", "owner": "ana", "permissions": "private" },
+    { "path": "/compartido", "type": "DIRECTORY", "owner": "admin", "permissions": "public" },
+    { "path": "/compartido/vacio", "type": "DIRECTORY", "owner": "admin", "permissions": "public" },
+    { "path": "/sistema/boot.bin", "type": "FILE", "startBlock": 10, "blocks": 3, "owner": "admin", "permissions": "public" },
+    { "path": "/sistema/config/red.cfg", "type": "FILE", "startBlock": 20, "blocks": 2, "owner": "admin", "permissions": "private" },
+    { "path": "/sistema/logs/eventos.log", "type": "FILE", "startBlock": 30, "blocks": 4, "owner": "admin", "permissions": "private" },
+    { "path": "/usuarios/cesar/notas.txt", "type": "FILE", "startBlock": 45, "blocks": 2, "owner": "cesar", "permissions": "private" },
+    { "path": "/usuarios/cesar/proyectos/avila.txt", "type": "FILE", "startBlock": 60, "blocks": 5, "owner": "cesar", "permissions": "private" },
+    { "path": "/usuarios/ana/tareas.txt", "type": "FILE", "startBlock": 80, "blocks": 3, "owner": "ana", "permissions": "private" },
+    { "path": "/usuarios/ana/guia.pdf", "type": "FILE", "startBlock": 100, "blocks": 6, "owner": "ana", "permissions": "public" },
+    { "path": "/compartido/lectura.txt", "type": "FILE", "startBlock": 130, "blocks": 2, "owner": "admin", "permissions": "public" }
+  ]
+}

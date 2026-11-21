@@ -39,6 +39,7 @@ public class SimulatedDisk implements IClockTickable {
 
     private IORequest activeRequest;
     private int remainingTransferCycles;
+    private int activeTransferIndex;
     private int pendingBoundaryBlock = -1;
     private boolean pendingWrapJumpToZero = false;
     private int nextRequestId = 1;
@@ -57,8 +58,8 @@ public class SimulatedDisk implements IClockTickable {
         if (swapSizeBlocks < 0) {
             throw new IllegalArgumentException("swapSizeBlocks no puede ser negativo");
         }
-        if (initialHead < 0 || initialHead >= totalBlocks) {
-            throw new IllegalArgumentException("initialHead fuera de rango [0, " + (totalBlocks - 1) + "]");
+        if (initialHead < 0 || initialHead >= totalBlocks + swapSizeBlocks) {
+            throw new IllegalArgumentException("initialHead fuera del disco físico");
         }
         if (headSpeedPerTick <= 0) {
             throw new IllegalArgumentException("headSpeedPerTick debe ser mayor que 0");
@@ -137,6 +138,57 @@ public class SimulatedDisk implements IClockTickable {
         }
     }
 
+    /** Reserva una cadena para una creación pendiente; no publica un archivo. */
+    public int reserveChainedBlocks(String path, int count, int processId) {
+        if (count <= 0 || path == null || path.isEmpty() || processId < 0) return -1;
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            if (freeDataBlocks < count) return -1;
+            int[] selected = new int[count];
+            int found = 0;
+            for (int i = 0; i < totalBlocks && found < count; i++) {
+                if (blocks[i].isFree()) selected[found++] = i;
+            }
+            if (found != count) return -1;
+            for (int i = 0; i < count; i++) {
+                blocks[selected[i]].reserve(path, processId,
+                        i + 1 < count ? selected[i + 1] : DiskBlock.END_OF_CHAIN);
+            }
+            freeDataBlocks -= count;
+            return selected[0];
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    /** Confirma o libera únicamente una cadena reservada íntegra del proceso indicado. */
+    public boolean finishReservation(int startBlock, int processId, boolean confirm) {
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            int current = startBlock;
+            int count = 0;
+            while (current != DiskBlock.END_OF_CHAIN) {
+                if (current < 0 || current >= totalBlocks || count >= totalBlocks) return false;
+                DiskBlock block = blocks[current];
+                if (!block.isReserved() || block.getOwnerProcessId() != processId) return false;
+                current = block.getNextBlock();
+                count++;
+            }
+            if (count == 0) return false;
+            current = startBlock;
+            while (current != DiskBlock.END_OF_CHAIN) {
+                DiskBlock block = blocks[current];
+                int next = block.getNextBlock();
+                if (confirm) block.confirmReservation();
+                else { block.free(); freeDataBlocks++; }
+                current = next;
+            }
+            return true;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
     public int allocateChainedBlocksFrom(int startBlock, String filePath, int count, int ownerProcessId) {
         if (count <= 0 || filePath == null || filePath.isEmpty()) {
             return -1;
@@ -172,6 +224,25 @@ public class SimulatedDisk implements IClockTickable {
         }
     }
 
+    public boolean allocateExactChain(MyLinkedList<Integer> chain, String path, int ownerProcessId) {
+        if (chain == null || chain.isEmpty() || path == null || path.isEmpty()) return false;
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            if (freeDataBlocks < chain.size()) return false;
+            for (int i = 0; i < chain.size(); i++) {
+                int block = chain.get(i);
+                if (block < 0 || block >= totalBlocks || !blocks[block].isFree()) return false;
+                for (int j = 0; j < i; j++) if (chain.get(j) == block) return false;
+            }
+            for (int i = 0; i < chain.size(); i++) {
+                int next = i + 1 < chain.size() ? chain.get(i + 1) : DiskBlock.END_OF_CHAIN;
+                blocks[chain.get(i)].allocate(path, ownerProcessId, next);
+            }
+            freeDataBlocks -= chain.size();
+            return true;
+        } finally { blockMapMutex.release(); }
+    }
+
     public int freeChainedBlocks(int startBlock) {
         if (startBlock < 0 || startBlock >= totalBlocks) {
             return 0;
@@ -183,7 +254,7 @@ public class SimulatedDisk implements IClockTickable {
             int guard = 0;
             while (curr >= 0 && curr < totalBlocks && guard <= totalBlocks) {
                 DiskBlock b = blocks[curr];
-                if (!b.isOccupied()) {
+                if (!b.isOccupied() || b.isReserved()) {
                     break;
                 }
                 int next = b.getNextBlock();
@@ -307,10 +378,16 @@ public class SimulatedDisk implements IClockTickable {
 
     public IORequest enqueueRequest(ProcessControlBlock pcb, IOOperationType operation,
                                     String path, int targetBlock, int blockCount, int arrivalCycle) {
+        int[] transferBlocks = null;
+        if ((operation == IOOperationType.CREATE && pcb != null && pcb.getCreationType() != null)
+                || operation == IOOperationType.SUSPEND || operation == IOOperationType.REACTIVATE) {
+            transferBlocks = copyTransferBlocks(targetBlock, blockCount);
+        }
         queueMutex.acquireUninterruptibly();
         try {
             int id = nextRequestId++;
             IORequest req = new IORequest(id, pcb, operation, path, targetBlock, blockCount, arrivalCycle);
+            req.setTransferBlocks(transferBlocks);
             ioQueue.append(req);
             reorderQueueLocked();
             return req;
@@ -326,6 +403,10 @@ public class SimulatedDisk implements IClockTickable {
 
     public void enqueueRequest(IORequest request) {
         if (request == null) return;
+        if (request.getOperation() == IOOperationType.SUSPEND
+                || request.getOperation() == IOOperationType.REACTIVATE) {
+            request.setTransferBlocks(copyTransferBlocks(request.getTargetBlock(), request.getBlockCount()));
+        }
         queueMutex.acquireUninterruptibly();
         try {
             ioQueue.append(request);
@@ -333,6 +414,14 @@ public class SimulatedDisk implements IClockTickable {
         } finally {
             queueMutex.release();
         }
+    }
+
+    private int[] copyTransferBlocks(int targetBlock, int blockCount) {
+        MyLinkedList<Integer> chain = getChainBlocks(targetBlock);
+        if (chain.size() != blockCount) throw new IllegalStateException("La cadena reservada no coincide con la solicitud.");
+        int[] result = new int[chain.size()];
+        for (int i = 0; i < chain.size(); i++) result[i] = chain.get(i);
+        return result;
     }
 
     @Override
@@ -344,7 +433,7 @@ public class SimulatedDisk implements IClockTickable {
             }
         }
 
-        int targetPos = normalizeTargetPosition(activeRequest.getTargetBlock());
+        int targetPos = normalizeTargetPosition(activeRequest.getTransferBlock(activeTransferIndex));
         if (pendingBoundaryBlock >= 0 || headPosition != targetPos) {
             int budget = headSpeedPerTick;
 
@@ -360,7 +449,7 @@ public class SimulatedDisk implements IClockTickable {
                 }
                 if (headPosition == pendingBoundaryBlock) {
                     if (pendingWrapJumpToZero) {
-                        // C-SCAN: llega a totalBlocks - 1 y salta a 0 sin contar el salto de regreso
+                        // C-SCAN: llega al extremo físico y salta a 0 sin contar el salto de regreso
                         headPosition = 0;
                         headDirection = HeadDirection.UP;
                         pendingWrapJumpToZero = false;
@@ -379,11 +468,17 @@ public class SimulatedDisk implements IClockTickable {
                 headPosition += (headDirection == HeadDirection.UP ? step2 : -step2);
                 totalHeadMovement += step2;
             }
-            return;
+            boolean swapTransfer = activeRequest.getOperation() == IOOperationType.SUSPEND
+                    || activeRequest.getOperation() == IOOperationType.REACTIVATE;
+            // En una transferencia de swap ya iniciada, alcanzar el siguiente bloque
+            // y transferirlo pueden ocurrir en el mismo ciclo.
+            if (!swapTransfer || activeTransferIndex == 0 || pendingBoundaryBlock >= 0
+                    || headPosition != targetPos) return;
         }
 
         // El cabezal está sobre el bloque objetivo: 1 ciclo de reloj por bloque leído/escrito
         remainingTransferCycles--;
+        activeTransferIndex++;
         if (remainingTransferCycles <= 0) {
             IORequest finished = activeRequest;
             activeRequest = null;
@@ -395,7 +490,7 @@ public class SimulatedDisk implements IClockTickable {
             String policyName = schedulingPolicy != null ? schedulingPolicy.getPolicyType().name() : "FIFO";
             String procName = finished.getPcb() != null ? finished.getPcb().getName() : ("Req#" + finished.getId());
             emitEvent("El disco completó la solicitud de " + procName + " en el bloque "
-                    + finished.getTargetBlock() + " (" + policyName + ")");
+                    + headPosition + " (" + policyName + ")");
             if (completionListener != null) {
                 completionListener.onRequestCompleted(finished, currentCycle);
             }
@@ -417,22 +512,22 @@ public class SimulatedDisk implements IClockTickable {
             if (schedulingPolicy != null) {
                 if (schedulingPolicy instanceof SCANDiskPolicy scan) {
                     scan.setDirection(headDirection);
-                    selected = scan.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = scan.selectNext(ioQueue, headPosition, blocks.length);
                     scanBounced = scan.didBounceOnLastSelect();
                     scanBoundary = scan.getLastBounceBoundary();
                 } else if (schedulingPolicy instanceof CSCANDiskPolicy cscan) {
-                    selected = cscan.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = cscan.selectNext(ioQueue, headPosition, blocks.length);
                     cscanWrapped = cscan.didWrapOnLastSelect();
                 } else if (schedulingPolicy instanceof LOOKDiskPolicy look) {
                     look.setDirection(headDirection);
-                    selected = look.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = look.selectNext(ioQueue, headPosition, blocks.length);
                 } else if (schedulingPolicy instanceof CLOOKDiskPolicy clook) {
-                    selected = clook.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = clook.selectNext(ioQueue, headPosition, blocks.length);
                     if (selected != null && selected.getTargetBlock() < headPosition) {
                         clookWrapped = true;
                     }
                 } else {
-                    selected = schedulingPolicy.selectNext(ioQueue, headPosition, totalBlocks);
+                    selected = schedulingPolicy.selectNext(ioQueue, headPosition, blocks.length);
                 }
             }
             if (selected == null) {
@@ -447,6 +542,7 @@ public class SimulatedDisk implements IClockTickable {
             activeRequest = selected;
             activeRequest.setStartServiceCycle(currentCycle);
             remainingTransferCycles = Math.max(1, activeRequest.getBlockCount());
+            activeTransferIndex = 0;
             pendingBoundaryBlock = -1;
             pendingWrapJumpToZero = false;
 
@@ -455,7 +551,7 @@ public class SimulatedDisk implements IClockTickable {
                 pendingBoundaryBlock = scanBoundary;
                 headDirection = scanBoundary >= headPosition ? HeadDirection.UP : HeadDirection.DOWN;
             } else if (cscanWrapped) {
-                pendingBoundaryBlock = totalBlocks - 1;
+                pendingBoundaryBlock = blocks.length - 1;
                 pendingWrapJumpToZero = true;
                 headDirection = HeadDirection.UP;
             } else if (clookWrapped) {
@@ -513,7 +609,7 @@ public class SimulatedDisk implements IClockTickable {
 
         int simulatedHead = anchorHead;
         while (!remaining.isEmpty()) {
-            IORequest next = tempPolicy.selectNext(remaining, simulatedHead, totalBlocks);
+            IORequest next = tempPolicy.selectNext(remaining, simulatedHead, blocks.length);
             if (next == null) {
                 next = remaining.get(0);
             }
@@ -525,7 +621,7 @@ public class SimulatedDisk implements IClockTickable {
 
     private int normalizeTargetPosition(int targetBlock) {
         if (targetBlock < 0) return 0;
-        if (targetBlock >= totalBlocks) return totalBlocks - 1;
+        if (targetBlock >= blocks.length) return blocks.length - 1;
         return targetBlock;
     }
 
@@ -616,7 +712,7 @@ public class SimulatedDisk implements IClockTickable {
     }
 
     public void setHeadPosition(int headPosition) {
-        if (headPosition < 0 || headPosition >= totalBlocks) {
+        if (headPosition < 0 || headPosition >= blocks.length) {
             throw new IllegalArgumentException("headPosition fuera de rango");
         }
         this.headPosition = headPosition;

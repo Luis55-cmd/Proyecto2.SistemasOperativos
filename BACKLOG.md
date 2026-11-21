@@ -1,5 +1,13 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
+## Avances locales — 20 de noviembre de 2026
+
+Base: `develop` en `4e60324`. En la rama de trabajo se incorporaron la vista de Archivos (árbol, detalles y tabla), la creación de archivos y directorios mediante proceso y solicitud de disco, bloques reservados y consulta del mapa por clic. La raíz y cada directorio ocupan un bloque; los JSON anteriores pueden necesitar cambios si sus bloques entran en conflicto. El cambio destructivo de capacidad está deshabilitado en interfaz y controlador.
+
+El estudiante comprobó visualmente carga de JSON, creación, política C-SCAN, actualización de la tabla y consulta del mapa. Se ejecutaron directamente los programas activos de prueba: 29 pasaron y dos pruebas de interfaz heredadas fallaron (`CreacionComputadoresGuiTest`, espera varias instancias, y `MonitorSimulacionTest`, espera entradas antiguas del menú). Las pruebas que requieren argumentos no se ejecutaron. Las pruebas de directorios se actualizaron para la nueva contabilidad; la prueba de logs espera su entrega en el hilo de Swing.
+
+Pendientes: integrar lectura, renombrado y eliminación por E/S; completar sesión y selector de identidad; pruebas adicionales de reservas, cancelación y suspensión; cola de E/S y métricas; guardado desde Inicio. El arranque manual cuando ya existe un proceso difiere de la exigencia literal de cargar ambos JSON y está pendiente de aclaración con el equipo. El PR #37 de swap y FILE_IO toca las mismas clases de kernel y procesos: conciliar explícitamente antes de integrar ambos.
+
 Corte: 14 de noviembre de 2026, `develop` en `edde1ec`. Los estados son una fotografía: **pendiente** significa que todavía no se ha verificado o completado aquí; no implica que no exista código. Los issues cerrados no certifican integración. NetBeans compiló y abrió la interfaz; el usuario confirmó que la simulación arranca después de corregir el requisito de dos computadores. Se ejecutaron directamente pruebas existentes el 14-11-2026; ver resultados y límites al final.
 
 **Cómo usarlo:** atender una tarea por vez en el orden indicado. El orden es sugerido; las dependencias entre áreas se indican debajo. Al terminar, registrar evidencia y actualizar estado. Antes de programar, elaborar y explicar el mapa de la función según la regla pedagógica del proyecto.
@@ -247,4 +255,3 @@ Las pruebas nuevas verifican operaciones CRUD, permisos y carga/guardado de ambo
 | Criterios | Estado |
 |---|---|
 | Extras o consideraciones (caché de bloques u otros) | ⬜ |
-

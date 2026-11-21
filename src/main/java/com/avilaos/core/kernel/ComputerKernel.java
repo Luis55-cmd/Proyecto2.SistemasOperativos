@@ -408,6 +408,10 @@ public class ComputerKernel {
             return;
         }
 
+        if (disk != null && p.getReservedStart() >= 0) {
+            disk.finishReservation(p.getReservedStart(), p.getId(), false);
+            p.setReservedStart(-1);
+        }
         event(proceso(p) + (p.getRemainingDeadline() <= 0 ? " terminó por vencimiento de deadline" : " terminó normalmente"));
 
         if (com != null) {
@@ -639,7 +643,26 @@ public class ComputerKernel {
 // [P2-LEGACY]                     currentRunning.executeOneCycle(currentCycle);
 // [P2-LEGACY]                 }
             { // [P2] rama unica: ya no existen PRODUCER/CONSUMER
-                if (currentRunning.getType() == ProcessType.FILE_IO && !currentRunning.isDiskRequestIssued()) {
+                if (currentRunning.getType() == ProcessType.FILE_IO && currentRunning.getCreationType() != null
+                        && !currentRunning.isCreationIssued()) {
+                    try {
+                        int inicio = fileSystemManager.reserveCreation(currentRunning);
+                        currentRunning.setReservedStart(inicio);
+                        currentRunning.setCreationIssued(true);
+                        currentRunning.setDiskRequestIssued(true);
+                        currentRunning.setMode(com.avilaos.core.model.ExecutionMode.KERNEL);
+                        cpu.setMode(com.avilaos.core.model.ExecutionMode.KERNEL);
+                        currentRunning.executeOneCycle(currentCycle);
+                        blockProcess(comp, currentRunning);
+                        currentRunning.setBlockReason(BlockReason.WAITING_DISK);
+                        disk.enqueueRequest(currentRunning, com.avilaos.core.model.IOOperationType.CREATE,
+                                currentRunning.getTargetPath(), inicio, currentRunning.getFileSizeBlocks(), currentCycle);
+                        event("Creación pendiente: " + currentRunning.getTargetPath() + " · bloques reservados");
+                    } catch (RuntimeException ex) {
+                        event("Creación rechazada: " + ex.getMessage());
+                        terminateProcess(comp, currentRunning);
+                    }
+                } else if (currentRunning.getType() == ProcessType.FILE_IO && !currentRunning.isDiskRequestIssued()) {
                     // Instrucción de sistema operativo para generar solicitud de E/S al disco
                     currentRunning.setMode(ExecutionMode.KERNEL);
                     cpu.setMode(ExecutionMode.KERNEL);
@@ -647,6 +670,7 @@ public class ComputerKernel {
                     // Garantizar que quede al menos 1 instrucción para finalizar tras volver del disco
                     if (currentRunning.getRemainingTime() <= 0) {
                         currentRunning.setRemainingTime(1);
+                        currentRunning.setState(ProcessState.EJECUTANDO);
                     }
                     currentRunning.setDiskRequestIssued(true);
                     issueFileIORequest(comp, currentRunning, currentCycle);
@@ -907,14 +931,14 @@ public class ComputerKernel {
         IOOperationType op = p.getIoOperation() != null ? p.getIoOperation() : IOOperationType.READ;
         String path = (p.getTargetPath() != null && !p.getTargetPath().trim().isEmpty())
                 ? p.getTargetPath().trim() : "/archivo.txt";
+        p.setTargetPath(path);
         int blocks = Math.max(1, p.getFileSizeBlocks());
-        String owner = (p.getOwner() != null && !p.getOwner().trim().isEmpty()) ? p.getOwner().trim() : "admin";
-
         if (accessControl != null && fileSystemManager != null) {
             FsNodeType nodeType = (op == IOOperationType.CREATE && p.getFileSizeBlocks() <= 0)
                     ? FsNodeType.DIRECTORY : FsNodeType.FILE;
             AccessControlManager.AccessDecision decision =
-                    accessControl.checkOperation(fileSystemManager.getTree(), op, path, nodeType);
+                    new AccessControlManager(p.getRequesterMode(), p.getRequesterName())
+                            .checkOperation(fileSystemManager.getTree(), op, path, nodeType);
             if (!decision.allowed()) {
                 event(decision.message());
                 terminateProcess(comp, p);
@@ -928,26 +952,20 @@ public class ComputerKernel {
             if (fileSystemManager != null) {
                 switch (op) {
                     case CREATE -> {
-                        if (p.getFileSizeBlocks() <= 0) {
-                            fileSystemManager.createDirectory(path, owner, FilePermission.PUBLIC, p.getName());
-                            targetBlock = 0;
-                            transferBlocks = 1;
-                        } else {
-                            FSNode created = fileSystemManager.createFile(
-                                    path, blocks, owner, FilePermission.PUBLIC, p.getName(), p.getId());
-                            targetBlock = Math.max(0, created.getFirstBlock());
-                            transferBlocks = Math.max(1, created.getSizeBlocks());
-                        }
+                        p.setCreationType(p.getFileSizeBlocks() <= 0 ? FsNodeType.DIRECTORY : FsNodeType.FILE);
+                        p.setFileSizeBlocks(blocks);
+                        p.setCreationPermission(FilePermission.PUBLIC);
+                        targetBlock = fileSystemManager.reserveCreation(p);
+                        p.setReservedStart(targetBlock);
+                        p.setCreationIssued(true);
+                        transferBlocks = blocks;
                     }
                     case READ, UPDATE, DELETE -> {
                         FSNode existing = fileSystemManager.findNode(path);
                         if (existing != null) {
                             targetBlock = Math.max(0, existing.getFirstBlock());
                             transferBlocks = Math.max(1, existing.getSizeBlocks());
-                        } else {
-                            targetBlock = Math.abs(path.hashCode()) % Math.max(1, disk.getTotalBlocks());
-                            transferBlocks = blocks;
-                        }
+                        } else throw new IllegalArgumentException("No existe la ruta: " + path);
                     }
                     default -> {
                         targetBlock = 0;
@@ -963,7 +981,13 @@ public class ComputerKernel {
 
         p.setBlockReason(BlockReason.WAITING_DISK);
         blockProcess(comp, p);
-        disk.enqueueRequest(p, op, path, targetBlock, transferBlocks, currentCycle);
+        try {
+            disk.enqueueRequest(p, op, path, targetBlock, transferBlocks, currentCycle);
+        } catch (RuntimeException ex) {
+            event("No se pudo encolar la operación: " + ex.getMessage());
+            terminateProcess(comp, p);
+            return;
+        }
         event(proceso(p) + " ejecutó syscall " + op + " sobre " + path
                 + " (bloque " + targetBlock + ") en modo KERNEL y pasó a BLOQUEADO");
     }
@@ -1136,18 +1160,32 @@ public class ComputerKernel {
             case REACTIVATE -> onSwapInCompleted(com, request);
             default -> {
                 ProcessControlBlock p = request.getPcb();
+                if (p != null && com != null && p.getComputerId() != com.getId()) return;
                 if (fileSystemManager != null && p != null && !p.isTerminated()) {
                     try {
-                        if (request.getOperation() == IOOperationType.UPDATE
-                                && p.getNewFileName() != null && !p.getNewFileName().trim().isEmpty()
-                                && fileSystemManager.findNode(request.getPath()) != null) {
-                            fileSystemManager.renameNode(request.getPath(), p.getNewFileName().trim());
-                        } else if (request.getOperation() == IOOperationType.DELETE
-                                && fileSystemManager.findNode(request.getPath()) != null) {
-                            fileSystemManager.deleteNode(request.getPath());
+                        if (request.getOperation() == IOOperationType.CREATE && p.getCreationType() != null) {
+                            fileSystemManager.completeCreation(p);
+                            event("Creación completada: " + p.getTargetPath());
+                        } else if (request.getOperation() == IOOperationType.READ
+                                || request.getOperation() == IOOperationType.UPDATE
+                                || request.getOperation() == IOOperationType.DELETE) {
+                            FSNode nodo = fileSystemManager.findNode(request.getPath());
+                            if (nodo == null) throw new IllegalStateException("La ruta ya no existe: " + request.getPath());
+                            var decision = new AccessControlManager(p.getRequesterMode(), p.getRequesterName())
+                                    .checkOperation(fileSystemManager.getTree(), request.getOperation(), request.getPath(), nodo.getType());
+                            if (!decision.allowed()) throw new IllegalStateException(decision.message());
+                            if (request.getOperation() == IOOperationType.UPDATE) {
+                                if (p.getNewFileName() == null || p.getNewFileName().trim().isEmpty())
+                                    throw new IllegalArgumentException("Falta el nuevo nombre");
+                                fileSystemManager.renameNode(request.getPath(), p.getNewFileName().trim());
+                            } else if (request.getOperation() == IOOperationType.DELETE) {
+                                fileSystemManager.deleteNode(request.getPath());
+                            }
                         }
                     } catch (RuntimeException ex) {
-                        event("Aviso en finalización de " + request.getOperation() + ": " + ex.getMessage());
+                        event("Operación fallida: " + ex.getMessage());
+                        terminateProcess(com, p);
+                        return;
                     }
                 }
                 if (p != null && !p.isTerminated()) {

@@ -37,10 +37,12 @@ public class DiskAndSwapLogTest {
             }
         } catch (Exception ignored) {
         }
-        for (int i = 0; i < logs.size(); i++) {
-            String log = logs.get(i);
-            if (log != null && log.contains(fragment)) {
-                return true;
+        synchronized (logs) {
+            for (int i = 0; i < logs.size(); i++) {
+                String log = logs.get(i);
+                if (log != null && log.contains(fragment)) {
+                    return true;
+                }
             }
         }
         return false;
@@ -50,7 +52,7 @@ public class DiskAndSwapLogTest {
         MyLinkedList<String> logs = new MyLinkedList<>();
         SimulatedDisk disk = new SimulatedDisk(200, 100, 50, 10);
         disk.setSchedulingPolicy(new SSTFDiskPolicy());
-        disk.setEventListener(logs::append);
+        disk.setEventListener(log -> { synchronized (logs) { logs.append(log); } });
 
         ProcessControlBlock p4 = new ProcessControlBlock("P4", 1, ProcessType.FILE_IO, 10, 16, 1, 100);
         IORequest req = new IORequest(1, p4, IOOperationType.READ, "archivo.txt", 87, 1, 0);
@@ -71,7 +73,7 @@ public class DiskAndSwapLogTest {
         controller.reset();
 
         MyLinkedList<String> logs = new MyLinkedList<>();
-        controller.addLogListener(logs::append);
+        controller.addLogListener(log -> { synchronized (logs) { logs.append(log); } });
 
         // Crear computador con RAM limitada (32 unidades)
         Computer comp = controller.createComputer("PC-Test", 32, SchedulingPolicyType.FCFS, 3);

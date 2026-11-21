@@ -12,7 +12,7 @@ import javax.swing.border.EmptyBorder;
 
 /** Vista Swing: conserva formularios; no modifica el kernel ni ejecuta procesos. */
 public class PanelPrincipal extends JPanel {
-    public enum Destino { MENU, COMPUTADOR, BUFFER, DISCO, PROCESO, SIMULACION, METRICAS }
+    public enum Destino { MENU, COMPUTADOR, BUFFER, DISCO, ARCHIVOS, PROCESO, SIMULACION, METRICAS }
     static final Color FONDO = new Color(246, 243, 234);
     static final Color TINTA = new Color(38, 58, 43);
     static final Color GRIS = new Color(119, 105, 85);
@@ -46,12 +46,26 @@ public class PanelPrincipal extends JPanel {
     private final JLabel discoCabezal = texto(" ", 14, GRIS, false);
     private final JLabel discoPolitica = texto(" ", 14, GRIS, false);
     private boolean consultaDiscoPendiente = false;
+    private final JTree arbolArchivos = new JTree();
+    private final JTabbedPane vistasArchivos = new JTabbedPane();
+    private final DefaultTableModel tablaAsignacion = new DefaultTableModel(
+            new String[]{"Nombre", "Bloques", "Primer bloque", "Dueño", "Proceso creador"}, 0) {
+        @Override public boolean isCellEditable(int row, int column) { return false; }
+    };
+    private boolean actualizandoArbolArchivos;
+    private final JLabel[] detallesArchivo = new JLabel[7];
+    private final JLabel estadoSolicitudArchivo = texto("Selecciona una acción para crear un elemento.", 13, GRIS, false);
+    private com.avilaos.core.model.ProcessControlBlock solicitudArchivo;
+    private boolean consultaArchivosPendiente;
+    private String firmaArbol = "";
     private final JToggleButton[] botonesPoliticaDisco = new JToggleButton[4];
     private final com.avilaos.disk.DiskSchedulingPolicyType[] politicasDisco = {
         com.avilaos.disk.DiskSchedulingPolicyType.FIFO, com.avilaos.disk.DiskSchedulingPolicyType.SSTF,
         com.avilaos.disk.DiskSchedulingPolicyType.SCAN, com.avilaos.disk.DiskSchedulingPolicyType.C_SCAN
     };
     private boolean[] bloquesOcupados = new boolean[0];
+    private boolean[] bloquesReservados = new boolean[0];
+    private String[] detallesBloques = new String[0];
     private int cabezalMapa = 0;
     private int limiteDatosMapa = 0;
     private final JPanel mapaDisco = new JPanel() {
@@ -67,10 +81,12 @@ public class PanelPrincipal extends JPanel {
                 int inicio = (int) ((long) i * total / filas);
                 int fin = (int) ((long) (i + 1) * total / filas);
                 int ocupados = 0;
+                int reservados = 0;
                 for (int j = inicio; j < fin; j++) if (bloquesOcupados[j]) ocupados++;
+                for (int j = inicio; j < fin; j++) if (bloquesReservados[j]) reservados++;
                 int y = 8 + i * alto / filas;
                 int siguiente = 8 + (i + 1) * alto / filas;
-                g.setColor(ocupados == 0 ? Color.WHITE : ocupados == fin - inicio
+                g.setColor(reservados > 0 ? new Color(216, 178, 100) : ocupados == 0 ? Color.WHITE : ocupados == fin - inicio
                         ? new Color(38, 90, 83) : new Color(155, 190, 172));
                 g.fillRect(x, y, ancho, Math.max(1, siguiente - y));
                 g.setColor(new Color(218, 210, 190));
@@ -110,16 +126,28 @@ public class PanelPrincipal extends JPanel {
         @Override public String getToolTipText(java.awt.event.MouseEvent e) {
             int total = bloquesOcupados.length;
             int alto = Math.max(1, getHeight() - 16);
-            if (total == 0 || e.getY() < 8 || e.getY() >= 8 + alto) return null;
+            int ancho = Math.min(150, Math.max(20, getWidth() - 110));
+            if (total == 0 || e.getX() < 40 || e.getX() >= 40 + ancho || e.getY() < 8 || e.getY() >= 8 + alto) return null;
             int filas = Math.min(total, Math.max(1, alto / 5));
-            int fila = Math.min(filas - 1, (e.getY() - 8) * filas / alto);
+            int fila = Math.min(filas - 1, (((e.getY() - 8 + 1) * filas) - 1) / alto);
             int inicio = (int) ((long) fila * total / filas);
             int fin = (int) ((long) (fila + 1) * total / filas);
             int ocupados = 0;
+            int reservados = 0;
             for (int i = inicio; i < fin; i++) if (bloquesOcupados[i]) ocupados++;
-            return "Bloques " + inicio + "–" + (fin - 1) + ": " + ocupados + " ocupados de " + (fin - inicio);
+            for (int i = inicio; i < fin; i++) if (bloquesReservados[i]) reservados++;
+            StringBuilder resultado = new StringBuilder("<html>");
+            resultado.append(inicio == fin - 1 ? "Bloque " + inicio : "Bloques " + inicio + "–" + (fin - 1));
+            resultado.append(": ").append(fin - inicio - ocupados).append(" libres, ")
+                    .append(ocupados - reservados).append(" ocupados, ").append(reservados).append(" reservados");
+            for (int i = inicio; i < fin; i++) resultado.append("<br>").append(escaparHtml(detallesBloques[i]));
+            return resultado.append("</html>").toString();
         }
     };
+
+    private static String escaparHtml(String texto) {
+        return texto.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
 
     // Controles de Computador
     private final JTextField nombreComputador = new JTextField();
@@ -162,7 +190,7 @@ public class PanelPrincipal extends JPanel {
         lateral.add(Box.createVerticalStrut(28));
         
         // [P2-LEGACY] String[] titulos = {"01   Inicio", "02   Computadores", "03   Buffers", "04   Procesos", "05   Simulación", "06   Métricas"};
-        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Disco", "04   Procesos", "05   Simulación", "06   Métricas"}; // [P2] sin Buffers
+        String[] titulos = {"01   Inicio", "02   Computador", "", "03   Disco", "04   Archivos", "05   Procesos", "06   Simulación", "07   Métricas"}; // [P2] sin Buffers
         for (Destino destino : Destino.values()) {
             if (destino == Destino.BUFFER) continue; // [P2] pantalla de buffers oculta
             JButton boton = accion(titulos[destino.ordinal()], false);
@@ -187,6 +215,7 @@ public class PanelPrincipal extends JPanel {
         paginaDisco.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         paginaDisco.getVerticalScrollBar().setUnitIncrement(20);
         pantallas.add(paginaDisco, Destino.DISCO.name());
+        pantallas.add(archivos(), Destino.ARCHIVOS.name());
         
 // [P2-LEGACY]         pantallas.add(buffer(), Destino.BUFFER.name());
         
@@ -208,6 +237,7 @@ public class PanelPrincipal extends JPanel {
             metricas.actualizarMetricas();
             actualizarListaComputadores();
             if (destinoActual == Destino.DISCO) actualizarVistaDisco();
+            if (destinoActual == Destino.ARCHIVOS) actualizarVistaArchivos();
 // [P2-LEGACY]             actualizarListaBuffers();
 // [P2-LEGACY]             actualizarOpcionesComputadoresBuffer();
         });
@@ -227,6 +257,7 @@ public class PanelPrincipal extends JPanel {
         distribucion.show(pantallas, destino.name());
         destinoActual = destino;
         if (destino == Destino.DISCO) actualizarVistaDisco();
+        if (destino == Destino.ARCHIVOS) actualizarVistaArchivos();
         for (Destino item : Destino.values()) {
             JButton boton = navegacion[item.ordinal()];
             if (boton == null) continue; // [P2] BUFFER oculto
@@ -273,7 +304,7 @@ public class PanelPrincipal extends JPanel {
         recorrido.setAlignmentX(LEFT_ALIGNMENT);
         recorrido.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
         String[] etapas = {"Computador", "Disco", "Archivos", "Procesos", "Simulación"};
-        Destino[] destinos = {Destino.COMPUTADOR, Destino.DISCO, null, Destino.PROCESO, Destino.SIMULACION};
+        Destino[] destinos = {Destino.COMPUTADOR, Destino.DISCO, Destino.ARCHIVOS, Destino.PROCESO, Destino.SIMULACION};
         for (int i = 0; i < etapas.length; i++) {
             if (i > 0) {
                 JLabel flecha = texto("  →  ", 15, GRIS, false);
@@ -448,6 +479,305 @@ public class PanelPrincipal extends JPanel {
     
     
 
+    /** Vista de jerarquía, detalles y tabla de asignación. */
+    private JPanel archivos() {
+        JPanel panel = new JPanel(new BorderLayout(0, 14));
+        panel.setBackground(FONDO);
+        panel.setBorder(new EmptyBorder(22, 28, 22, 28));
+        JPanel encabezado = new JPanel();
+        encabezado.setOpaque(false);
+        encabezado.setLayout(new BoxLayout(encabezado, BoxLayout.Y_AXIS));
+        encabezado.add(texto("ARCHIVOS", 11, ACENTO, true));
+        encabezado.add(Box.createVerticalStrut(5));
+        encabezado.add(texto("Tus archivos", 28, TINTA, true));
+        encabezado.add(Box.createVerticalStrut(5));
+        encabezado.add(texto("Explora la estructura y solicita operaciones sobre tus archivos.", 13, GRIS, false));
+        panel.add(encabezado, BorderLayout.NORTH);
+
+        JPanel jerarquia = tarjeta();
+        jerarquia.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        jerarquia.add(texto("JERARQUÍA", 11, ACENTO, true));
+        jerarquia.add(Box.createVerticalStrut(8));
+        jerarquia.add(texto("Sistema de archivos", 20, TINTA, true));
+        jerarquia.add(Box.createVerticalStrut(12));
+        arbolArchivos.setModel(null);
+        arbolArchivos.setBackground(PAPEL);
+        arbolArchivos.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+        arbolArchivos.addTreeSelectionListener(e -> {
+            mostrarDetallesArchivo();
+            if (!actualizandoArbolArchivos && arbolArchivos.getLastSelectedPathComponent() != null)
+                vistasArchivos.setSelectedIndex(0);
+        });
+        arbolArchivos.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent e) {
+                if (vistasArchivos.getTabCount() > 0) vistasArchivos.setSelectedIndex(0);
+            }
+        });
+        JScrollPane scrollArbol = new JScrollPane(arbolArchivos);
+        scrollArbol.setAlignmentX(LEFT_ALIGNMENT);
+        scrollArbol.setPreferredSize(new Dimension(260, 340));
+        scrollArbol.setBorder(BorderFactory.createLineBorder(BORDE));
+        jerarquia.add(scrollArbol);
+
+        JPanel detalles = tarjeta();
+        detalles.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        detalles.add(texto("DETALLES", 11, ACENTO, true));
+        detalles.add(Box.createVerticalStrut(8));
+        detalles.add(texto("Selecciona un elemento", 20, TINTA, true));
+        detalles.add(Box.createVerticalStrut(8));
+        detalles.add(texto("Sus propiedades aparecerán aquí.", 13, GRIS, false));
+        detalles.add(Box.createVerticalStrut(16));
+        String[] campos = {"Nombre", "Ruta", "Tipo", "Dueño", "Permisos", "Tamaño en bloques", "Primer bloque"};
+        for (int i = 0; i < campos.length; i++) {
+            detallesArchivo[i] = texto(campos[i] + "  ·  —", 13, GRIS, false);
+            detalles.add(detallesArchivo[i]);
+            detalles.add(Box.createVerticalStrut(6));
+        }
+        detalles.add(Box.createVerticalStrut(12));
+        detalles.add(texto("ACCIONES", 11, ACENTO, true));
+        detalles.add(Box.createVerticalStrut(8));
+        JPanel acciones = new JPanel(new GridLayout(3, 2, 6, 6));
+        acciones.setOpaque(false);
+        acciones.setAlignmentX(LEFT_ALIGNMENT);
+        acciones.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+        for (String nombre : new String[]{"Crear archivo", "Crear directorio", "Leer", "Renombrar", "Eliminar"}) {
+            JButton boton = accion(nombre, false);
+            if (nombre.equals("Crear archivo") || nombre.equals("Crear directorio")) {
+                boolean archivo = nombre.equals("Crear archivo");
+                boton.setToolTipText("Solicitar creación mediante un proceso de E/S");
+                boton.addActionListener(e -> mostrarFormularioCreacionArchivo(archivo));
+            } else {
+                boton.setEnabled(false);
+                boton.setToolTipText("Disponible cuando se conecten las operaciones");
+            }
+            acciones.add(boton);
+        }
+        detalles.add(acciones);
+        detalles.add(Box.createVerticalStrut(12));
+        detalles.add(texto("ESTADO DE LA SOLICITUD", 11, ACENTO, true));
+        detalles.add(Box.createVerticalStrut(6));
+        detalles.add(estadoSolicitudArchivo);
+
+        JPanel reflexion = new JPanel(new BorderLayout(16, 0));
+        reflexion.setBackground(PAPEL);
+        reflexion.setAlignmentX(LEFT_ALIGNMENT);
+        reflexion.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDE), new EmptyBorder(12, 24, 12, 24)));
+        reflexion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+        JPanel cita = new JPanel();
+        cita.setOpaque(false);
+        cita.setLayout(new BoxLayout(cita, BoxLayout.Y_AXIS));
+        cita.add(texto("SOBRE EL ÁRBOL", 11, ACENTO, true));
+        cita.add(Box.createVerticalStrut(8));
+        cita.add(texto("“Aunque sean miles sus partes,", 16, TINTA, true));
+        cita.add(texto("todas forman un solo árbol.”", 16, TINTA, true));
+        cita.add(Box.createVerticalStrut(6));
+        cita.add(texto("Juan Amos Comenio · Didáctica magna 18 · adaptación libre", 12, GRIS, false));
+        reflexion.add(cita, BorderLayout.CENTER);
+        java.net.URL imagenComenio = getClass().getResource("/imagenes/comenio.png");
+        if (imagenComenio != null) {
+            Image retrato = new ImageIcon(imagenComenio).getImage().getScaledInstance(88, 90, Image.SCALE_SMOOTH);
+            JLabel etiquetaRetrato = new JLabel(new ImageIcon(retrato));
+            etiquetaRetrato.setToolTipText("Retrato de Juan Amos Comenio");
+            reflexion.add(etiquetaRetrato, BorderLayout.EAST);
+        }
+        JPanel columnaArbol = new JPanel(new BorderLayout(0, 12));
+        columnaArbol.setOpaque(false);
+        columnaArbol.add(jerarquia, BorderLayout.CENTER);
+        columnaArbol.add(reflexion, BorderLayout.SOUTH);
+        JScrollPane scrollDetalles = new JScrollPane(detalles);
+        scrollDetalles.setBorder(null);
+        scrollDetalles.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollDetalles.getVerticalScrollBar().setUnitIncrement(20);
+        JTable tabla = new JTable(tablaAsignacion);
+        tabla.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        tabla.setFillsViewportHeight(true);
+        tabla.setRowHeight(28);
+        tabla.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+        tabla.setBackground(PAPEL);
+        tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        int[] anchos = {155, 75, 110, 115, 180};
+        for (int i = 0; i < anchos.length; i++) tabla.getColumnModel().getColumn(i).setPreferredWidth(anchos[i]);
+        JScrollPane scrollTabla = new JScrollPane(tabla);
+        scrollTabla.setBorder(BorderFactory.createLineBorder(BORDE));
+        JPanel panelTabla = new JPanel(new BorderLayout(0, 12));
+        panelTabla.setBackground(PAPEL);
+        panelTabla.setBorder(new EmptyBorder(20, 20, 20, 20));
+        JPanel encabezadoTabla = new JPanel();
+        encabezadoTabla.setOpaque(false);
+        encabezadoTabla.setLayout(new BoxLayout(encabezadoTabla, BoxLayout.Y_AXIS));
+        encabezadoTabla.add(texto("ASIGNACIÓN", 11, ACENTO, true));
+        encabezadoTabla.add(Box.createVerticalStrut(8));
+        encabezadoTabla.add(texto("Tabla de archivos", 20, TINTA, true));
+        encabezadoTabla.add(Box.createVerticalStrut(6));
+        encabezadoTabla.add(texto("Archivos de todos los directorios.", 12, GRIS, false));
+        panelTabla.add(encabezadoTabla, BorderLayout.NORTH);
+        panelTabla.add(scrollTabla, BorderLayout.CENTER);
+        vistasArchivos.addTab("Detalles y acciones", scrollDetalles);
+        vistasArchivos.addTab("Tabla de archivos", panelTabla);
+        vistasArchivos.setBackground(PAPEL);
+        vistasArchivos.setForeground(TINTA);
+        JPanel contenido = new JPanel(new GridLayout(1, 2, 20, 0));
+        contenido.setOpaque(false);
+        contenido.add(columnaArbol);
+        contenido.add(vistasArchivos);
+        panel.add(contenido, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private static final class ModeloArbolArchivos implements javax.swing.tree.TreeModel {
+        private final com.avilaos.filesystem.FSNode raiz;
+        ModeloArbolArchivos(com.avilaos.filesystem.FSNode raiz) { this.raiz = raiz; }
+        public Object getRoot() { return raiz; }
+        public Object getChild(Object parent, int index) { return ((com.avilaos.filesystem.FSNode) parent).getChildren().get(index); }
+        public int getChildCount(Object parent) { return ((com.avilaos.filesystem.FSNode) parent).getChildren().size(); }
+        public boolean isLeaf(Object node) { return !((com.avilaos.filesystem.FSNode) node).isDirectory(); }
+        public void valueForPathChanged(javax.swing.tree.TreePath path, Object value) { }
+        public int getIndexOfChild(Object parent, Object child) {
+            var hijos = ((com.avilaos.filesystem.FSNode) parent).getChildren();
+            for (int i = 0; i < hijos.size(); i++) if (hijos.get(i) == child) return i;
+            return -1;
+        }
+        public void addTreeModelListener(javax.swing.event.TreeModelListener listener) { }
+        public void removeTreeModelListener(javax.swing.event.TreeModelListener listener) { }
+    }
+
+    private String firmaNodo(com.avilaos.filesystem.FSNode nodo) {
+        StringBuilder firma = new StringBuilder();
+        firma.append(nodo.getPath()).append('|').append(nodo.getType()).append('|').append(nodo.getOwner())
+                .append('|').append(nodo.getPermission()).append('|').append(nodo.getSizeBlocks()).append('|').append(nodo.getFirstBlock())
+                .append('|').append(nodo.getCreatorProcess()).append('\n');
+        for (int i = 0; i < nodo.getChildren().size(); i++) firma.append(firmaNodo(nodo.getChildren().get(i)));
+        return firma.toString();
+    }
+
+    private void actualizarVistaArchivos() {
+        if (consultaArchivosPendiente) return;
+        consultaArchivosPendiente = true;
+        var solicitud = solicitudArchivo;
+        GuiRequest.model(controller, () -> {
+            var fs = controller.getFileSystemManager();
+            String estado = null;
+            if (solicitud != null) {
+                if (solicitud.isCreationCompleted())
+                    estado = "Creación completada: " + solicitud.getTargetPath();
+                else if (solicitud.isTerminated()) estado = "Creación fallida; revisa el log.";
+                else if (solicitud.isCreationIssued()) estado = "Esperando disco · bloques reservados.";
+                else estado = "Proceso " + solicitud.getId() + " · esperando CPU.";
+            }
+            return new Object[]{fs.snapshotTree(), estado};
+        }, datos -> {
+            consultaArchivosPendiente = false;
+            var raiz = (com.avilaos.filesystem.FSNode) datos[0];
+            if (solicitud == solicitudArchivo && datos[1] != null) estadoSolicitudArchivo.setText((String) datos[1]);
+            String nuevaFirma = firmaNodo(raiz);
+            if (!nuevaFirma.equals(firmaArbol)) {
+                Object anterior = arbolArchivos.getLastSelectedPathComponent();
+                String ruta = anterior instanceof com.avilaos.filesystem.FSNode n ? n.getPath() : null;
+                firmaArbol = nuevaFirma;
+                actualizarTablaAsignacion(raiz);
+                actualizandoArbolArchivos = true;
+                try {
+                arbolArchivos.setModel(new ModeloArbolArchivos(raiz));
+                arbolArchivos.expandRow(0);
+                if (ruta != null) {
+                    javax.swing.tree.TreePath seleccion = new javax.swing.tree.TreePath(raiz);
+                    com.avilaos.filesystem.FSNode actual = raiz;
+                    String[] partes = ruta.split("/");
+                    for (String parte : partes) {
+                        if (parte.isEmpty()) continue;
+                        actual = actual.findChild(parte);
+                        if (actual == null) { seleccion = null; break; }
+                        seleccion = seleccion.pathByAddingChild(actual);
+                    }
+                    if (seleccion != null) arbolArchivos.setSelectionPath(seleccion);
+                }
+                } finally { actualizandoArbolArchivos = false; }
+                mostrarDetallesArchivo();
+            }
+        }, error -> {
+            consultaArchivosPendiente = false;
+            controller.logEvent("No se pudo consultar el árbol: " + error.getMessage());
+        });
+    }
+
+    private void actualizarTablaAsignacion(com.avilaos.filesystem.FSNode raiz) {
+        tablaAsignacion.setRowCount(0);
+        agregarArchivosATabla(raiz);
+    }
+
+    private void agregarArchivosATabla(com.avilaos.filesystem.FSNode nodo) {
+        if (nodo.isFile()) {
+            tablaAsignacion.addRow(new Object[]{nodo.getName(), nodo.getSizeBlocks(), nodo.getFirstBlock(), nodo.getOwner(), nodo.getCreatorProcess()});
+        }
+        for (int i = 0; i < nodo.getChildren().size(); i++) agregarArchivosATabla(nodo.getChildren().get(i));
+    }
+
+    private void mostrarDetallesArchivo() {
+        Object selected = arbolArchivos.getLastSelectedPathComponent();
+        var nodo = selected instanceof com.avilaos.filesystem.FSNode n ? n : null;
+        String[] nombres = {"Nombre", "Ruta", "Tipo", "Dueño", "Permisos", "Tamaño en bloques", "Primer bloque"};
+        String[] valores = nodo == null ? new String[]{"—", "—", "—", "—", "—", "—", "—"} : new String[]{
+            nodo.getName().isEmpty() ? "/" : nodo.getName(), nodo.getPath(), nodo.isDirectory() ? "Directorio" : "Archivo",
+            nodo.getOwner(), nodo.getPermission().toString(), Integer.toString(nodo.getSizeBlocks()),
+            nodo.getFirstBlock() < 0 ? "—" : Integer.toString(nodo.getFirstBlock())};
+        for (int i = 0; i < nombres.length; i++) if (detallesArchivo[i] != null) detallesArchivo[i].setText(nombres[i] + "  ·  " + valores[i]);
+    }
+
+    /** Solicita un proceso; el elemento aparece cuando termina la E/S. */
+    private void mostrarFormularioCreacionArchivo(boolean archivo) {
+        JPanel formulario = new JPanel();
+        formulario.setLayout(new BoxLayout(formulario, BoxLayout.Y_AXIS));
+        formulario.setBackground(PAPEL);
+        formulario.setBorder(new EmptyBorder(16, 16, 16, 16));
+        formulario.add(texto("SOLICITAR CREACIÓN", 11, ACENTO, true));
+        formulario.add(Box.createVerticalStrut(12));
+        Object selected = arbolArchivos.getLastSelectedPathComponent();
+        var nodo = selected instanceof com.avilaos.filesystem.FSNode n ? n : null;
+        String directorio = nodo == null ? "/" : nodo.isDirectory() ? nodo.getPath() : nodo.getParent().getPath();
+        JTextField destino = new JTextField(directorio);
+        JTextField nombre = new JTextField();
+        JTextField dueno = new JTextField("admin");
+        JSpinner bloques = new JSpinner(new SpinnerNumberModel(1, 1, 500, 1));
+        JComboBox<String> permiso = new JComboBox<>(new String[]{"Público", "Privado"});
+        formulario.add(campo("Directorio destino", destino));
+        formulario.add(Box.createVerticalStrut(10));
+        formulario.add(campo("Nombre", nombre));
+        if (archivo) {
+            formulario.add(Box.createVerticalStrut(10));
+            formulario.add(campo("Tamaño en bloques", bloques));
+        }
+        formulario.add(Box.createVerticalStrut(10));
+        formulario.add(campo("Dueño del elemento (lo asigna ADMIN)", dueno));
+        formulario.add(Box.createVerticalStrut(10));
+        formulario.add(campo("Permiso", permiso));
+        formulario.add(Box.createVerticalStrut(14));
+        formulario.add(texto("<html>El nombre del proceso se genera automáticamente.<br>El elemento aparecerá al terminar la E/S.</html>", 12, GRIS, false));
+        int respuesta = JOptionPane.showConfirmDialog(this, formulario,
+                archivo ? "Crear archivo" : "Crear directorio", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (respuesta != JOptionPane.OK_OPTION) return;
+        String base = destino.getText().trim();
+        String nombreTexto = nombre.getText().trim();
+        if (!base.startsWith("/") || nombreTexto.isEmpty() || nombreTexto.contains("/") || nombreTexto.equals(".") || nombreTexto.equals("..")) {
+            JOptionPane.showMessageDialog(this, "Indica un directorio absoluto y un nombre válido.", "Datos inválidos", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        while (base.length() > 1 && base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        String ruta = (base.equals("/") ? "" : base) + "/" + nombreTexto;
+        int cantidad = archivo ? (Integer) bloques.getValue() : 1;
+        String propietario = dueno.getText().trim();
+        var tipo = archivo ? com.avilaos.filesystem.FsNodeType.FILE : com.avilaos.filesystem.FsNodeType.DIRECTORY;
+        var acceso = permiso.getSelectedIndex() == 0 ? com.avilaos.filesystem.FilePermission.PUBLIC : com.avilaos.filesystem.FilePermission.PRIVATE;
+        estadoSolicitudArchivo.setText("Enviando solicitud…");
+        GuiRequest.model(controller, () -> controller.requestCreation(ruta, tipo, cantidad, propietario, acceso), p -> {
+            solicitudArchivo = p;
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · pendiente de CPU y disco.");
+            actualizarVistaArchivos();
+        }, error -> {
+            estadoSolicitudArchivo.setText("Solicitud rechazada.");
+            JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo crear el proceso", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
     /** Vista de consulta; el mapa de bloques aún está pendiente. */
     private JPanel disco() {
         JPanel panel = new PanelDiscoAjustable();
@@ -486,13 +816,17 @@ public class PanelPrincipal extends JPanel {
         
         panelTamanos.add(texto("Bloques:", 12, TINTA, false));
         JSpinner spinBloques = new JSpinner(new SpinnerNumberModel(100, 10, 500, 10)); 
+        spinBloques.setEnabled(false);
         panelTamanos.add(spinBloques);
         
         panelTamanos.add(texto("Swap:", 12, TINTA, false));
         JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(50, 0, 200, 10));
+        spinSwap.setEnabled(false);
         panelTamanos.add(spinSwap);
         
         JButton btnAplicarTamano = new JButton("Aplicar");
+        btnAplicarTamano.setEnabled(false);
+        btnAplicarTamano.setToolTipText("Deshabilitado para proteger archivos, E/S y swap.");
         btnAplicarTamano.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
         btnAplicarTamano.addActionListener(e -> {
             int nuevosBloques = (Integer) spinBloques.getValue();
@@ -501,6 +835,7 @@ public class PanelPrincipal extends JPanel {
         });
         panelTamanos.add(btnAplicarTamano);
         configuracion.add(panelTamanos);
+        configuracion.add(texto("Cambio de capacidad deshabilitado para proteger los datos.", 12, GRIS, false));
         configuracion.add(Box.createVerticalStrut(12));
         // ----------------------------------------------
 
@@ -534,20 +869,34 @@ public class PanelPrincipal extends JPanel {
         
         JPanel mapa = tarjeta();
         mapa.setMinimumSize(new Dimension(0, 0));
-        mapa.setMaximumSize(new Dimension(Integer.MAX_VALUE, 520));
+        mapa.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         mapa.add(texto("OCUPACIÓN", 11, ACENTO, true));
         mapa.add(Box.createVerticalStrut(8));
         mapa.add(texto("Mapa del disco", 20, TINTA, true));
         mapa.add(Box.createVerticalStrut(6));
         mapa.add(texto("Blanco: libre · Oscuro: ocupado", 12, GRIS, false));
+        mapa.add(texto("Dorado: incluye reservas pendientes", 12, GRIS, false));
         mapa.add(texto("Verde claro: rango mixto", 12, GRIS, false));
         mapa.add(texto("Rayado: área de swap", 12, GRIS, false));
+        mapa.add(texto("Haz clic en una sección para inspeccionarla.", 12, GRIS, false));
         mapa.add(Box.createVerticalStrut(8));
         mapaDisco.setBackground(PAPEL);
         mapaDisco.setAlignmentX(LEFT_ALIGNMENT);
         mapaDisco.setPreferredSize(new Dimension(360, 380));
         mapaDisco.setMaximumSize(new Dimension(Integer.MAX_VALUE, 380));
-        mapaDisco.setToolTipText("Pasa el cursor por un rango para ver su ocupación");
+        JPopupMenu detalleBloquePopup = new JPopupMenu();
+        JLabel detalleBloque = new JLabel();
+        detalleBloque.setBorder(new EmptyBorder(10, 12, 10, 12));
+        detalleBloquePopup.add(detalleBloque);
+        mapaDisco.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent e) {
+                if (!SwingUtilities.isLeftMouseButton(e)) return;
+                String detalle = mapaDisco.getToolTipText(e);
+                if (detalle == null) return;
+                detalleBloque.setText(detalle);
+                detalleBloquePopup.show(mapaDisco, e.getX(), e.getY());
+            }
+        });
         mapa.add(mapaDisco);
         
         JPanel cita = new JPanel(new BorderLayout(16, 0));
@@ -594,7 +943,7 @@ public class PanelPrincipal extends JPanel {
         panel.add(contenido);
         return panel;
     }
-    
+
     private void actualizarVistaDisco() {
 
 if (consultaDiscoPendiente) return;
@@ -609,7 +958,23 @@ int datos = disco.getTotalBlocks();
 
 int swap = disco.getSwapSizeBlocks();
 boolean[] ocupados = new boolean[disco.getTotalPhysicalBlocks()];
-for (int i = 0; i < ocupados.length; i++) ocupados[i] = disco.getBlock(i).isOccupied();
+boolean[] reservados = new boolean[ocupados.length];
+String[] detalles = new String[ocupados.length];
+for (int i = 0; i < ocupados.length; i++) {
+    var bloque = disco.getBlock(i);
+    ocupados[i] = bloque.isOccupied();
+    reservados[i] = bloque.isReserved();
+    String zona = bloque.isSwapBlock() ? "swap" : "datos";
+    if (!ocupados[i]) {
+        detalles[i] = i + " · " + zona + " · libre";
+    } else {
+        String titular = bloque.getOccupiedBy() == null ? "sin identificador" : bloque.getOccupiedBy();
+        String estado = reservados[i] ? "reservado para " : bloque.isSwapBlock() ? "swap · " : "ocupado por ";
+        String proceso = bloque.getOwnerProcessId() >= 0 ? " · proceso ID " + bloque.getOwnerProcessId() : "";
+        String siguiente = bloque.getNextBlock() >= 0 ? " · siguiente " + bloque.getNextBlock() : " · fin de cadena";
+        detalles[i] = i + " · " + estado + titular + proceso + siguiente;
+    }
+}
     String[] resumen = new String[]{
     controller.isFileSystemJsonLoaded() ? "Sistema de archivos cargado desde JSON" : "Disco inicial del simulador; no se ha cargado un JSON",
     "Bloques de datos: " + datos + " · Swap: " + swap + " · Total físico: " + disco.getTotalPhysicalBlocks(),
@@ -618,7 +983,7 @@ for (int i = 0; i < ocupados.length; i++) ocupados[i] = disco.getBlock(i).isOccu
     "Política: " + disco.getPolicyType() + " · Velocidad: " + disco.getHeadSpeedPerTick() + " posiciones por ciclo"
 };
 
-return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType()};
+return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType(), reservados, detalles};
 
 }, datos -> {
 
@@ -627,6 +992,8 @@ consultaDiscoPendiente = false;
 String[] resumen = (String[]) datos[0];
 
 bloquesOcupados = (boolean[]) datos[1];
+bloquesReservados = (boolean[]) datos[5];
+detallesBloques = (String[]) datos[6];
 
 cabezalMapa = (Integer) datos[2];
 

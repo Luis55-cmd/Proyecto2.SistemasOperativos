@@ -18,6 +18,7 @@ public class IORequest {
     private final int arrivalCycle;
     private int startServiceCycle = -1;
     private int completionCycle = -1;
+    private int[] transferBlocks;
 
     public IORequest(int id, ProcessControlBlock pcb, IOOperationType operation,
                      String path, int targetBlock, int blockCount, int arrivalCycle) {
@@ -62,6 +63,11 @@ public class IORequest {
 
     public int getBlockCount() {
         return blockCount;
+    }
+
+    void setTransferBlocks(int[] blocks) { transferBlocks = blocks; }
+    int getTransferBlock(int index) {
+        return transferBlocks != null && index >= 0 && index < transferBlocks.length ? transferBlocks[index] : targetBlock;
     }
 
     public int getArrivalCycle() {
