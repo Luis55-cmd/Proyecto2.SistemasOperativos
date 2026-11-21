@@ -348,6 +348,73 @@ public class SimulationController implements IClockTickable {
         } finally { StateAccess.exit(); }
     }
 
+    /** Solicita leer un archivo usando la identidad activa al crear el proceso. */
+    public ProcessControlBlock requestRead(String path) {
+        StateAccess.enter();
+        try {
+            if (computers.isEmpty()) throw new IllegalStateException("Crea primero un computador.");
+            var node = fileSystemManager.findNode(path);
+            if (node == null || !node.isFile()) throw new IllegalArgumentException("Selecciona un archivo existente.");
+            UserMode mode = currentMode;
+            String actor = mode == UserMode.ADMIN ? "admin" : accessControl.getActiveUsername();
+            var decision = new com.avilaos.filesystem.AccessControlManager(mode, actor).checkOperation(
+                    fileSystemManager.getTree(), IOOperationType.READ, path, node.getType());
+            if (!decision.allowed()) throw new IllegalArgumentException(decision.message());
+            ProcessControlBlock p = createProcess("Leer " + path, computers.get(0).getId(), ProcessType.FILE_IO, 2, 2, 5, 10000);
+            if (p == null) throw new IllegalStateException("No se pudo crear el proceso; revisa RAM y log.");
+            p.setIoOperation(IOOperationType.READ);
+            p.setTargetPath(path);
+            p.setRequesterMode(mode);
+            p.setRequesterName(actor);
+            return p;
+        } finally { StateAccess.exit(); }
+    }
+
+    /** Solicita eliminar un archivo o directorio cuando el disco atienda la E/S. */
+    public ProcessControlBlock requestDelete(String path) {
+        StateAccess.enter();
+        try {
+            if (computers.isEmpty()) throw new IllegalStateException("Crea primero un computador.");
+            var node = fileSystemManager.findNode(path);
+            if (node == null || "/".equals(path)) throw new IllegalArgumentException("Selecciona un archivo o directorio distinto de la raíz.");
+            UserMode mode = currentMode;
+            String actor = mode == UserMode.ADMIN ? "admin" : accessControl.getActiveUsername();
+            var decision = new com.avilaos.filesystem.AccessControlManager(mode, actor).checkOperation(
+                    fileSystemManager.getTree(), IOOperationType.DELETE, path, node.getType());
+            if (!decision.allowed()) throw new IllegalArgumentException(decision.message());
+            ProcessControlBlock p = createProcess("Eliminar " + path, computers.get(0).getId(), ProcessType.FILE_IO, 2, 2, 5, 10000);
+            if (p == null) throw new IllegalStateException("No se pudo crear el proceso; revisa RAM y log.");
+            p.setIoOperation(IOOperationType.DELETE);
+            p.setTargetPath(path);
+            p.setRequesterMode(mode);
+            p.setRequesterName(actor);
+            return p;
+        } finally { StateAccess.exit(); }
+    }
+
+    public ProcessControlBlock requestRename(String path, String newName) {
+        StateAccess.enter();
+        try {
+            if (computers.isEmpty()) throw new IllegalStateException("Crea primero un computador.");
+            if (currentMode != UserMode.ADMIN) throw new IllegalArgumentException("Solo el administrador puede renombrar archivos y directorios.");
+            var node = fileSystemManager.findNode(path);
+            if (node == null || "/".equals(path)) throw new IllegalArgumentException("Selecciona un archivo o directorio distinto de la raíz.");
+            String name = newName == null ? "" : newName.trim();
+            if (name.isEmpty() || name.contains("/") || name.equals(".") || name.equals(".."))
+                throw new IllegalArgumentException("Indica un nombre válido.");
+            var sibling = node.getParent().findChild(name);
+            if (sibling != null && sibling != node) throw new IllegalArgumentException("Ya existe un elemento con ese nombre.");
+            ProcessControlBlock p = createProcess("Renombrar " + path, computers.get(0).getId(), ProcessType.FILE_IO, 2, 2, 5, 10000);
+            if (p == null) throw new IllegalStateException("No se pudo crear el proceso; revisa RAM y log.");
+            p.setIoOperation(IOOperationType.UPDATE);
+            p.setTargetPath(path);
+            p.setNewFileName(name);
+            p.setRequesterMode(currentMode);
+            p.setRequesterName("admin");
+            return p;
+        } finally { StateAccess.exit(); }
+    }
+
     public ProcessControlBlock requestCreation(String path, com.avilaos.filesystem.FsNodeType type,
             int blocks, String owner, com.avilaos.filesystem.FilePermission permission) {
         StateAccess.enter();
@@ -976,6 +1043,22 @@ public class SimulationController implements IClockTickable {
     
     public UserMode getMode() {
         return currentMode;
+    }
+
+    /** Cambia conjuntamente el modo y la identidad de las próximas solicitudes. */
+    public void setUserSession(UserMode mode, String username) {
+        if (mode == null) throw new IllegalArgumentException("Selecciona un modo de usuario.");
+        if (mode == UserMode.USER && (username == null || username.trim().isEmpty())) {
+            throw new IllegalArgumentException("Indica un nombre de usuario.");
+        }
+        String actor = mode == UserMode.ADMIN ? "admin" : username.trim();
+        StateAccess.enter();
+        try {
+            accessControl.setSession(mode, actor);
+            currentMode = mode;
+            logEvent("Cambio de sesión: " + mode.name() + " · " + actor);
+            notifyGUI();
+        } finally { StateAccess.exit(); }
     }
 
     /**

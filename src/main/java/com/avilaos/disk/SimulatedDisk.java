@@ -380,6 +380,7 @@ public class SimulatedDisk implements IClockTickable {
                                     String path, int targetBlock, int blockCount, int arrivalCycle) {
         int[] transferBlocks = null;
         if ((operation == IOOperationType.CREATE && pcb != null && pcb.getCreationType() != null)
+                || ((operation == IOOperationType.READ || operation == IOOperationType.UPDATE || operation == IOOperationType.DELETE) && pcb != null)
                 || operation == IOOperationType.SUSPEND || operation == IOOperationType.REACTIVATE) {
             transferBlocks = copyTransferBlocks(targetBlock, blockCount);
         }

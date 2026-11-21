@@ -26,8 +26,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
     private final JButton paso = accion("+1 ciclo", false);
     private final JComboBox<Integer> intervalo = new JComboBox<>(new Integer[]{100, 250, 500, 1000});
     private final JTabbedPane vistas = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
-    private UserMode modoUsuario = UserMode.ADMIN; // Modo por defecto
-    private final JButton botonModoUsuario = accion("Modo: ADMIN", false);
+    private final JButton botonModoUsuario = accion("Sesión: ADMIN · admin", false);
     private final JPanel resumenEquipos = new JPanel();
 // [P2-LEGACY]     private final DefaultTableModel modeloBuffers = tabla("Buffer", "Computador", "Elementos", "Capacidad", "Latencia", "Mutex", "Llenos", "Vacíos");
 // [P2-LEGACY]     private final JTable buffers = new JTable(modeloBuffers);
@@ -92,15 +91,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
         JButton aplicar = accion("Aplicar", false);
         aplicar.addActionListener(e -> { Integer ms = (Integer) intervalo.getSelectedItem(); if (ms != null) GuiRequest.control(controller, () -> controller.setCycleDurationMs(ms)); });
         controles.add(aplicar);
-        botonModoUsuario.addActionListener(e -> {
-            // Alternar entre ADMIN y USER
-            modoUsuario = (modoUsuario == UserMode.ADMIN) ? UserMode.USER : UserMode.ADMIN;
-            botonModoUsuario.setText("Modo: " + modoUsuario.name());
-            
-            GuiRequest.control(controller, () -> controller.setMode(modoUsuario));
-            
-            actualizar(); 
-        });
+        botonModoUsuario.addActionListener(e -> mostrarSesion());
         controles.add(botonModoUsuario);
         principal.add(controles);
         principal.add(Box.createVerticalStrut(8));
@@ -131,6 +122,40 @@ public final class VistaSimulacionAlternativa extends JPanel {
         cabecera.add(principal, BorderLayout.CENTER);
         cabecera.add(relojAnimado, BorderLayout.EAST);
         return cabecera;
+    }
+
+    private void mostrarSesion() {
+        JComboBox<UserMode> modo = new JComboBox<>(UserMode.values());
+        modo.setSelectedItem(controller.getMode());
+        JTextField nombre = new JTextField(controller.getAccessControl().getActiveUsername(), 16);
+        nombre.setEditable(modo.getSelectedItem() == UserMode.USER);
+        modo.addActionListener(e -> {
+            boolean esUser = modo.getSelectedItem() == UserMode.USER;
+            nombre.setEditable(esUser);
+            nombre.setText(esUser ? "" : "admin");
+        });
+        JPanel formulario = new JPanel(new GridLayout(0, 2, 8, 8));
+        formulario.add(new JLabel("Modo")); formulario.add(modo);
+        formulario.add(new JLabel("Usuario")); formulario.add(nombre);
+        Object[] opciones = {"Aplicar", "Cancelar"};
+        while (JOptionPane.showOptionDialog(this, formulario, "Cambiar sesión",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE, null, opciones, opciones[0]) == JOptionPane.OK_OPTION) {
+            UserMode elegido = (UserMode) modo.getSelectedItem();
+            String actor = nombre.getText().trim();
+            if (elegido == UserMode.USER && actor.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Indica un nombre de usuario.", "Sesión", JOptionPane.ERROR_MESSAGE);
+                continue;
+            }
+            botonModoUsuario.setEnabled(false);
+            GuiRequest.model(controller, () -> { controller.setUserSession(elegido, actor); return true; }, ok -> {
+                botonModoUsuario.setText("Sesión: " + elegido + " · " + (elegido == UserMode.ADMIN ? "admin" : actor));
+                botonModoUsuario.setEnabled(true);
+            }, error -> {
+                botonModoUsuario.setEnabled(true);
+                JOptionPane.showMessageDialog(this, error.getMessage(), "Sesión", JOptionPane.ERROR_MESSAGE);
+            });
+            break;
+        }
     }
 
     private void elegirArchivo(boolean guardar, JButton boton) {
@@ -210,6 +235,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
         iniciar.setText(view.running && view.paused ? "Reanudar" : "Iniciar");
         iniciar.setEnabled(!activo); pausar.setEnabled(activo); paso.setEnabled(!activo && view.computers.size() > 0);
         if (anterior.interval != view.interval || anterior.session != view.session) intervalo.setSelectedItem(view.interval);
+        if (anterior.session != view.session) botonModoUsuario.setText("Sesión: ADMIN · admin");
         boolean cambio = ids.length != view.computers.size() || anterior.session != view.session;
         if (!cambio) for (int i=0; i<ids.length; i++) if (ids[i] != view.computers.get(i).id()) { cambio=true; break; }
         if (cambio) reconstruir();
