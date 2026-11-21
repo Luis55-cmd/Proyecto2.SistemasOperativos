@@ -79,7 +79,7 @@ public class AccessControlManagerTest {
 
         AccessControlManager.AccessDecision denyModifyOther =
                 ac.checkOperation(fs.getTree(), IOOperationType.UPDATE, "/home_user2/publico2.txt", FsNodeType.FILE);
-        check(!denyModifyOther.allowed() && denyModifyOther.message().contains("otros usuarios"),
+        check(!denyModifyOther.allowed() && denyModifyOther.message().contains("administrador"),
                 "user1 NO puede modificar archivos de user2 aunque sean públicos");
 
         AccessControlManager.AccessDecision denyPolicy = ac.canChangePolicy();

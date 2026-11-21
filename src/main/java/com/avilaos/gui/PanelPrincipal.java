@@ -54,8 +54,24 @@ public class PanelPrincipal extends JPanel {
     };
     private boolean actualizandoArbolArchivos;
     private final JLabel[] detallesArchivo = new JLabel[7];
-    private final JLabel estadoSolicitudArchivo = texto("Selecciona una acción para crear un elemento.", 13, GRIS, false);
+    private final JTextArea estadoSolicitudArchivo = crearEstadoSolicitudArchivo();
+    private JButton botonRenombrarArchivo;
     private com.avilaos.core.model.ProcessControlBlock solicitudArchivo;
+    private static JTextArea crearEstadoSolicitudArchivo() {
+        JTextArea estado = new JTextArea("Selecciona una acción para crear un elemento.");
+        estado.setEditable(false);
+        estado.setFocusable(false);
+        estado.setOpaque(false);
+        estado.setLineWrap(true);
+        estado.setWrapStyleWord(true);
+        estado.setFont(texto("", 13, GRIS, false).getFont());
+        estado.setForeground(GRIS);
+        estado.setRows(3);
+        estado.setMinimumSize(new Dimension(0, estado.getPreferredSize().height));
+        estado.setMaximumSize(new Dimension(Integer.MAX_VALUE, estado.getPreferredSize().height));
+        estado.setAlignmentX(LEFT_ALIGNMENT);
+        return estado;
+    }
     private boolean consultaArchivosPendiente;
     private String firmaArbol = "";
     private final JToggleButton[] botonesPoliticaDisco = new JToggleButton[4];
@@ -546,6 +562,17 @@ public class PanelPrincipal extends JPanel {
                 boolean archivo = nombre.equals("Crear archivo");
                 boton.setToolTipText("Solicitar creación mediante un proceso de E/S");
                 boton.addActionListener(e -> mostrarFormularioCreacionArchivo(archivo));
+            } else if (nombre.equals("Leer")) {
+                boton.setToolTipText("Solicitar lectura del archivo seleccionado");
+                boton.addActionListener(e -> solicitarLecturaArchivo());
+            } else if (nombre.equals("Renombrar")) {
+                botonRenombrarArchivo = boton;
+                boton.setEnabled(controller.getMode() == com.avilaos.core.model.UserMode.ADMIN);
+                boton.setToolTipText("Solicitar cambio de nombre del elemento seleccionado");
+                boton.addActionListener(e -> solicitarRenombrado());
+            } else if (nombre.equals("Eliminar")) {
+                boton.setToolTipText("Solicitar eliminación del elemento seleccionado");
+                boton.addActionListener(e -> solicitarEliminacion());
             } else {
                 boton.setEnabled(false);
                 boton.setToolTipText("Disponible cuando se conecten las operaciones");
@@ -651,6 +678,11 @@ public class PanelPrincipal extends JPanel {
     }
 
     private void actualizarVistaArchivos() {
+        if (botonRenombrarArchivo != null) {
+            boolean admin = controller.getMode() == com.avilaos.core.model.UserMode.ADMIN;
+            botonRenombrarArchivo.setEnabled(admin);
+            botonRenombrarArchivo.setToolTipText(admin ? "Solicitar cambio de nombre" : "Solo el administrador puede renombrar");
+        }
         if (consultaArchivosPendiente) return;
         consultaArchivosPendiente = true;
         var solicitud = solicitudArchivo;
@@ -723,6 +755,63 @@ public class PanelPrincipal extends JPanel {
         for (int i = 0; i < nombres.length; i++) if (detallesArchivo[i] != null) detallesArchivo[i].setText(nombres[i] + "  ·  " + valores[i]);
     }
 
+    private void solicitarEliminacion() {
+        Object selected = arbolArchivos.getLastSelectedPathComponent();
+        var nodo = selected instanceof com.avilaos.filesystem.FSNode n ? n : null;
+        if (nodo == null || "/".equals(nodo.getPath())) {
+            JOptionPane.showMessageDialog(this, "Selecciona un archivo o directorio distinto de la raíz.", "Eliminar", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        String ruta = nodo.getPath();
+        String mensaje = "¿Eliminar " + ruta + "?" + (nodo.isDirectory() ? "\nSe eliminarán todos sus archivos y subdirectorios." : "");
+        if (JOptionPane.showConfirmDialog(this, mensaje, "Confirmar eliminación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
+        estadoSolicitudArchivo.setText("Enviando solicitud de eliminación…");
+        GuiRequest.model(controller, () -> controller.requestDelete(ruta), p -> {
+            solicitudArchivo = null;
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · eliminación pendiente.");
+        }, error -> {
+            estadoSolicitudArchivo.setText("Eliminación rechazada: " + error.getMessage());
+            JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo eliminar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void solicitarRenombrado() {
+        Object selected = arbolArchivos.getLastSelectedPathComponent();
+        var nodo = selected instanceof com.avilaos.filesystem.FSNode n ? n : null;
+        if (nodo == null || "/".equals(nodo.getPath())) {
+            JOptionPane.showMessageDialog(this, "Selecciona un archivo o directorio distinto de la raíz.", "Renombrar", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        String ruta = nodo.getPath();
+        String nombre = JOptionPane.showInputDialog(this, "Nuevo nombre para " + ruta + ":", nodo.getName());
+        if (nombre == null) return;
+        estadoSolicitudArchivo.setText("Enviando solicitud de renombrado…");
+        GuiRequest.model(controller, () -> controller.requestRename(ruta, nombre), p -> {
+            solicitudArchivo = null;
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · renombrado pendiente.");
+        }, error -> {
+            estadoSolicitudArchivo.setText("Renombrado rechazado: " + error.getMessage());
+            JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo renombrar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void solicitarLecturaArchivo() {
+        Object selected = arbolArchivos.getLastSelectedPathComponent();
+        var nodo = selected instanceof com.avilaos.filesystem.FSNode n ? n : null;
+        if (nodo == null || !nodo.isFile()) {
+            JOptionPane.showMessageDialog(this, "Selecciona un archivo para leer.", "Leer archivo", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        String ruta = nodo.getPath();
+        estadoSolicitudArchivo.setText("Enviando solicitud de lectura…");
+        GuiRequest.model(controller, () -> controller.requestRead(ruta), p -> {
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · lectura pendiente.");
+        }, error -> {
+            estadoSolicitudArchivo.setText("Lectura rechazada: " + error.getMessage());
+            JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo solicitar la lectura", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
     /** Solicita un proceso; el elemento aparece cuando termina la E/S. */
     private void mostrarFormularioCreacionArchivo(boolean archivo) {
         JPanel formulario = new JPanel();
@@ -736,7 +825,8 @@ public class PanelPrincipal extends JPanel {
         String directorio = nodo == null ? "/" : nodo.isDirectory() ? nodo.getPath() : nodo.getParent().getPath();
         JTextField destino = new JTextField(directorio);
         JTextField nombre = new JTextField();
-        JTextField dueno = new JTextField("admin");
+        JTextField dueno = new JTextField(controller.getAccessControl().getActiveUsername());
+        dueno.setEditable(controller.getMode() == com.avilaos.core.model.UserMode.ADMIN);
         JSpinner bloques = new JSpinner(new SpinnerNumberModel(1, 1, 500, 1));
         JComboBox<String> permiso = new JComboBox<>(new String[]{"Público", "Privado"});
         formulario.add(campo("Directorio destino", destino));

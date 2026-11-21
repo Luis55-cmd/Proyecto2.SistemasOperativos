@@ -109,7 +109,7 @@ public class AccessControlManager {
         return switch (operation) {
             case CREATE -> checkCreateAsUser(tree, targetPath, targetType != null ? targetType : FsNodeType.FILE);
             case READ -> checkReadAsUser(tree, targetPath);
-            case UPDATE -> checkModifyAsUser(tree, targetPath, "modificar/renombrar");
+            case UPDATE -> AccessDecision.deny("Operación rechazada (modo USER): solo el administrador puede renombrar archivos y directorios.");
             case DELETE -> checkModifyAsUser(tree, targetPath, "eliminar");
             default -> AccessDecision.deny("Operación no soportada: " + operation);
         };
@@ -154,6 +154,9 @@ public class AccessControlManager {
         FSNode node = tree.find(targetPath);
         if (node == null) {
             return AccessDecision.deny("Operación rechazada: no existe la ruta '" + targetPath + "'.");
+        }
+        if (node.isDirectory()) {
+            return AccessDecision.deny("Operación rechazada (modo USER): solo el administrador puede eliminar directorios.");
         }
         if ("admin".equalsIgnoreCase(node.getOwner())) {
             return AccessDecision.deny("Operación rechazada (modo USER): no se permite " + verb

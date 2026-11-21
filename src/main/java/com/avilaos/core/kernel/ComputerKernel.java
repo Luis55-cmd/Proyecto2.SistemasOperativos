@@ -404,6 +404,10 @@ public class ComputerKernel {
     }
 
     public void terminateProcess(Computer com, ProcessControlBlock p) {
+        terminateProcess(com, p, null);
+    }
+
+    private void terminateProcess(Computer com, ProcessControlBlock p, String failureReason) {
         if (p == null || p.isTerminated()) {
             return;
         }
@@ -412,7 +416,8 @@ public class ComputerKernel {
             disk.finishReservation(p.getReservedStart(), p.getId(), false);
             p.setReservedStart(-1);
         }
-        event(proceso(p) + (p.getRemainingDeadline() <= 0 ? " terminó por vencimiento de deadline" : " terminó normalmente"));
+        event(proceso(p) + (failureReason != null ? " terminó por fallo: " + failureReason
+                : p.getRemainingDeadline() <= 0 ? " terminó por vencimiento de deadline" : " terminó normalmente"));
 
         if (com != null) {
             com.registrarTerminacion(p, clock != null ? clock.getCycleCounter() : Math.max(0, p.getCompletionCycle()));
@@ -660,7 +665,7 @@ public class ComputerKernel {
                         event("Creación pendiente: " + currentRunning.getTargetPath() + " · bloques reservados");
                     } catch (RuntimeException ex) {
                         event("Creación rechazada: " + ex.getMessage());
-                        terminateProcess(comp, currentRunning);
+                        terminateProcess(comp, currentRunning, ex.getMessage());
                     }
                 } else if (currentRunning.getType() == ProcessType.FILE_IO && !currentRunning.isDiskRequestIssued()) {
                     // Instrucción de sistema operativo para generar solicitud de E/S al disco
@@ -925,7 +930,7 @@ public class ComputerKernel {
     private void issueFileIORequest(Computer comp, ProcessControlBlock p, int currentCycle) {
         if (disk == null) {
             event("Error: no hay disco configurado para atender a " + proceso(p));
-            terminateProcess(comp, p);
+            terminateProcess(comp, p, "no hay disco configurado");
             return;
         }
         IOOperationType op = p.getIoOperation() != null ? p.getIoOperation() : IOOperationType.READ;
@@ -941,7 +946,7 @@ public class ComputerKernel {
                             .checkOperation(fileSystemManager.getTree(), op, path, nodeType);
             if (!decision.allowed()) {
                 event(decision.message());
-                terminateProcess(comp, p);
+                terminateProcess(comp, p, decision.message());
                 return;
             }
         }
@@ -975,7 +980,7 @@ public class ComputerKernel {
             }
         } catch (RuntimeException ex) {
             event("Operación " + op + " sobre '" + path + "' rechazada para " + proceso(p) + ": " + ex.getMessage());
-            terminateProcess(comp, p);
+            terminateProcess(comp, p, ex.getMessage());
             return;
         }
 
@@ -985,7 +990,7 @@ public class ComputerKernel {
             disk.enqueueRequest(p, op, path, targetBlock, transferBlocks, currentCycle);
         } catch (RuntimeException ex) {
             event("No se pudo encolar la operación: " + ex.getMessage());
-            terminateProcess(comp, p);
+            terminateProcess(comp, p, ex.getMessage());
             return;
         }
         event(proceso(p) + " ejecutó syscall " + op + " sobre " + path
@@ -1174,17 +1179,21 @@ public class ComputerKernel {
                             var decision = new AccessControlManager(p.getRequesterMode(), p.getRequesterName())
                                     .checkOperation(fileSystemManager.getTree(), request.getOperation(), request.getPath(), nodo.getType());
                             if (!decision.allowed()) throw new IllegalStateException(decision.message());
-                            if (request.getOperation() == IOOperationType.UPDATE) {
+                            if (request.getOperation() == IOOperationType.READ) {
+                                event("Lectura completada: " + request.getPath());
+                            } else if (request.getOperation() == IOOperationType.UPDATE) {
                                 if (p.getNewFileName() == null || p.getNewFileName().trim().isEmpty())
                                     throw new IllegalArgumentException("Falta el nuevo nombre");
                                 fileSystemManager.renameNode(request.getPath(), p.getNewFileName().trim());
+                                event("Renombrado completado: " + request.getPath() + " → " + p.getNewFileName().trim());
                             } else if (request.getOperation() == IOOperationType.DELETE) {
-                                fileSystemManager.deleteNode(request.getPath());
+                                int liberados = fileSystemManager.deleteNode(request.getPath());
+                                event("Eliminación completada: " + request.getPath() + " · bloques liberados: " + liberados);
                             }
                         }
                     } catch (RuntimeException ex) {
                         event("Operación fallida: " + ex.getMessage());
-                        terminateProcess(com, p);
+                        terminateProcess(com, p, ex.getMessage());
                         return;
                     }
                 }

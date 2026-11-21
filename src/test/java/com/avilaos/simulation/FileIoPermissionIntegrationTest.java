@@ -37,10 +37,12 @@ public class FileIoPermissionIntegrationTest {
         fs.findNode("/mio/nota").setOwner("otro");
         c.setMode(UserMode.ADMIN);
         for (int i = 0; i < 100 && !stale.isTerminated(); i++) c.stepSimulation();
-        SwingUtilities.invokeAndWait(() -> { });
         boolean rechazado = false;
-        synchronized (logs) {
-            for (int i = 0; i < logs.size(); i++) if (logs.get(i).contains("Operación fallida") && logs.get(i).contains("privado")) rechazado = true;
+        for (int intento = 0; intento < 10 && !rechazado; intento++) {
+            SwingUtilities.invokeAndWait(() -> { });
+            synchronized (logs) {
+                for (int i = 0; i < logs.size(); i++) if (logs.get(i).contains("Operación fallida") && logs.get(i).contains("privado")) rechazado = true;
+            }
         }
         check(stale.isTerminated() && rechazado, "revalida usando identidad original, aunque cambie la sesión");
         c.reset();
