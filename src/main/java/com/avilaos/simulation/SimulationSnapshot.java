@@ -2,11 +2,7 @@ package com.avilaos.simulation;
 import com.avilaos.core.model.*;
 import com.avilaos.core.structures.MyLinkedList;
 import com.avilaos.hardware.Computer;
-// [P2-LEGACY] import com.avilaos.sync.Buffer;
 
-/** Copia de valores, sin referencias al modelo vivo. Se publica con volatile.
- * Las listas y arrays se encapsulan; sus elementos son registros inmutables.
- */
 public final class SimulationSnapshot {
     public final long session;
     public final int cycle;
@@ -15,18 +11,26 @@ public final class SimulationSnapshot {
     public final Values<Node> computers;
     public final Values<BufferView> buffers;
     public final Values<ProcessRow> processes;
+    
     public record ProcessRow(int computerId, String computerName, ProcessState state, ProcessView process) { }
-    public record Usage(int computerId, double percent, double throughput, double successRate, double waitTime) {
-        public Usage(int computerId, double percent) { this(computerId, percent, 0.0, 0.0, 0.0); }
+    
+    public record Usage(int computerId, double percent, double throughput, double successRate, double waitTime, int suspensions, int reactivations) {
+        public Usage(int computerId, double percent) { this(computerId, percent, 0.0, 0.0, 0.0, 0, 0); }
     }
+    
     public record Sample(int cycle, Values<Usage> usage) { }
     public final Values<Sample> history;
+    
     public static final class Values<T> {
         private final Object[] items;
         private Values(Object[] items) { this.items = items; }
         public int size() { return items.length; }
         @SuppressWarnings("unchecked") public T get(int index) { return (T) items[index]; }
     }
+    
+    // -----------------------------------------------------------
+    // ProcessView ACTUALIZADO (Con suspensions y reactivations)
+    // -----------------------------------------------------------
     public record ProcessView(
             String description, 
             int id, 
@@ -49,10 +53,12 @@ public final class SimulationSnapshot {
             int fileSizeBlocks,
             String owner,
             com.avilaos.core.model.ExecutionMode processMode,
-            String newFileName
+            String newFileName,
+            int suspensions,     // NUEVO
+            int reactivations    // NUEVO
     ) {
         public ProcessView(String description, int id, String name, com.avilaos.core.model.ProcessType type, int remainingTime, int memoryAddressRegister, int priority, int remainingDeadline) {
-            this(description, id, name, type, remainingTime, remainingTime, memoryAddressRegister, 0, priority, remainingDeadline, remainingDeadline, 0, com.avilaos.core.model.BlockReason.NONE, null, 0, 0, 0, 0, 0, 0, 0, null, null, 0, null, null, null);
+            this(description, id, name, type, remainingTime, remainingTime, memoryAddressRegister, 0, priority, remainingDeadline, remainingDeadline, 0, com.avilaos.core.model.BlockReason.NONE, null, 0, 0, 0, 0, 0, 0, 0, null, null, 0, null, null, null, 0, 0);
         }
         public String getDescription() { return description; }
         public int getId() { return id; }
@@ -74,20 +80,26 @@ public final class SimulationSnapshot {
         public String getOwner() { return owner; }
         public com.avilaos.core.model.ExecutionMode getProcessMode() { return processMode; }
         public String getNewFileName() { return newFileName; }
+        public int getSuspensions(){ return suspensions;}
+        public int getReactivations(){ return reactivations;}
         @Override public String toString() { return description; }
     }
+    
     public record CpuView(ProcessView PCB, ExecutionMode mode, int PC) {
         public ProcessView getPCB() { return PCB; }
         public ExecutionMode getMode() { return mode; }
         public int getPC() { return PC; }
     }
+    
     public record MemoryView(int totalMemory, int usedMemory) {
         public int getTotalMemory() { return totalMemory; }
         public int getUsedMemory() { return usedMemory; }
     }
+    
     public record RamView(int totalSize) {
         public int getTotalSize() { return totalSize; }
     }
+    
     public record QueueView(int count, String text, Values<ProcessView> processes) {
         public QueueView(int count, String text) {
             this(count, text, new Values<>(new Object[0]));
@@ -98,6 +110,7 @@ public final class SimulationSnapshot {
         public Values<ProcessView> getProcesses() { return processes; }
         @Override public String toString() { return text; }
     }
+    
     public record KernelView(QueueView newQueue, QueueView readyQueue, QueueView blockedQueue, QueueView endedQueue,
                              QueueView readySuspendedQueue, QueueView blockedSuspendedQueue) {
         public KernelView(QueueView newQueue, QueueView readyQueue, QueueView blockedQueue, QueueView endedQueue) {
@@ -112,6 +125,7 @@ public final class SimulationSnapshot {
         public QueueView getReadySuspendedQueue() { return readySuspendedQueue; }
         public QueueView getBlockedSuspendedQueue() { return blockedSuspendedQueue; }
     }
+    
     public record Node(int id, String name, SchedulingPolicyType politica, int quantum, CpuView cpu, MemoryView memoryManager, RamView ram, KernelView kernel, int ciclosActivos, int ciclosObservados, int procesosCompletados, int procesosFinalizados, int deadlinesCumplidos, int totalTiempoRespuesta, int totalTiempoEspera, int suspensionCount, int reactivationCount) {
         public Node(int id, String name, SchedulingPolicyType politica, int quantum, CpuView cpu, MemoryView memoryManager, RamView ram, KernelView kernel, int ciclosActivos, int ciclosObservados, int procesosCompletados, int procesosFinalizados, int deadlinesCumplidos, int totalTiempoRespuesta, int totalTiempoEspera) {
             this(id, name, politica, quantum, cpu, memoryManager, ram, kernel, ciclosActivos, ciclosObservados, procesosCompletados, procesosFinalizados, deadlinesCumplidos, totalTiempoRespuesta, totalTiempoEspera, 0, 0);
@@ -137,10 +151,12 @@ public final class SimulationSnapshot {
         public int getDeadlinesCumplidos() { return deadlinesCumplidos; }
         public int getTotalTiempoRespuesta() { return totalTiempoRespuesta; }
     }
+    
     public record PermitView(int count) {
         public int getCount() { return count; }
         public int availablePermits() { return count; }
     }
+    
     public record BufferView(int id, int idComp, int storage, int sizeInMemory, int produced, int comsumed, QueueView datos, PermitView mutex, PermitView llenos, PermitView vacios, String blockedProcessesAsString, int latency) {
         public BufferView(int id, int idComp, int storage, int sizeInMemory, int produced, int comsumed, QueueView datos, PermitView mutex, PermitView llenos, PermitView vacios, String blockedProcessesAsString) {
             this(id, idComp, storage, sizeInMemory, produced, comsumed, datos, mutex, llenos, vacios, blockedProcessesAsString, 0);
@@ -159,6 +175,9 @@ public final class SimulationSnapshot {
         public int getLatency() { return latency; }
     }
 
+    // -----------------------------------------------------------
+    // toProcessView ACTUALIZADO (Extrayendo del PCB original)
+    // -----------------------------------------------------------
     private static ProcessView toProcessView(ProcessControlBlock p) {
         if (p == null) return null;
         int mem = p.getAssignedMemory() > 0 ? p.getAssignedMemory() : p.getRequiredMemory();
@@ -184,7 +203,9 @@ public final class SimulationSnapshot {
                 p.getFileSizeBlocks(),
                 p.getOwner(),
                 p.getMode(),
-                p.getNewFileName()
+                p.getNewFileName(),
+                p.getSuspensions(),    // NUEVO
+                p.getReactivations()   // NUEVO
         );
     }
 
@@ -219,16 +240,6 @@ public final class SimulationSnapshot {
                     c.getProcesosCompletados(),c.getProcesosFinalizados(),c.getDeadlinesCumplidos(),c.getTotalTiempoRespuesta(),c.getTotalTiempoEspera(),
                     c.getSuspensionCount(),c.getReactivationCount());
         }
-// [P2-LEGACY]         Object[] copiedBuffers=new Object[sources.size()];
-// [P2-LEGACY]         for(int i=0;i<sources.size();i++) {
-// [P2-LEGACY]             var b=sources.get(i);
-// [P2-LEGACY]             int m = b.getTheoreticalValue(Buffer.SemaphoreKind.MUTEX);
-// [P2-LEGACY]             int l = b.getTheoreticalValue(Buffer.SemaphoreKind.LLENOS);
-// [P2-LEGACY]             int v = b.getTheoreticalValue(Buffer.SemaphoreKind.VACIOS);
-// [P2-LEGACY]             copiedBuffers[i]=new BufferView(b.getId(),b.getIdComp(),b.getStorage(),b.getSizeInMemory(),b.getProduced(),b.getComsumed(),
-// [P2-LEGACY]                     new QueueView(b.getDatos().size(),b.getDatos().toString()),new PermitView(m),
-// [P2-LEGACY]                     new PermitView(l),new PermitView(v),b.getBlockedProcessesAsString(), b.getLatency());
-// [P2-LEGACY]         }
         int processCount = 0;
         for (int i=0; i<nodes.size(); i++) processCount += nodes.get(i).getKernel().getProcessList().size();
         Object[] copiedProcesses = new Object[processCount];
@@ -250,7 +261,10 @@ public final class SimulationSnapshot {
             usages[i]=new Usage(node.id(),node.ciclosObservados()==0 ? 0.0 : 100.0*node.ciclosActivos()/node.ciclosObservados(),
                     node.ciclosObservados()==0 ? 0.0 : (double)node.procesosCompletados()/node.ciclosObservados(),
                     node.procesosFinalizados()==0 ? 0.0 : 100.0*node.deadlinesCumplidos()/node.procesosFinalizados(),
-                    node.procesosCompletados()==0 ? 0.0 : (double)node.totalTiempoEspera()/node.procesosCompletados());
+                    node.procesosCompletados()==0 ? 0.0 : (double)node.totalTiempoEspera()/node.procesosCompletados(),
+                    node.suspensionCount(),      // <-- NUEVO DATO PARA EL GRÁFICO
+                    node.reactivationCount()     // <-- NUEVO DATO PARA EL GRÁFICO
+            );
         }
         int retained=previous!=null && previous.session==session && previous.cycle<=cycle ? previous.history.size() : 0;
         if(retained>0 && previous.cycle==cycle) retained--;

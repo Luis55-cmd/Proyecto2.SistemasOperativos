@@ -1,13 +1,5 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.avilaos.gui;
 
-/**
- *
- * @author rafr
- */
 import com.avilaos.simulation.SimulationController;
 
 import org.jfree.chart.ChartFactory;
@@ -35,16 +27,17 @@ import java.awt.Dimension;
 public class PanelMetricasCopia extends JPanel {
     /** Métricas que se pueden graficar; el índice 0 (utilización) es la vista por defecto. */
     private static final String[] METRICAS = {
-        "Utilización de CPU", "Procesos completados por tick", "Deadlines cumplidos", "Espera combinada anterior (promedio)"
+        "Utilización de CPU", "Procesos completados por tick", "Deadlines cumplidos", "Espera combinada anterior (promedio)", "Suspensiones", "Reactivaciones"
     };
     private static final String[] TITULOS = {
         "Utilización acumulada del procesador", "Throughput acumulado por computador",
-        "Tasa de éxito: deadlines cumplidos", "Espera combinada anterior por proceso completado"
+        "Tasa de éxito: deadlines cumplidos", "Espera combinada anterior por proceso completado",
+        "Acumulado histórico de suspensiones", "Acumulado histórico de reactivaciones"
     };
     private static final String[] EJES = {
-        "Utilización (%)", "Throughput (proc/tick)", "Tasa de éxito (%)", "Espera promedio (ticks)"
+        "Utilización (%)", "Throughput (proc/tick)", "Tasa de éxito (%)", "Espera promedio (ticks)", "Total suspensiones", "Total reactivaciones"
     };
-    private static final double[] RANGO_MINIMO = {5.0, 0.05, 5.0, 1.0};
+    private static final double[] RANGO_MINIMO = {5.0, 0.05, 5.0, 1.0, 2.0, 2.0};
 
     private final SimulationController controller;
     private final XYSeriesCollection dataset;
@@ -62,18 +55,18 @@ public class PanelMetricasCopia extends JPanel {
     private final JLabel lblRendimientoGlobal = new JLabel("Resumen del sistema");
     private final JLabel lblTiempos = new JLabel("Sin procesos completados");
     private final JLabel lblDetalle = new JLabel(" ");
+    
+    // TABLA EQUIPOS ACTUALIZADA CON SUSPENSIONES Y REACTIVACIONES
     private final DefaultTableModel tablaEquipos = new DefaultTableModel(
-            new Object[]{"Computador", "CPU usada (%)", "Completados", "Completados/tick", "Respuesta promedio (ticks)", "Deadlines cumplidos", "Listo total (ticks)", "Bloqueado total (ticks)", "Semáforos total (ticks)"}, 0) {
+            new Object[]{"Computador", "CPU usada (%)", "Completados", "Completados/tick", "Respuesta promedio (ticks)", "Deadlines cumplidos", "Listo total (ticks)", "Bloqueado total (ticks)", "Semáforos total (ticks)", "Suspensiones", "Reactivaciones"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
+    
+    // TABLA PROCESOS ACTUALIZADA CON SUSPENSIONES Y REACTIVACIONES
     private final DefaultTableModel tablaProcesos = new DefaultTableModel(
-            new Object[]{"ID", "Proceso", "Computador", "Estado", "En listo (ticks)", "Bloqueado (ticks)", "En semáforos (ticks)"}, 0) {
+            new Object[]{"ID", "Proceso", "Computador", "Estado", "En listo (ticks)", "Bloqueado (ticks)", "En semáforos (ticks)", "Suspensiones", "Reactivaciones"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
-// [P2-LEGACY]     private final DefaultTableModel tablaBuffers = new DefaultTableModel(
-// [P2-LEGACY]             new Object[]{"Buffer", "Computador anfitrión", "Elementos producidos", "Elementos consumidos", "Espera en semáforos promedio (ticks/proceso)"}, 0) {
-// [P2-LEGACY]         @Override public boolean isCellEditable(int row, int column) { return false; }
-// [P2-LEGACY]     };
 
     public PanelMetricasCopia(SimulationController controller) {
         this.controller = controller;
@@ -131,7 +124,6 @@ public class PanelMetricasCopia extends JPanel {
         JTabbedPane tablas = new JTabbedPane();
         tablas.addTab("Computadores", crearTabla(tablaEquipos));
         tablas.addTab("Procesos", crearTabla(tablaProcesos));
-// [P2-LEGACY]         tablas.addTab("Buffers", crearTabla(tablaBuffers));
         pnlInferior.add(tablas, BorderLayout.CENTER);
         lblDetalle.setText("Totales de todos los procesos · semáforos está incluido en bloqueado");
         pnlInferior.add(lblDetalle, BorderLayout.SOUTH);
@@ -156,6 +148,8 @@ public class PanelMetricasCopia extends JPanel {
             case 1 -> u.throughput();
             case 2 -> u.successRate();
             case 3 -> u.waitTime();
+            case 4 -> u.suspensions();   // ACTUALIZADO
+            case 5 -> u.reactivations(); // ACTUALIZADO
             default -> u.percent();
         };
     }
@@ -182,13 +176,12 @@ public class PanelMetricasCopia extends JPanel {
     }
 
     public void actualizarMetricas() {
-        var view=controller.snapshot();
-        if(session!=view.session) {
-            nodos=new Node[0]; seriesPorMetrica=new XYSeries[METRICAS.length][0];
-            dataset.removeAllSeries(); session=view.session; lastSample=-1;
+        var view = controller.snapshot();
+        if(session != view.session) {
+            nodos = new Node[0]; seriesPorMetrica = new XYSeries[METRICAS.length][0];
+            dataset.removeAllSeries(); session = view.session; lastSample = -1;
         }
         int cicloActual = view.cycle;
-
 
         var computadores = view.computers;
         int cantidadComputadores = computadores.size();
@@ -223,23 +216,20 @@ public class PanelMetricasCopia extends JPanel {
         long activosGlobal = 0, observadosGlobal = 0;
         tablaEquipos.setRowCount(0);
         tablaProcesos.setRowCount(0);
-// [P2-LEGACY]         tablaBuffers.setRowCount(0);
         double maxUtil = -1.0;
         double minUtil = 101.0;
-        
-
         
         // Actualizar datos de Computadores y Gráfico
         for (int i = 0; i < cantidadComputadores; i++) {
             var c = computadores.get(i);
             
             double utilizacion = c.getCiclosObservados() == 0 ? 0.0 : ((double) c.getCiclosActivos() / c.getCiclosObservados()) * 100.0;
-            for(int h=0;h<view.history.size();h++) {
-                var sample=view.history.get(h);
-                if(sample.cycle()<lastSample && !cambio) continue;
-                for(int u=0;u<sample.usage().size();u++) {
-                    var usage=sample.usage().get(u);
-                    if(usage.computerId()==c.getId()) {
+            for(int h=0; h<view.history.size(); h++) {
+                var sample = view.history.get(h);
+                if(sample.cycle() < lastSample && !cambio) continue;
+                for(int u=0; u<sample.usage().size(); u++) {
+                    var usage = sample.usage().get(u);
+                    if(usage.computerId() == c.getId()) {
                         for (int m = 0; m < METRICAS.length; m++) {
                             seriesPorMetrica[m][i].addOrUpdate((double)sample.cycle(), valor(m, usage));
                         }
@@ -249,20 +239,29 @@ public class PanelMetricasCopia extends JPanel {
             
             activosGlobal += c.getCiclosActivos();
             observadosGlobal += c.getCiclosObservados();
-            int listos = 0, bloqueados = 0, semaforos = 0;
+            
+            // VARIABLES ACTUALIZADAS PARA INCLUIR SUSPENSIONES Y REACTIVACIONES
+            int listos = 0, bloqueados = 0, semaforos = 0, suspensiones = 0, reactivaciones = 0;
+            
             for (int p = 0; p < view.processes.size(); p++) {
                 var fila = view.processes.get(p);
                 if (fila.computerId() != c.getId()) continue;
                 listos += fila.process().readyWaitTicks();
                 bloqueados += fila.process().blockedWaitTicks();
                 semaforos += fila.process().semaphoreWaitTicks();
+                suspensiones += fila.process().suspensions();
+                reactivaciones += fila.process().reactivations();
             }
+            
+            // AGREGANDO DATOS A LA FILA DE LA TABLA EQUIPOS
             tablaEquipos.addRow(new Object[]{
                 c.getName(), String.format("%.1f", utilizacion), c.getProcesosCompletados(),
                 String.format("%.4f", c.getCiclosObservados() == 0 ? 0.0 : (double) c.getProcesosCompletados() / c.getCiclosObservados()),
                 String.format("%.1f", c.getProcesosCompletados() == 0 ? 0.0 : (double) c.getTotalTiempoRespuesta() / c.getProcesosCompletados()),
-                c.getDeadlinesCumplidos() + " de " + c.getProcesosFinalizados(), listos, bloqueados, semaforos
+                c.getDeadlinesCumplidos() + " de " + c.getProcesosFinalizados(), 
+                listos, bloqueados, semaforos, suspensiones, reactivaciones
             });
+            
             if (utilizacion > maxUtil) maxUtil = utilizacion;
             if (utilizacion < minUtil) minUtil = utilizacion;
             
@@ -272,7 +271,8 @@ public class PanelMetricasCopia extends JPanel {
             tiempoRespuestaTotalGlobal += c.getTotalTiempoRespuesta();
         }
 
-        lastSample=cicloActual;
+        lastSample = cicloActual;
+        
         // Calcular KPIs del Sistema
         double throughput = cicloActual == 0 ? 0.0 : (double) procesosCompletadosGlobal / cicloActual;
         double ratioDeadlines = finalizadosGlobal > 0
@@ -289,46 +289,18 @@ public class PanelMetricasCopia extends JPanel {
         for (int i = 0; i < view.processes.size(); i++) {
             var fila = view.processes.get(i);
             var p = fila.process();
-            tablaProcesos.addRow(new Object[]{p.id(), p.name(), fila.computerName(), fila.state(),
-                    p.readyWaitTicks(), p.blockedWaitTicks(), p.semaphoreWaitTicks()});
-            if (esProductorConsumidor(p)) {
-                participantes++;
-                esperaSemaforos += p.semaphoreWaitTicks();
-            }
+            
+            // AGREGANDO DATOS A LA FILA DE LA TABLA PROCESOS
+            tablaProcesos.addRow(new Object[]{
+                p.id(), p.name(), fila.computerName(), fila.state(),
+                p.readyWaitTicks(), p.blockedWaitTicks(), p.semaphoreWaitTicks(),
+                p.suspensions(), p.reactivations()
+            });
         }
+        
         String promedioSemaforos = participantes == 0 ? "—" : String.format("%.1f", (double) esperaSemaforos / participantes);
         lblTiempos.setText(String.format("Respuesta promedio (completados): %.1f ticks   ·   Bloqueo en semáforos promedio: %s ticks/proceso   ·   Brecha de CPU: %.1f puntos",
                 tiempoRespuestaPromedio, promedioSemaforos, equidad));
-
-// [P2-LEGACY]         // Actualizar KPIs de Buffers usando iteración estándar sobre tu MyLinkedList
-// [P2-LEGACY]         var buffers = view.buffers;
-// [P2-LEGACY]         for (int i = 0; i < buffers.size(); i++) {
-// [P2-LEGACY]             var b = buffers.get(i);
-// [P2-LEGACY]             String anfitrion = "ID " + b.getIdComp();
-// [P2-LEGACY]             for (int c = 0; c < computadores.size(); c++) {
-// [P2-LEGACY]                 if (computadores.get(c).getId() == b.getIdComp()) anfitrion = computadores.get(c).getName();
-// [P2-LEGACY]             }
-// [P2-LEGACY]             int total = 0, cantidad = 0;
-// [P2-LEGACY]             for (int p = 0; p < view.processes.size(); p++) {
-// [P2-LEGACY]                 var proceso = view.processes.get(p).process();
-// [P2-LEGACY]                 if (esProductorConsumidor(proceso) && correspondeAlBuffer(proceso.targetBufferId(), b.getId())) {
-// [P2-LEGACY]                     cantidad++;
-// [P2-LEGACY]                     total += proceso.semaphoreWaitTicks();
-// [P2-LEGACY]                 }
-// [P2-LEGACY]             }
-// [P2-LEGACY]             tablaBuffers.addRow(new Object[]{b.getId(), anfitrion, b.getProduced(), b.getComsumed(),
-// [P2-LEGACY]                     cantidad == 0 ? "—" : String.format("%.1f", (double) total / cantidad)});
-// [P2-LEGACY]         }
         lblDetalle.setText("Totales incluyen procesos activos y finalizados · semáforos está incluido en bloqueado · promedios de semáforos: productores y consumidores creados");
-    }
-
-    private static boolean esProductorConsumidor(com.avilaos.simulation.SimulationSnapshot.ProcessView p) {
-        return p.type() == com.avilaos.core.model.ProcessType.PRODUCER || p.type() == com.avilaos.core.model.ProcessType.CONSUMER;
-    }
-
-    private static boolean correspondeAlBuffer(String id, int bufferId) {
-        if (id == null) return false;
-        try { return Integer.parseInt(id.replaceAll("[^0-9]", "")) == bufferId; }
-        catch (NumberFormatException ex) { return false; }
     }
 }
