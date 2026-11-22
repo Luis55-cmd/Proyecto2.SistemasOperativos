@@ -17,9 +17,35 @@ public final class SimulationSnapshot {
     public record Usage(int computerId, double percent, double throughput, double successRate, double waitTime, int suspensions, int reactivations) {
         public Usage(int computerId, double percent) { this(computerId, percent, 0.0, 0.0, 0.0, 0, 0); }
     }
-    
-    public record Sample(int cycle, Values<Usage> usage) { }
+
+    public record DiskUsage(
+            int totalHeadMovement,
+            double averageWaitTime,
+            int completedRequestsCount,
+            int queueSize,
+            int activeHeadPosition,
+            com.avilaos.disk.HeadDirection activeHeadDirection,
+            com.avilaos.disk.DiskSchedulingPolicyType activePolicy,
+            int fifoServed, int sstfServed, int scanServed, int cscanServed, int lookServed, int clookServed,
+            int fifoMovement, int sstfMovement, int scanMovement, int cscanMovement, int lookMovement, int clookMovement,
+            double fifoAvgWait, double sstfAvgWait, double scanAvgWait, double cscanAvgWait, double lookAvgWait, double clookAvgWait
+    ) {
+        public static DiskUsage empty() {
+            return new DiskUsage(0, 0.0, 0, 0, 0, com.avilaos.disk.HeadDirection.UP,
+                    com.avilaos.disk.DiskSchedulingPolicyType.FIFO,
+                    0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        }
+    }
+
+    public record Sample(int cycle, Values<Usage> usage, DiskUsage diskUsage) {
+        public Sample(int cycle, Values<Usage> usage) {
+            this(cycle, usage, DiskUsage.empty());
+        }
+    }
     public final Values<Sample> history;
+    public final DiskUsage disk;
     
     public static final class Values<T> {
         private final Object[] items;
@@ -221,8 +247,41 @@ public final class SimulationSnapshot {
 
     // [P2-LEGACY] public SimulationSnapshot(long session, int cycle, boolean running, boolean paused, int interval, MyLinkedList<Computer> nodes, MyLinkedList<Buffer> sources, SimulationSnapshot previous) {
     public SimulationSnapshot(long session, int cycle, boolean running, boolean paused, int interval,
-            MyLinkedList<Computer> nodes, SimulationSnapshot previous) { // [P2] sin buffers
+            MyLinkedList<Computer> nodes, SimulationSnapshot previous) {
+        this(session, cycle, running, paused, interval, nodes, null, previous);
+    }
+
+    public SimulationSnapshot(long session, int cycle, boolean running, boolean paused, int interval,
+            MyLinkedList<Computer> nodes, com.avilaos.disk.SimulatedDisk diskModel, SimulationSnapshot previous) { // [P2]
         this.session=session; this.cycle=cycle; this.running=running; this.paused=paused; this.interval=interval;
+        DiskUsage currentDisk = diskModel == null ? DiskUsage.empty() : new DiskUsage(
+                diskModel.getTotalHeadMovement(),
+                diskModel.getAverageWaitTimeCycles(),
+                diskModel.getCompletedRequestsCount(),
+                diskModel.getQueueSize(),
+                diskModel.getHeadPosition(),
+                diskModel.getHeadDirection(),
+                diskModel.getPolicyType(),
+                diskModel.getAtendidasFIFO(),
+                diskModel.getAtendidasSSTF(),
+                diskModel.getAtendidasSCAN(),
+                diskModel.getAtendidasCSCAN(),
+                diskModel.getAtendidasLOOK(),
+                diskModel.getAtendidasCLOOK(),
+                diskModel.getMovementFIFO(),
+                diskModel.getMovementSSTF(),
+                diskModel.getMovementSCAN(),
+                diskModel.getMovementCSCAN(),
+                diskModel.getMovementLOOK(),
+                diskModel.getMovementCLOOK(),
+                diskModel.getAverageWaitTimeFIFO(),
+                diskModel.getAverageWaitTimeSSTF(),
+                diskModel.getAverageWaitTimeSCAN(),
+                diskModel.getAverageWaitTimeCSCAN(),
+                diskModel.getAverageWaitTimeLOOK(),
+                diskModel.getAverageWaitTimeCLOOK()
+        );
+        this.disk = currentDisk;
         Object[] copiedNodes = new Object[nodes.size()];
         for (int i=0; i<nodes.size(); i++) {
             var c=nodes.get(i); var p=c.getCpu().getPCB(); var k=c.getKernel();
@@ -271,7 +330,7 @@ public final class SimulationSnapshot {
         int count=Math.min(1999,retained);
         Object[] samples=new Object[count+1];
         for(int i=0;i<count;i++) samples[i]=previous.history.get(retained-count+i);
-        samples[count]=new Sample(cycle,new Values<>(usages));
+        samples[count]=new Sample(cycle,new Values<>(usages), currentDisk);
         history=new Values<>(samples);
     }
 }
