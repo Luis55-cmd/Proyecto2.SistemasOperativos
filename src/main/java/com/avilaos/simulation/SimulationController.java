@@ -327,7 +327,9 @@ public class SimulationController implements IClockTickable {
                 return null;
             }
             // 1 instruction = 1 unit of RAM for FILE_IO
-            int instructions = Math.max(1, fileSizeBlocks > 0 ? fileSizeBlocks : 1);
+            int instructions = operation == IOOperationType.READ
+                    ? com.avilaos.core.model.ProcessSizing.fileReadInstructions()
+                    : Math.max(1, fileSizeBlocks > 0 ? fileSizeBlocks : 1);
             ProcessControlBlock pcb = createProcess(name, computerId, ProcessType.FILE_IO,
                     instructions, instructions, priority, deadline);
             if (pcb == null) return null;
@@ -620,7 +622,7 @@ public class SimulationController implements IClockTickable {
         StateAccess.enter();
         try {
             if (dualJsonGateActive && !isReadyToStartClock()) {
-                String msg = "Error: Carga el sistema de archivos y prepara un computador con procesos, o carga el JSON de procesos y configuración.";
+                String msg = "Error: Prepara un computador con procesos o carga el JSON de procesos y configuración.";
                 logEvent(msg);
                 throw new IllegalStateException(msg);
             }
@@ -640,7 +642,7 @@ public class SimulationController implements IClockTickable {
         StateAccess.enter();
         try {
             if (dualJsonGateActive && !isReadyToStartClock()) {
-                String msg = "Error: Carga el sistema de archivos y prepara un computador con procesos, o carga el JSON de procesos y configuración.";
+                String msg = "Error: Prepara un computador con procesos o carga el JSON de procesos y configuración.";
                 logEvent(msg);
                 throw new IllegalStateException(msg);
             }
@@ -837,7 +839,7 @@ public class SimulationController implements IClockTickable {
     }
 
     public boolean isReadyToStartClock() {
-        if (!fileSystemJsonLoaded) return false;
+        if (computers.isEmpty()) return false;
         if (processesJsonLoaded) return true;
         for (int i = 0; i < computers.size(); i++) {
             Computer computer = computers.get(i);

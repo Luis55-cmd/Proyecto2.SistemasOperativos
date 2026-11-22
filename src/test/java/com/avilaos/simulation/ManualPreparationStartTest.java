@@ -25,6 +25,15 @@ public class ManualPreparationStartTest {
         for (int i = 0; i < 50 && controller.getFileSystemManager().findNode("/compartido/prueba") == null; i++) controller.stepSimulation();
         check(controller.getFileSystemManager().findNode("/compartido/prueba") != null, "creación completada");
         controller.reset();
+        controller.setDualJsonGateActive(true);
+        var manual = controller.createComputer("Manual", 128, SchedulingPolicyType.EDF);
+        controller.createConfiguredProcess("Aristóteles", manual.getId(), com.avilaos.core.model.ProcessType.CPU_BOUND,
+                5, 5, 100, 0, 0, null, 1, 1);
+        check(!controller.isFileSystemJsonLoaded(), "sin JSON de archivos");
+        check(controller.isReadyToStartClock(), "configuración manual permite iniciar sin JSON");
+        controller.startSimulation();
+        controller.pauseSimulation();
+        controller.reset();
         System.out.println("PASS ManualPreparationStartTest");
     }
 }

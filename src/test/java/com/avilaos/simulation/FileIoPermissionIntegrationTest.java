@@ -22,8 +22,12 @@ public class FileIoPermissionIntegrationTest {
         c.getDisk().setHeadPosition(100);
         var read = c.createConfigFileIOProcess("leer", pc.getId(), IOOperationType.READ, "/mio/nota", 0,
                 "user1", ExecutionMode.USER, null, 1, 1000);
+        check(read.getTotalInstructions() == 2 && read.getAssignedMemory() == 2, "lectura reserva dos instrucciones y dos unidades de RAM");
         c.setMode(UserMode.ADMIN);
+        c.stepSimulation();
+        check(read.getProgramCounter() == 1 && !read.isTerminated(), "primera instrucción solicita la lectura");
         for (int i = 0; i < 100 && !read.isTerminated(); i++) c.stepSimulation();
+        check(read.getProgramCounter() == 2, "segunda instrucción termina tras volver del disco");
         check(read.isTerminated() && c.getDisk().getCompletedRequestsCount() == 1, "lectura termina por disco");
 
         c.setMode(UserMode.USER);
