@@ -1055,6 +1055,7 @@ public class ComputerKernel {
                     "SWAP:" + victim.getName(), startSwapBlock, mem, clock != null ? clock.getCycleCounter() : 0);
             disk.enqueueRequest(req);
             suspensionCount++;
+            victim.addSuspension();
         }
     }
 
@@ -1129,6 +1130,7 @@ public class ComputerKernel {
                     "SWAP:" + candidate.getName(), swapBlock, mem, clock != null ? clock.getCycleCounter() : 0);
             disk.enqueueRequest(req);
             reactivationCount++;
+            candidate.addReactivation();
         }
     }
 

@@ -191,6 +191,10 @@ public class DiskAndSwapLogTest {
             throw new AssertionError("Se esperaba exactamente 1 suspensión y 1 reactivación (obtenido: susp="
                     + comp.getSuspensionCount() + ", react=" + comp.getReactivationCount() + ")");
         }
+        if (p1.getSuspensions() != 1 || p1.getReactivations() != 1
+                || p2.getSuspensions() != 0 || p2.getReactivations() != 0) {
+            throw new AssertionError("Los contadores deben corresponder al proceso suspendido y reactivado");
+        }
         System.out.println("PASS: testRealSimulationCycle0SuspensionAndReactivation");
     }
 

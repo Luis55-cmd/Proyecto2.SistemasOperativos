@@ -70,6 +70,8 @@ public class ProcessControlBlock {
     private int processedElements;
 
     private int memoryPointer;
+    private int suspensionCount = 0;
+    private int reactivationCount = 0;
     public enum SyncPhase { WAIT_SLOT, WAIT_MUTEX, ACCESS, SIGNAL_MUTEX, SIGNAL_SLOT, WORK }
     private SyncPhase syncPhase = SyncPhase.WORK;
     private int operationWorkDone;
@@ -638,6 +640,23 @@ public class ProcessControlBlock {
 
     public void setMode(ExecutionMode mode) {
         this.mode = mode;
+    }
+    
+    public int getSuspensions() {
+        return suspensionCount;
+    }
+
+    public int getReactivations() {
+        return reactivationCount;
+    }
+
+    // Estos métodos los usarás en tu Kernel/Scheduler para aumentar el contador
+    public void addSuspension() {
+        this.suspensionCount++;
+    }
+
+    public void addReactivation() {
+        this.reactivationCount++;
     }
 
     // --- Atributos Proyecto 2: E/S de archivos, permisos y área de Swap ---

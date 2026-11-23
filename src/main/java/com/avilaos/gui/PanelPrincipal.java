@@ -45,6 +45,7 @@ public class PanelPrincipal extends JPanel {
     private final JLabel discoOcupacion = texto(" ", 14, GRIS, false);
     private final JLabel discoCabezal = texto(" ", 14, GRIS, false);
     private final JLabel discoPolitica = texto(" ", 14, GRIS, false);
+    private final JLabel discoMetricas = texto(" ", 14, GRIS, false);
     private boolean consultaDiscoPendiente = false;
     private final JTree arbolArchivos = new JTree();
     private final JTabbedPane vistasArchivos = new JTabbedPane();
@@ -894,6 +895,8 @@ public class PanelPrincipal extends JPanel {
         configuracion.add(discoCabezal);
         configuracion.add(Box.createVerticalStrut(6));
         configuracion.add(discoPolitica);
+        configuracion.add(Box.createVerticalStrut(6));
+        configuracion.add(discoMetricas);
         configuracion.add(Box.createVerticalStrut(12));
         
         // --- NUEVA SECCIÓN: CONFIGURACIÓN DE TAMAÑO ---
@@ -1070,7 +1073,8 @@ for (int i = 0; i < ocupados.length; i++) {
     "Bloques de datos: " + datos + " · Swap: " + swap + " · Total físico: " + disco.getTotalPhysicalBlocks(),
     "Datos libres: " + disco.getFreeDataBlocks() + " / " + datos + " · Swap libre: " + disco.getFreeSwapBlocks() + " / " + swap,
     "Cabezal: bloque " + disco.getHeadPosition() + " · Dirección: " + (disco.getHeadDirection() == com.avilaos.disk.HeadDirection.UP ? "creciente ↑" : "decreciente ↓"),
-    "Política: " + disco.getPolicyType() + " · Velocidad: " + disco.getHeadSpeedPerTick() + " posiciones por ciclo"
+    "Política: " + disco.getPolicyType() + " · Velocidad: " + disco.getHeadSpeedPerTick() + " posiciones por ciclo",
+    "Métricas: Desplazamiento cabezal " + disco.getTotalHeadMovement() + " bloques · Espera prom. " + String.format("%.2f", disco.getAverageWaitTimeCycles()) + " ticks · Atendidas: " + disco.getCompletedRequestsCount() + " (" + disco.getDetallePorPolitica() + ")"
 };
 
 return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType(), reservados, detalles};
@@ -1098,6 +1102,8 @@ discoOcupacion.setText(resumen[2]);
 discoCabezal.setText(resumen[3]);
 
 discoPolitica.setText(resumen[4]);
+
+discoMetricas.setText(resumen[5]);
 
 for (int i = 0; i < botonesPoliticaDisco.length; i++) {
 

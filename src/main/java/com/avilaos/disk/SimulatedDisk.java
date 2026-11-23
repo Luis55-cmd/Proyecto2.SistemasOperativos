@@ -38,6 +38,8 @@ public class SimulatedDisk implements IClockTickable {
     private int headSpeedPerTick;
 
     private IORequest activeRequest;
+    // La política que selecciona una solicitud conserva su atribución hasta terminarla.
+    private DiskSchedulingPolicyType activeRequestPolicy;
     private int remainingTransferCycles;
     private int activeTransferIndex;
     private int pendingBoundaryBlock = -1;
@@ -50,6 +52,48 @@ public class SimulatedDisk implements IClockTickable {
 
     private IDiskCompletionListener completionListener;
     private IDiskEventListener eventListener;
+    private int atendidasFIFO = 0;
+    private int atendidasSSTF = 0;
+    private int atendidasSCAN = 0;
+    private int atendidasCSCAN = 0;
+    private int atendidasLOOK = 0;
+    private int atendidasCLOOK = 0;
+
+    private int movementFIFO = 0;
+    private int movementSSTF = 0;
+    private int movementSCAN = 0;
+    private int movementCSCAN = 0;
+    private int movementLOOK = 0;
+    private int movementCLOOK = 0;
+
+    private int waitTimeFIFO = 0;
+    private int waitTimeSSTF = 0;
+    private int waitTimeSCAN = 0;
+    private int waitTimeCSCAN = 0;
+    private int waitTimeLOOK = 0;
+    private int waitTimeCLOOK = 0;
+
+    public String getDetallePorPolitica() {
+        return String.format("FIFO:%d | SSTF:%d | SCAN:%d | C-SCAN:%d | LOOK:%d | C-LOOK:%d", 
+                atendidasFIFO, atendidasSSTF, atendidasSCAN, atendidasCSCAN, atendidasLOOK, atendidasCLOOK);
+    }
+
+    private void recordHeadMovement(int step) {
+        if (step <= 0) return;
+        totalHeadMovement += step;
+        if (activeRequestPolicy != null) {
+            switch (activeRequestPolicy) {
+                case FIFO -> movementFIFO += step;
+                case SSTF -> movementSSTF += step;
+                case SCAN -> movementSCAN += step;
+                case C_SCAN -> movementCSCAN += step;
+                case LOOK -> movementLOOK += step;
+                case C_LOOK -> movementCLOOK += step;
+            }
+        } else {
+            movementFIFO += step;
+        }
+    }
 
     public SimulatedDisk(int totalBlocks, int swapSizeBlocks, int initialHead, int headSpeedPerTick) {
         if (totalBlocks <= 0) {
@@ -445,7 +489,7 @@ public class SimulatedDisk implements IClockTickable {
                 if (distToBoundary > 0) {
                     headDirection = pendingBoundaryBlock > headPosition ? HeadDirection.UP : HeadDirection.DOWN;
                     headPosition += (headDirection == HeadDirection.UP ? step1 : -step1);
-                    totalHeadMovement += step1;
+                    recordHeadMovement(step1);
                     budget -= step1;
                 }
                 if (headPosition == pendingBoundaryBlock) {
@@ -467,7 +511,7 @@ public class SimulatedDisk implements IClockTickable {
                 int step2 = Math.min(budget, dist);
                 headDirection = targetPos > headPosition ? HeadDirection.UP : HeadDirection.DOWN;
                 headPosition += (headDirection == HeadDirection.UP ? step2 : -step2);
-                totalHeadMovement += step2;
+                recordHeadMovement(step2);
             }
             boolean swapTransfer = activeRequest.getOperation() == IOOperationType.SUSPEND
                     || activeRequest.getOperation() == IOOperationType.REACTIVATE;
@@ -485,10 +529,22 @@ public class SimulatedDisk implements IClockTickable {
             activeRequest = null;
             finished.setCompletionCycle(currentCycle);
             completedRequestsCount++;
-            if (finished.getStartServiceCycle() >= 0) {
-                totalWaitTimeCycles += Math.max(0, finished.getStartServiceCycle() - finished.getArrivalCycle());
+            int waitTime = Math.max(0, finished.getStartServiceCycle() >= 0
+                    ? finished.getStartServiceCycle() - finished.getArrivalCycle()
+                    : finished.getCompletionCycle() - finished.getArrivalCycle());
+            totalWaitTimeCycles += waitTime;
+            
+            DiskSchedulingPolicyType pt = activeRequestPolicy;
+            switch (pt) {
+                case FIFO -> { atendidasFIFO++; waitTimeFIFO += waitTime; }
+                case SSTF -> { atendidasSSTF++; waitTimeSSTF += waitTime; }
+                case SCAN -> { atendidasSCAN++; waitTimeSCAN += waitTime; }
+                case C_SCAN -> { atendidasCSCAN++; waitTimeCSCAN += waitTime; }
+                case LOOK -> { atendidasLOOK++; waitTimeLOOK += waitTime; }
+                case C_LOOK -> { atendidasCLOOK++; waitTimeCLOOK += waitTime; }
             }
-            String policyName = schedulingPolicy != null ? schedulingPolicy.getPolicyType().name() : "FIFO";
+            String policyName = pt.name();
+            
             String procName = finished.getPcb() != null ? finished.getPcb().getName() : ("Req#" + finished.getId());
             emitEvent("El disco completó la solicitud de " + procName + " en el bloque "
                     + headPosition + " (" + policyName + ")");
@@ -535,6 +591,7 @@ public class SimulatedDisk implements IClockTickable {
                 selected = ioQueue.get(0);
             }
             ioQueue.remove(selected);
+            activeRequestPolicy = schedulingPolicy != null ? schedulingPolicy.getPolicyType() : DiskSchedulingPolicyType.FIFO;
         } finally {
             queueMutex.release();
         }
@@ -790,6 +847,75 @@ public class SimulatedDisk implements IClockTickable {
         this.eventListener = eventListener;
     }
 
+    public int getMovementFIFO() { return movementFIFO; }
+    public int getMovementSSTF() { return movementSSTF; }
+    public int getMovementSCAN() { return movementSCAN; }
+    public int getMovementCSCAN() { return movementCSCAN; }
+    public int getMovementLOOK() { return movementLOOK; }
+    public int getMovementCLOOK() { return movementCLOOK; }
+
+    public int getAtendidasFIFO() { return atendidasFIFO; }
+    public int getAtendidasSSTF() { return atendidasSSTF; }
+    public int getAtendidasSCAN() { return atendidasSCAN; }
+    public int getAtendidasCSCAN() { return atendidasCSCAN; }
+    public int getAtendidasLOOK() { return atendidasLOOK; }
+    public int getAtendidasCLOOK() { return atendidasCLOOK; }
+
+    public int getMovementByPolicy(DiskSchedulingPolicyType type) {
+        if (type == null) return 0;
+        return switch (type) {
+            case FIFO -> movementFIFO;
+            case SSTF -> movementSSTF;
+            case SCAN -> movementSCAN;
+            case C_SCAN -> movementCSCAN;
+            case LOOK -> movementLOOK;
+            case C_LOOK -> movementCLOOK;
+        };
+    }
+
+    public int getServicedByPolicy(DiskSchedulingPolicyType type) {
+        if (type == null) return 0;
+        return switch (type) {
+            case FIFO -> atendidasFIFO;
+            case SSTF -> atendidasSSTF;
+            case SCAN -> atendidasSCAN;
+            case C_SCAN -> atendidasCSCAN;
+            case LOOK -> atendidasLOOK;
+            case C_LOOK -> atendidasCLOOK;
+        };
+    }
+
+    public double getAverageWaitTime(DiskSchedulingPolicyType type) {
+        if (type == null) return 0.0;
+        return switch (type) {
+            case FIFO -> atendidasFIFO == 0 ? 0.0 : (double) waitTimeFIFO / atendidasFIFO;
+            case SSTF -> atendidasSSTF == 0 ? 0.0 : (double) waitTimeSSTF / atendidasSSTF;
+            case SCAN -> atendidasSCAN == 0 ? 0.0 : (double) waitTimeSCAN / atendidasSCAN;
+            case C_SCAN -> atendidasCSCAN == 0 ? 0.0 : (double) waitTimeCSCAN / atendidasCSCAN;
+            case LOOK -> atendidasLOOK == 0 ? 0.0 : (double) waitTimeLOOK / atendidasLOOK;
+            case C_LOOK -> atendidasCLOOK == 0 ? 0.0 : (double) waitTimeCLOOK / atendidasCLOOK;
+        };
+    }
+
+    public double getAverageWaitTimeFIFO() { return atendidasFIFO == 0 ? 0.0 : (double) waitTimeFIFO / atendidasFIFO; }
+    public double getAverageWaitTimeSSTF() { return atendidasSSTF == 0 ? 0.0 : (double) waitTimeSSTF / atendidasSSTF; }
+    public double getAverageWaitTimeSCAN() { return atendidasSCAN == 0 ? 0.0 : (double) waitTimeSCAN / atendidasSCAN; }
+    public double getAverageWaitTimeCSCAN() { return atendidasCSCAN == 0 ? 0.0 : (double) waitTimeCSCAN / atendidasCSCAN; }
+    public double getAverageWaitTimeLOOK() { return atendidasLOOK == 0 ? 0.0 : (double) waitTimeLOOK / atendidasLOOK; }
+    public double getAverageWaitTimeCLOOK() { return atendidasCLOOK == 0 ? 0.0 : (double) waitTimeCLOOK / atendidasCLOOK; }
+
+    public int getTotalWaitTime(DiskSchedulingPolicyType type) {
+        if (type == null) return 0;
+        return switch (type) {
+            case FIFO -> waitTimeFIFO;
+            case SSTF -> waitTimeSSTF;
+            case SCAN -> waitTimeSCAN;
+            case C_SCAN -> waitTimeCSCAN;
+            case LOOK -> waitTimeLOOK;
+            case C_LOOK -> waitTimeCLOOK;
+        };
+    }
+
     public void reset() {
         blockMapMutex.acquireUninterruptibly();
         try {
@@ -815,6 +941,7 @@ public class SimulatedDisk implements IClockTickable {
         headPosition = initialHeadPosition;
         headDirection = HeadDirection.UP;
         activeRequest = null;
+        activeRequestPolicy = null;
         remainingTransferCycles = 0;
         pendingBoundaryBlock = -1;
         pendingWrapJumpToZero = false;
@@ -822,5 +949,23 @@ public class SimulatedDisk implements IClockTickable {
         completedRequestsCount = 0;
         totalWaitTimeCycles = 0;
         nextRequestId = 1;
+        atendidasFIFO = 0;
+        atendidasSSTF = 0;
+        atendidasSCAN = 0;
+        atendidasCSCAN = 0;
+        atendidasLOOK = 0;
+        atendidasCLOOK = 0;
+        movementFIFO = 0;
+        movementSSTF = 0;
+        movementSCAN = 0;
+        movementCSCAN = 0;
+        movementLOOK = 0;
+        movementCLOOK = 0;
+        waitTimeFIFO = 0;
+        waitTimeSSTF = 0;
+        waitTimeSCAN = 0;
+        waitTimeCSCAN = 0;
+        waitTimeLOOK = 0;
+        waitTimeCLOOK = 0;
     }
 }

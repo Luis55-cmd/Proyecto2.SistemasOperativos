@@ -59,8 +59,7 @@ public class SimulationController implements IClockTickable {
     }
     private void publishSnapshot() {
         snapshot = new SimulationSnapshot(session, clock.getCycleCounter(), clock.isRunning(), clock.isPaused(),
-                // [P2-LEGACY] clock.getCycleDurationMs(), computers, buffers, snapshot);
-                clock.getCycleDurationMs(), computers, snapshot); // [P2] sin buffers
+                clock.getCycleDurationMs(), computers, disk, snapshot); // [P2] con disco
         synchronized (guiListeners) {
             if (refreshPending) return;
             refreshPending = true;
