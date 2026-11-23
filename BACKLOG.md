@@ -1,5 +1,15 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
+## Validación de develop — 23 de noviembre de 2026
+
+Base verificada: `develop` en `4ff6d9a`. El código y las pruebas compilan con `javac --release 21`; la ejecución fue con JDK 26, sin pantalla. De 42 programas ejecutados inicialmente, 38 pasaron; `CargaDuplicadosTest` pasó al aportar su entrada y `EventosLogTest` con `12-eventos-log.json` falló al cargar el escenario heredado. Las otras dos pruebas fallidas son `CreacionComputadoresGuiTest` (espera dos computadores en una vista que cambió) y `MonitorSimulacionTest` (busca textos anteriores del menú). Deben actualizarse o investigarse sin asumir que el fallo sea una regresión funcional. Hay archivos de pruebas heredadas comentados y Maven no está instalado; no se ejecutaron esos casos ni una suite Maven.
+
+La carga desde controlador aceptó seis sistemas de archivos y tres configuraciones de procesos; rechazó cuatro entradas inválidas sin cambiar las referencias y el número de procesos comprobados. Se detectaron y corrigieron en la rama de validación los escenarios `11-disco-lleno` y `12-disco-disperso`, que asignaban al bloque 0 reservado por raíz. `JsonCargaEscenariosTest` verifica los 13 casos y ocupación; `MetricasDiscoGuiTest` comprueba sin pantalla la tabla FIFO y los diez selectores de métricas. Falta comprobación visual y ejecución con runtime Java 21. El botón de guardar de Inicio está deshabilitado; las pruebas de persistencia existentes solo demuestran exportación y recarga a nivel de controlador/serializador.
+
+El estudiante confirmó que el inicio manual sin ambos JSON no será penalizado por los preparadores; esa duda está cerrada. Pendientes: velocidad de cabezal en interfaz, guardar desde Inicio, capacidad de disco protegida, contraste visual, comparación de políticas con cargas equivalentes y documentación de entrega. Los cambios de esta sección y las pruebas corresponden a la rama `revision/validacion-develop`, no a `develop`.
+
+**Modo entrega y deuda pedagógica:** la IA preparó los escenarios, las pruebas y esta validación. Después de entregar, reconstruir la reserva de raíz/directorios, explicar el recorrido de carga y rechazo de JSON, revisar cómo se llenan las métricas y reproducir una prueba fallida y su corrección.
+
 ## Actualización de métricas — 23 de noviembre de 2026
 
 El [PR #48](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/48) de Ricardo fue fusionado en `develop` el 23 de noviembre (commit de fusión `0516809`, cabecera probada `2c58a28`). El #47, dirigido a `main`, fue cerrado. `develop` también incluye el PR #46. El checkout local original permanece en `trabajo/flujo-creacion-procesos`, `6f70474` y no contiene la implementación del #48.
@@ -17,7 +27,7 @@ El PR #48 agrega métricas por política de solicitudes atendidas, desplazamient
 
 La pestaña permite crear procesos CPU-bound y procesos de lectura identificados visualmente como E/S-bound. La lectura manual usa internamente FILE_IO y dos instrucciones: solicitar lectura y terminar tras regresar del disco; requiere dos unidades de RAM. La duración de la operación depende de la cola y el recorrido del disco, no se calcula a partir de estas dos instrucciones. Esta cuenta es una decisión de implementación, no una fórmula exigida por el enunciado. Las operaciones de escritura y otras operaciones CRUD siguen en Archivos.
 
-El inicio con computador y procesos configurados manualmente puede prescindir de JSON. Esta decisión solicitada por el estudiante difiere del requisito literal de cargar ambos JSON, y sigue pendiente de acuerdo con el equipo o aclaratoria docente.
+El inicio con computador y procesos configurados manualmente puede prescindir de JSON. Aunque difiere de la redacción literal del enunciado, el estudiante confirmó que los preparadores no penalizarán esta alternativa; la duda se considera cerrada.
 
 Validación local: compilación con destino Java 21 y pruebas automáticas del formulario en modo sin pantalla, inicio manual, permisos y lectura fragmentada. El estudiante ejecutó desde la interfaz el escenario `13-arbol-complejo.json`: lector (RAM 2) solicitó READ en ciclo 1, disco terminó en ciclo 10, CPU de 15 instrucciones terminó en ciclo 16 y lector finalizó tras volver a CPU en ciclo 17. Este log demuestra el recorrido de lectura y concurrencia con CPU; el cambio visual de botones al crear el computador se comprobó automáticamente en modo sin pantalla, sin confirmación visual explícita posterior. Los PR [#45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) y [#46](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/46) están fusionados en `develop`.
 
@@ -30,7 +40,7 @@ Los PR [#44](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/44)
 - **CRUD e identidad:** la interfaz solicita creación, lectura, renombrado y eliminación mediante procesos de E/S. Lectura, renombrado y eliminación de archivos recorren sus cadenas de bloques; el resultado se registra al completar la operación. ADMIN renombra y elimina archivos o directorios; USER puede leer archivos propios o públicos, crear en directorios propios y eliminar archivos propios. Se impide a USER renombrar y eliminar directorios, y no se permite renombrar ni eliminar la raíz. El dueño propuesto es el usuario activo y el proceso conserva la identidad de su solicitante.
 - **Validación:** compilación con `javac --release 21` usando el JDK local. Pasaron 11 programas de prueba de CRUD, permisos, errores, cadenas fragmentadas, reservas, persistencia y swap. Una prueba de permisos se ajustó para esperar los lotes de log de Swing. Se comprobaron visualmente la creación durante swap, la lectura y eliminación de un archivo fragmentado, el cambio de sesión y la creación de un archivo por USER. El renombrado de directorio con descendientes y la eliminación de archivo propio por USER pasaron automáticamente, pero aún no se verificaron visualmente. Los tres escenarios adicionales de duplicados, disco lleno y swap insuficiente coincidieron con los logs; sus contadores finales no se revisaron visualmente.
 - **Fallos y concurrencia:** si una operación pendiente pierde su ruta, termina por fallo y registra el motivo; se libera la RAM y el swap asignados mediante la limpieza existente. El estado general sigue siendo `TERMINADO`, sin causa persistente diferenciada. El comportamiento con reemplazo o reducción del disco aún debe diseñarse, especialmente para solicitudes activas y procesos suspendidos.
-- **Pendientes:** configurar la velocidad del cabezal exigida por el enunciado; acordar e implementar la reconfiguración de capacidad del disco sin pérdida silenciosa y solo para ADMIN; completar el guardado desde Inicio y verificar persistencia; revisar colas, métricas, políticas, casos límite y las dos pruebas de interfaz heredadas fallidas. Contrastar con el equipo el inicio manual frente al requisito de cargar ambos JSON y aclarar el tratamiento de swap en la capacidad física. Revisar la imagen con marca de Alamy antes de distribuir.
+- **Pendientes:** configurar la velocidad del cabezal exigida por el enunciado; acordar e implementar la reconfiguración de capacidad del disco sin pérdida silenciosa y solo para ADMIN; completar el guardado desde Inicio y verificar persistencia; revisar colas, métricas, políticas, casos límite y las dos pruebas de interfaz heredadas fallidas. Aclarar el tratamiento de swap en la capacidad física. Revisar la imagen con marca de Alamy antes de distribuir. La duda del inicio manual quedó cerrada según el estudiante.
 - **Coordinación:** Ricardo indicó que pensaba trabajar en métricas y consideró tomar la personalización del disco; acordar con él el alcance definitivo antes de tocar las mismas clases. El redimensionamiento sigue deshabilitado; no se han definido aún las reglas para datos o procesos afectados.
 - **Modo entrega y defensa:** la IA diseñó e implementó principalmente las conexiones de CRUD, sesión, recorrido de lectura y tratamiento de fallos de E/S. Pendiente para el estudiante: reconstruir los contratos y conexiones; explicar permisos e identidad capturada; recorrer bloques y casos de error; modificar una función y depurar una solicitud fallida. La validación no equivale todavía a dominio para defensa.
 
@@ -124,7 +134,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T39 | 🟨 | Validar configuración y jerarquía del JSON del sistema de archivos antes de aplicarla. |
 | T40 | ⬜ | Restaurar bloques, cabezal, dueño y permisos; probar archivo de varios bloques. |
 | T41 | 🟨 | Validar JSON de procesos, políticas y rutas, con mensajes de error comprensibles. |
-| T42 | ⬜ | Validar los datos de disco y procesos antes de iniciar; permitir creación manual y carga JSON. El enunciado exige literalmente cargar ambos archivos: ver decisión y diferencia debajo. |
+| T42 | 🟨 | Validar los datos de disco y procesos antes de iniciar; permitir creación manual y carga JSON. La duda sobre prescindir de ambos JSON está cerrada por confirmación del estudiante; faltan casos funcionales por verificar. |
 | T43 | ⬜ | Guardar el estado modificado del sistema de archivos y volver a cargarlo. |
 | T44 | ⬜ | Reiniciar con nuevos procesos conservando el disco guardado. |
 
@@ -161,7 +171,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T66 | ⬜ | Diseñar e implementar eliminación del disco con confirmación de pérdida, incluso con procesos en swap; determinar y probar el destino de esos procesos, E/S activa y pendientes, sin dejar referencias huérfanas. |
 | T67 | ⬜ | Diseñar control de sesión ADMIN/USER y nombre en Simulación, con ADMIN/admin inicial y reglas de acceso comprobadas en interfaz y backend. Persistencia de sesión entre ejecuciones pendiente de decidir. |
 
-Los criterios son propuestas a precisar función por función, no afirmaciones de implementación. T62 depende de conciliar con el requisito literal de cargar ambos JSON; el equipo no ha confirmado aquí la alternativa manual. La eliminación del computador que conserva el disco es un flujo distinto de T66.
+Los criterios son propuestas a precisar, no afirmaciones de implementación. La duda sobre permitir inicio manual quedó cerrada por confirmación del estudiante. La eliminación del computador que conserva el disco es un flujo distinto de T66.
 
 ## Dependencias entre áreas
 

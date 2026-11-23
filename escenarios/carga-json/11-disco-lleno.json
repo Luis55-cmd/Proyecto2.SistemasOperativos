@@ -13,8 +13,8 @@
     {
       "path": "/pruebas/completo.bin",
       "type": "FILE",
-      "startBlock": 0,
-      "blocks": 200,
+      "startBlock": 2,
+      "blocks": 198,
       "owner": "admin",
       "permissions": "public"
     }
