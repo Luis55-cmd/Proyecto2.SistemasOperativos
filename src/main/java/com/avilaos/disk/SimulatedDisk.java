@@ -38,6 +38,8 @@ public class SimulatedDisk implements IClockTickable {
     private int headSpeedPerTick;
 
     private IORequest activeRequest;
+    // La política que selecciona una solicitud conserva su atribución hasta terminarla.
+    private DiskSchedulingPolicyType activeRequestPolicy;
     private int remainingTransferCycles;
     private int activeTransferIndex;
     private int pendingBoundaryBlock = -1;
@@ -79,8 +81,8 @@ public class SimulatedDisk implements IClockTickable {
     private void recordHeadMovement(int step) {
         if (step <= 0) return;
         totalHeadMovement += step;
-        if (schedulingPolicy != null) {
-            switch (schedulingPolicy.getPolicyType()) {
+        if (activeRequestPolicy != null) {
+            switch (activeRequestPolicy) {
                 case FIFO -> movementFIFO += step;
                 case SSTF -> movementSSTF += step;
                 case SCAN -> movementSCAN += step;
@@ -532,7 +534,7 @@ public class SimulatedDisk implements IClockTickable {
                     : finished.getCompletionCycle() - finished.getArrivalCycle());
             totalWaitTimeCycles += waitTime;
             
-            DiskSchedulingPolicyType pt = schedulingPolicy != null ? schedulingPolicy.getPolicyType() : DiskSchedulingPolicyType.FIFO;
+            DiskSchedulingPolicyType pt = activeRequestPolicy;
             switch (pt) {
                 case FIFO -> { atendidasFIFO++; waitTimeFIFO += waitTime; }
                 case SSTF -> { atendidasSSTF++; waitTimeSSTF += waitTime; }
@@ -589,6 +591,7 @@ public class SimulatedDisk implements IClockTickable {
                 selected = ioQueue.get(0);
             }
             ioQueue.remove(selected);
+            activeRequestPolicy = schedulingPolicy != null ? schedulingPolicy.getPolicyType() : DiskSchedulingPolicyType.FIFO;
         } finally {
             queueMutex.release();
         }
@@ -938,6 +941,7 @@ public class SimulatedDisk implements IClockTickable {
         headPosition = initialHeadPosition;
         headDirection = HeadDirection.UP;
         activeRequest = null;
+        activeRequestPolicy = null;
         remainingTransferCycles = 0;
         pendingBoundaryBlock = -1;
         pendingWrapJumpToZero = false;

@@ -34,7 +34,7 @@ public class PanelMetricasCopia extends JPanel {
         "Espera combinada anterior (promedio)",
         "Suspensiones",
         "Reactivaciones",
-        "Desplazamiento acumulado del cabezal (Comparación de políticas)",
+        "Desplazamiento acumulado del cabezal por política",
         "Desplazamiento total del cabezal",
         "Tiempo promedio de espera E/S por política",
         "Tiempo de espera promedio E/S (Global)"
@@ -463,6 +463,11 @@ public class PanelMetricasCopia extends JPanel {
                 p.readyWaitTicks(), p.blockedWaitTicks(), p.semaphoreWaitTicks(),
                 p.suspensions(), p.reactivations()
             });
+            if (p.type() == com.avilaos.core.model.ProcessType.PRODUCER
+                    || p.type() == com.avilaos.core.model.ProcessType.CONSUMER) {
+                participantes++;
+                esperaSemaforos += p.semaphoreWaitTicks();
+            }
         }
         
         String promedioSemaforos = participantes == 0 ? "—" : String.format("%.1f", (double) esperaSemaforos / participantes);
@@ -510,6 +515,6 @@ public class PanelMetricasCopia extends JPanel {
             });
         }
 
-        lblDetalle.setText("Totales de procesos y disco en tiempo real · desplazamiento y espera promedio discriminados por cada algoritmo");
+        lblDetalle.setText("Métricas de la ejecución actual · compare políticas con cargas iniciales equivalentes");
     }
 }

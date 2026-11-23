@@ -19,6 +19,7 @@ public class DiskPerformanceMetricsTest {
         testHeadMovementAndRequestsServicedByPolicy();
         testAverageWaitTimeCalculation();
         testPolicyComparisonMovementTracking();
+        testChangePolicyWhileServing();
         testSnapshotDiskMetricsCapture();
         testResetMetrics();
         System.out.println("TODAS LAS PRUEBAS DE MÉTRICAS DE RENDIMIENTO DE DISCO PASARON EXITOSAMENTE.");
@@ -60,7 +61,22 @@ public class DiskPerformanceMetricsTest {
 
         check(disk.getCompletedRequestsCount() == 2, "2 solicitudes completadas");
         double avgWait = disk.getAverageWaitTimeCycles();
-        check(avgWait >= 0.0, "El tiempo promedio de espera debe ser >= 0: " + avgWait);
+        check(avgWait == 0.5, "La espera media debe ser 0.5: " + avgWait);
+        check(disk.getAverageWaitTimeFIFO() == 0.5, "La espera FIFO debe ser 0.5");
+    }
+
+    private static void testChangePolicyWhileServing() {
+        SimulatedDisk disk = new SimulatedDisk(200, 50, 50, 10);
+        disk.setSchedulingPolicy(DiskSchedulingPolicyType.FIFO);
+        disk.enqueueRequest(null, IOOperationType.READ, "/primera", 90, 1, 1);
+        disk.enqueueRequest(null, IOOperationType.READ, "/segunda", 100, 1, 1);
+        disk.tick(1);
+        disk.setSchedulingPolicy(DiskSchedulingPolicyType.SSTF);
+        for (int cycle = 2; cycle < 100 && disk.getCompletedRequestsCount() < 2; cycle++) disk.tick(cycle);
+        check(disk.getAtendidasFIFO() == 1 && disk.getMovementFIFO() == 40, "La solicitud activa conserva FIFO");
+        check(disk.getAtendidasSSTF() == 1 && disk.getMovementSSTF() == 10, "La siguiente solicitud usa SSTF");
+        check(disk.getAverageWaitTimeFIFO() == 0.0 && disk.getAverageWaitTimeSSTF() == 5.0,
+                "La espera pertenece a la política que seleccionó cada solicitud");
     }
 
     private static void testPolicyComparisonMovementTracking() {

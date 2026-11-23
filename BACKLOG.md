@@ -1,18 +1,31 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
-## Procesos — PR #46 en revisión (21 de noviembre de 2026)
+## Actualización de métricas — 23 de noviembre de 2026
+
+Ricardo abrió el [PR #48](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/48) hacia `develop` (cabecera revisada `31119309`); está abierto y aún no integrado. El #47, dirigido a `main`, fue cerrado. `develop` remoto está en `1c972d7` e incluye el PR #46. El checkout local permanece en `trabajo/flujo-creacion-procesos`, `6f70474`; esta actualización del backlog es local.
+
+El PR #48 agrega métricas por política de solicitudes atendidas, desplazamiento y espera media, histórico en snapshots, tablas y gráficos de disco y de suspensiones/reactivaciones. En una copia aislada de su código se compilaron todas las fuentes principales y de prueba con `javac --release 21`, usando JDK 26 y dependencias locales; `DiskPerformanceMetricsTest` pasó. No se ejecutó con un runtime Java 21 ni se verificó visualmente. GitHub no reporta estados de commit ni ejecuciones de workflow para la cabecera revisada.
+
+**Correcciones y límites de la revisión:**
+
+- Se conectaron los contadores del PCB a las solicitudes de suspensión y reactivación encoladas; una prueba integrada comprueba los valores del proceso y del computador. Los contadores representan operaciones iniciadas, no necesariamente completadas.
+- Una solicitud activa conserva la política que la seleccionó para atribuir su desplazamiento, espera y finalización; el cambio de política afecta la siguiente selección. Una prueba cambia de FIFO a SSTF durante el recorrido y comprueba ambas solicitudes y sus esperas exactas.
+- Pasaron nueve programas de prueba de métricas, disco, swap, lectura, permisos, errores e inicio manual, en modo sin pantalla y Java 26 con compilación destino Java 21. Se restauró el cálculo de espera en semáforos de la vista anterior. Quedan pendientes la comprobación visual de tablas y gráficos, la ejecución con runtime Java 21 y comparar políticas con escenarios equivalentes. El modelo existente no cuenta el salto de retorno de C-SCAN/C-LOOK como desplazamiento: aclarar esta convención en las conclusiones.
+- **Modo entrega:** la IA diseñó e implementó las correcciones de atribución por política, los contadores por proceso y las pruebas. Para la defensa quedan por reconstruir el flujo kernel–PCB–snapshot–interfaz, explicar cuándo se cuenta cada evento, recorrer un cambio de política y depurar una cifra incorrecta. Después de la entrega, modificar y volver a probar estos recorridos sin ayuda.
+
+## Procesos — PR #46 integrado (21 de noviembre de 2026)
 
 La pestaña permite crear procesos CPU-bound y procesos de lectura identificados visualmente como E/S-bound. La lectura manual usa internamente FILE_IO y dos instrucciones: solicitar lectura y terminar tras regresar del disco; requiere dos unidades de RAM. La duración de la operación depende de la cola y el recorrido del disco, no se calcula a partir de estas dos instrucciones. Esta cuenta es una decisión de implementación, no una fórmula exigida por el enunciado. Las operaciones de escritura y otras operaciones CRUD siguen en Archivos.
 
 El inicio con computador y procesos configurados manualmente puede prescindir de JSON. Esta decisión solicitada por el estudiante difiere del requisito literal de cargar ambos JSON, y sigue pendiente de acuerdo con el equipo o aclaratoria docente.
 
-Validación local: compilación con destino Java 21 y pruebas automáticas del formulario en modo sin pantalla, inicio manual, permisos y lectura fragmentada. El estudiante ejecutó desde la interfaz el escenario `13-arbol-complejo.json`: lector (RAM 2) solicitó READ en ciclo 1, disco terminó en ciclo 10, CPU de 15 instrucciones terminó en ciclo 16 y lector finalizó tras volver a CPU en ciclo 17. Este log demuestra el recorrido de lectura y concurrencia con CPU; el cambio visual de botones al crear el computador se comprobó automáticamente en modo sin pantalla, sin confirmación visual explícita posterior. El [PR #45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) está fusionado en develop. El [PR #46](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/46) está abierto contra develop y pendiente de revisión; incluye estos cambios y el escenario probado. GitHub no reporta comprobaciones automáticas asociadas al PR.
+Validación local: compilación con destino Java 21 y pruebas automáticas del formulario en modo sin pantalla, inicio manual, permisos y lectura fragmentada. El estudiante ejecutó desde la interfaz el escenario `13-arbol-complejo.json`: lector (RAM 2) solicitó READ en ciclo 1, disco terminó en ciclo 10, CPU de 15 instrucciones terminó en ciclo 16 y lector finalizó tras volver a CPU en ciclo 17. Este log demuestra el recorrido de lectura y concurrencia con CPU; el cambio visual de botones al crear el computador se comprobó automáticamente en modo sin pantalla, sin confirmación visual explícita posterior. Los PR [#45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) y [#46](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/46) están fusionados en `develop`.
 
 Modo entrega: la IA implementó la interfaz, integración de lectura y cálculo de instrucciones. Pendiente para defensa: explicar el recorrido del proceso por CPU y disco, identidad y permisos, justificar las dos instrucciones, y practicar la localización de una lectura fallida. Después de la entrega, reconstruir y modificar el flujo y depurarlo sin ayuda.
 
-## Estado actual — 21 de noviembre de 2026
+## Corte de funcionalidades — 21 de noviembre de 2026
 
-Los PR [#44](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/44) y [#45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) fueron fusionados en `develop`. El [PR #46](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/46), con la creación de procesos descrita arriba, está abierto y pendiente de revisión; no se considera integrado. Las secciones posteriores recogen cortes históricos y las filas requieren evidencia individual antes de cambiar sus estados.
+Los PR [#44](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/44), [#45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) y [#46](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/46) fueron fusionados en `develop`. Las secciones posteriores recogen cortes históricos y las filas requieren evidencia individual antes de cambiar sus estados.
 
 - **CRUD e identidad:** la interfaz solicita creación, lectura, renombrado y eliminación mediante procesos de E/S. Lectura, renombrado y eliminación de archivos recorren sus cadenas de bloques; el resultado se registra al completar la operación. ADMIN renombra y elimina archivos o directorios; USER puede leer archivos propios o públicos, crear en directorios propios y eliminar archivos propios. Se impide a USER renombrar y eliminar directorios, y no se permite renombrar ni eliminar la raíz. El dueño propuesto es el usuario activo y el proceso conserva la identidad de su solicitante.
 - **Validación:** compilación con `javac --release 21` usando el JDK local. Pasaron 11 programas de prueba de CRUD, permisos, errores, cadenas fragmentadas, reservas, persistencia y swap. Una prueba de permisos se ajustó para esperar los lotes de log de Swing. Se comprobaron visualmente la creación durante swap, la lectura y eliminación de un archivo fragmentado, el cambio de sesión y la creación de un archivo por USER. El renombrado de directorio con descendientes y la eliminación de archivo propio por USER pasaron automáticamente, pero aún no se verificaron visualmente. Los tres escenarios adicionales de duplicados, disco lleno y swap insuficiente coincidieron con los logs; sus contadores finales no se revisaron visualmente.
@@ -126,8 +139,8 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T49 | 🟨 | Mostrar modo activo y permitir cambiar política de disco durante la ejecución. |
 | T50 | ⬜ | Validar tipo y rango en cada entrada sin detener la simulación. |
 | T51 | 🟨 | Registrar decisiones del disco y del planificador a mediano plazo en el log. |
-| T52 | ⬜ | Medir desplazamiento acumulado, espera media y solicitudes atendidas por política. |
-| T53 | ⬜ | Contar suspensiones y reactivaciones y mostrar gráfico de desplazamiento por tiempo. |
+| T52 | 🟨 | PR #48: contadores y gráficos implementados, con espera y cambio de política probados; comprobar interfaz y documentar convención de C-SCAN/C-LOOK. |
+| T53 | 🟨 | PR #48: gráfico e indicadores implementados; contadores por proceso comprobados en prueba integrada; validar gráficos visualmente y comparar escenarios equivalentes. |
 | T54 | ⬜ | Ejecutar un escenario integrado de CRUD mediante proceso de E/S. |
 | T55 | 🟨 | Ejecutar un escenario integrado de suspensión y reactivación. |
 | T56 | ⬜ | Documentar clases, métodos, enums e interfaces principales en el informe. |
