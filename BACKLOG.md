@@ -2,8 +2,9 @@
 
 ## Trabajo adicional en rama de validación — 23 de noviembre de 2026
 
-La rama `revision/validacion-develop` incorpora cambios que aún no están en `develop`:
+La rama `revision/validacion-develop` incorpora cambios que aún no están en `develop`. La última compilación fue con destino Java 21 y ejecución Java 26 sin pantalla: pasaron 52 programas; los ocho casos adicionales de coordinación también pasaron en la revisión anterior.
 
+- `CrudCompletoIntegracionTest` comprueba en una sola ejecución crear directorio y archivo, leer, renombrar y eliminar mediante seis solicitudes de disco, con liberación final de bloques y RAM. `SwapInsuficienteTest` comprueba que, sin swap, un proceso nuevo espera y luego se admite sin perder el archivo ni la RAM. `EfectoSuspensionTest` contrasta el mismo escenario con swap 0 y 100 y registra ciclos, movimiento, suspensión y reactivación. Se preparó `docs/borrador-informe-y-diagramas.md`, con clases, enums, dos diagramas UML y experimentos; requiere revisión del equipo y conversión al informe final.
 - Las cargas de JSON de archivos y procesos rechazan, antes de reemplazar la sesión, una simulación iniciada, solicitudes de E/S activas o pendientes, o bloques de swap ocupados. `CargaSeguraDiscoTest` comprueba la preservación de disco, árbol, computador, cola y swap para las dos sobrecargas de carga de archivos, además del rechazo en pausa. Esto no equivale a recuperar procesos suspendidos de un JSON.
 - El guardado escribe primero un archivo temporal en la carpeta de destino y reemplaza el JSON después; usa movimiento atómico cuando el sistema de archivos lo admite y reemplazo ordinario como alternativa. La prueba de persistencia cubre sustitución y recarga, y un fallo al intentar reemplazar un directorio no vacío comprueba que el destino se conserva y se elimina el temporal; no simula una interrupción ni todos los errores de escritura de bajo nivel.
 - El botón Guardar JSON del sistema de archivos en Inicio permite elegir destino, confirma el reemplazo y rechaza el guardado mientras haya una solicitud de disco activa o en cola. Una prueba sin pantalla invoca la misma operación posterior al selector, guarda un archivo real y lo vuelve a cargar; falta probar el selector y los mensajes visualmente. El guardado de procesos continúa deshabilitado. Este JSON guarda el sistema de archivos, no es un checkpoint completo de procesos y swap.
@@ -142,10 +143,10 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T31 | ⬜ | Completar solicitud y verificar que el proceso vuelve a listo. |
 | T32 | ⬜ | Registrar la operación como instrucción en modo sistema operativo. |
 | T33 | 🟨 | Verificar las siete transiciones y colas, incluyendo bloqueado/suspendido a listo/suspendido al ocurrir su evento. |
-| T34 | ⬜ | Probar falta de RAM: proceso nuevo queda en cola de largo plazo. |
+| T34 | ✅ | `SwapInsuficienteTest` comprueba que un proceso nuevo espera por falta de RAM y luego termina al liberarse memoria. |
 | T35 | 🟨 | Acordar y justificar criterio para seleccionar un proceso bloqueado a suspender. |
 | T36 | 🟨 | Solicitar suspensión por cola de disco y verificar ocupación de swap y liberación de RAM al completarse. |
-| T37 | ⬜ | Manejar falta de espacio en swap sin perder proceso ni memoria. |
+| T37 | 🟨 | `SwapInsuficienteTest` comprueba ausencia total de swap, espera y liberación posterior; faltan variantes de swap parcialmente ocupado y otras cargas. |
 | T38 | 🟨 | Solicitar reactivación cuando haya RAM y comprobar liberación de swap y retorno a listo. |
 
 ## Persistencia y configuración — #12
@@ -153,11 +154,11 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | ID | Estado | Acción y comprobación de terminado |
 |---|---|---|
 | T39 | 🟨 | Validar configuración y jerarquía del JSON del sistema de archivos antes de aplicarla. |
-| T40 | ⬜ | Restaurar bloques, cabezal, dueño y permisos; probar archivo de varios bloques. |
+| T40 | 🟨 | Rama de validación: `PersistenciaArchivoTest` comprueba restauración de cadena, cabezal, dueño y permisos; falta comprobar el flujo visual completo. |
 | T41 | 🟨 | Validar JSON de procesos, políticas y rutas, con mensajes de error comprensibles. |
 | T42 | 🟨 | Validar los datos de disco y procesos antes de iniciar; permitir creación manual y carga JSON. La duda sobre prescindir de ambos JSON está cerrada por confirmación del estudiante; faltan casos funcionales por verificar. |
 | T43 | 🟨 | Rama de validación: guardar desde Inicio y recargar probado sin pantalla, incluidos metadatos y cabezal en swap; falta comprobación visual del selector y de errores. |
-| T44 | ⬜ | Reiniciar con nuevos procesos conservando el disco guardado. |
+| T44 | 🟨 | `Module2FileSystemAndPersistenceTest` comprueba recarga de configuración de procesos y preservación del archivo creado en el disco a nivel de controlador; falta el recorrido completo desde Inicio. |
 
 ## Interfaz, métricas y cierre — #16, #17
 
@@ -172,13 +173,13 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T51 | 🟨 | Registrar decisiones del disco y del planificador a mediano plazo en el log. |
 | T52 | 🟨 | PR #48: contadores y gráficos implementados, con espera y cambio de política probados; comprobar interfaz y documentar convención de C-SCAN/C-LOOK. |
 | T53 | 🟨 | PR #48: gráfico e indicadores implementados; contadores por proceso comprobados en prueba integrada; validar gráficos visualmente y comparar escenarios equivalentes. |
-| T54 | ⬜ | Ejecutar un escenario integrado de CRUD mediante proceso de E/S. |
+| T54 | ✅ | `CrudCompletoIntegracionTest`: crear directorio y archivo, leer, renombrar y eliminar mediante seis E/S, con liberación de bloques y RAM; comprobación a nivel de controlador en rama de validación. |
 | T55 | 🟨 | Ejecutar un escenario integrado de suspensión y reactivación. |
-| T56 | ⬜ | Documentar clases, métodos, enums e interfaces principales en el informe. |
-| T57 | ⬜ | Actualizar el primer diagrama UML. |
-| T58 | ⬜ | Actualizar el segundo diagrama UML. |
-| T59 | ⬜ | Comparar políticas de disco con las métricas obtenidas y escribir conclusiones. |
-| T60 | ⬜ | Evaluar y documentar el efecto de la suspensión. |
+| T56 | 🟨 | Borrador de componentes y enums en `docs/borrador-informe-y-diagramas.md`; falta revisión e integración en el informe final. |
+| T57 | 🟨 | Diagrama UML de clases simplificado en el borrador; falta revisión del equipo y preparación para entrega. |
+| T58 | 🟨 | Diagrama UML de secuencia de lectura en el borrador; falta contrastar llamadas y revisión del equipo. |
+| T59 | 🟨 | Comparación reproducible de cuatro políticas y conclusiones acotadas en el borrador; falta revisión e incorporación al informe final. |
+| T60 | 🟨 | `EfectoSuspensionTest` compara un escenario con y sin swap y el borrador documenta su resultado; falta revisar conclusiones e incorporarlas al informe final. |
 | T61 | ⬜ | Preparar y practicar la defensa individual de cada integrante. |
 
 ## Gestión manual de disco y sesión — seguimiento posterior
