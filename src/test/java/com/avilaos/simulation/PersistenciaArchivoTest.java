@@ -1,6 +1,7 @@
 package com.avilaos.simulation;
 
 import com.avilaos.filesystem.FilePermission;
+import com.avilaos.io.FileSystemJsonSerializer;
 import java.nio.file.Files;
 
 /** Guarda y carga un archivo JSON real; no prueba la interfaz gráfica. */
@@ -29,7 +30,35 @@ public class PersistenciaArchivoTest {
             if (cadenaRestaurada.size() != bloques.length) throw new AssertionError("Tamaño de cadena");
             for (int i = 0; i < bloques.length; i++)
                 if (cadenaRestaurada.get(i) != bloques[i]) throw new AssertionError("Cadena distinta");
-            System.out.println("PASS: guardar y cargar JSON real con cadena, permisos, dueño y cabezal en datos");
+
+            int posicionSwap = c.getDisk().getTotalBlocks();
+            c.getDisk().setHeadPosition(posicionSwap);
+            c.saveFileSystemJson(archivo.toFile());
+            c.loadFileSystemJson(archivo.toFile());
+            if (c.getDisk().getHeadPosition() != posicionSwap
+                    || c.getFileSystemManager().findNode("/usuario/reporte") == null)
+                throw new AssertionError("No se restauró el cabezal en swap y el archivo");
+            String json = Files.readString(archivo);
+            try {
+                FileSystemJsonSerializer.loadFromString(json, 0);
+                throw new AssertionError("No debe aceptarse una posición fuera del disco físico");
+            } catch (IllegalArgumentException expected) {
+                if (!expected.getMessage().contains("currentHead")) throw expected;
+            }
+            String cadenaInvalida = "{\"diskConfig\":{\"totalBlocks\":20,\"initialHead\":0},"
+                    + "\"fileSystem\":[{\"path\":\"/archivo\",\"type\":\"FILE\",\"startBlock\":3,"
+                    + "\"blocks\":3,\"chain\":[3,4],\"owner\":\"ana\",\"permissions\":\"private\"}]}";
+            var discoAnterior = c.getDisk();
+            var arbolAnterior = c.getFileSystemManager();
+            try {
+                c.loadFileSystemJson(cadenaInvalida);
+                throw new AssertionError("Una cadena incompleta debe rechazarse");
+            } catch (IllegalArgumentException expected) {
+                if (!expected.getMessage().contains("chain")) throw expected;
+            }
+            if (c.getDisk() != discoAnterior || c.getFileSystemManager() != arbolAnterior)
+                throw new AssertionError("La carga inválida cambió el sistema anterior");
+            System.out.println("PASS: JSON real, metadatos y cabezal en datos y swap; rechaza swap insuficiente");
         } finally {
             Files.deleteIfExists(archivo);
             c.reset();

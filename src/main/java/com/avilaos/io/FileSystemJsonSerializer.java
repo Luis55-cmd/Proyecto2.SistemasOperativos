@@ -56,6 +56,7 @@ public final class FileSystemJsonSerializer {
         }
         int totalBlocks = -1;
         int initialHead = -1;
+        Integer currentHead = null;
         boolean hasDiskConfig = false;
         boolean hasFileSystem = false;
         MyLinkedList<EntrySpec> entries = new MyLinkedList<>();
@@ -73,6 +74,8 @@ public final class FileSystemJsonSerializer {
                             totalBlocks = reader.nextInt();
                         } else if ("initialHead".equals(k)) {
                             initialHead = reader.nextInt();
+                        } else if ("currentHead".equals(k)) {
+                            currentHead = reader.nextInt();
                         } else {
                             reader.skipValue();
                         }
@@ -105,7 +108,11 @@ public final class FileSystemJsonSerializer {
         }
 
         int effectiveSwap = Math.max(0, swapSizeBlocks);
-        SimulatedDisk disk = new SimulatedDisk(totalBlocks, effectiveSwap, initialHead);
+        int restoredHead = currentHead != null ? currentHead : initialHead;
+        if (restoredHead < 0 || (long) restoredHead >= (long) totalBlocks + effectiveSwap) {
+            throw new IllegalArgumentException("diskConfig.currentHead fuera del disco físico para el swap configurado.");
+        }
+        SimulatedDisk disk = new SimulatedDisk(totalBlocks, effectiveSwap, restoredHead);
         FileSystemManager fsManager = new FileSystemManager(disk);
 
         // Primero insertar directorios y archivos respetando el orden y validando bloques
@@ -120,7 +127,10 @@ public final class FileSystemJsonSerializer {
                 if (e.startBlock() < 0 || e.startBlock() >= totalBlocks) {
                     throw new IllegalArgumentException("startBlock fuera de rango en '" + e.path() + "': " + e.startBlock());
                 }
-                if (e.explicitChain() != null && e.explicitChain().size() == e.blocks()) {
+                if (e.explicitChain() != null && e.explicitChain().size() != e.blocks()) {
+                    throw new IllegalArgumentException("La longitud de 'chain' no coincide con blocks en " + e.path());
+                }
+                if (e.explicitChain() != null) {
                     allocateExplicitChain(disk, fsManager, e);
                 } else {
                     fsManager.createFileAtStartBlock(
@@ -129,7 +139,7 @@ public final class FileSystemJsonSerializer {
             }
         }
 
-        return new LoadedFileSystem(totalBlocks, initialHead, disk, fsManager);
+        return new LoadedFileSystem(totalBlocks, restoredHead, disk, fsManager);
     }
 
     public static LoadedFileSystem loadFromFile(File file, int swapSizeBlocks) throws IOException {
@@ -161,7 +171,11 @@ public final class FileSystemJsonSerializer {
 
             writer.name("diskConfig").beginObject();
             writer.name("totalBlocks").value(disk.getTotalBlocks());
-            writer.name("initialHead").value(disk.getHeadPosition());
+            int head = disk.getHeadPosition();
+            // initialHead conserva el formato oficial, limitado al área de datos.
+            // currentHead permite recuperar una posición física situada en swap.
+            writer.name("initialHead").value(Math.min(head, disk.getTotalBlocks() - 1));
+            if (head >= disk.getTotalBlocks()) writer.name("currentHead").value(head);
             writer.endObject();
 
             writer.name("fileSystem").beginArray();

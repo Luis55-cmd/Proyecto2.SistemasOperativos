@@ -1,10 +1,21 @@
 # Backlog operativo — Proyecto 2 ÁvilaOS
 
+## Trabajo adicional en rama de validación — 23 de noviembre de 2026
+
+La rama `revision/validacion-develop` incorpora cambios que aún no están en `develop`:
+
+- El botón Guardar JSON del sistema de archivos en Inicio permite elegir destino, confirma el reemplazo y rechaza el guardado mientras haya una solicitud de disco activa o en cola. Una prueba sin pantalla invoca la misma operación posterior al selector, guarda un archivo real y lo vuelve a cargar; falta probar el selector y los mensajes visualmente. El guardado de procesos continúa deshabilitado. Este JSON guarda el sistema de archivos, no es un checkpoint completo de procesos y swap.
+- Si el cabezal está en swap, el JSON conserva un `initialHead` compatible con el área de datos y agrega `currentHead` con la posición física. La carga la recupera cuando el swap configurado abarca esa posición y la rechaza si no alcanza. Los archivos existentes sin `currentHead` conservan su interpretación anterior. Si se necesita otro tamaño de swap, debe configurarse antes de cargar; el JSON de archivos no guarda ese tamaño.
+- Las cadenas explícitas con longitud distinta de `blocks` se rechazan sin reemplazar el estado actual. Una configuración de procesos cuya memoria individual supera la RAM se rechaza antes de modificar la sesión. También se impide reemplazar procesos con solicitudes de disco pendientes o swap ocupado, y cambiar el tamaño de swap si el cabezal quedaría fuera del disco.
+- La vista Disco permite ajustar la velocidad de 1 a 500 bloques por ciclo; el controlador exige ADMIN y aplica el cambio en el siguiente ciclo. Hay pruebas de límites, permisos, desplazamiento y conexión de interfaz sin pantalla; falta revisión visual.
+
+**Modo entrega:** la IA diseñó e implementó el guardado, la extensión JSON, las validaciones, el ajuste de velocidad y las pruebas. Para defensa: reconstruir la ruta botón–controlador–serializador, explicar la diferencia entre `initialHead` y `currentHead`, el límite del swap configurado y el efecto de la velocidad por ciclo; después de entregar, modificar y depurar estos recorridos sin ayuda.
+
 ## Validación de develop — 23 de noviembre de 2026
 
 **Seguimiento posterior en la rama:** se actualizaron `CreacionComputadoresGuiTest` y `MonitorSimulacionTest` para la interfaz actual y ahora pasan sin pantalla; `EventosLogTest` sigue fallando al cargar su escenario heredado de buffers/red. Tras recompilar, pasaron 44 programas sin argumentos, incluidas las pruebas agregadas; `CargaDuplicadosTest` pasó por separado con su archivo y `EventosLogTest` quedó pendiente. `PersistenciaArchivoTest` guarda y vuelve a cargar un archivo JSON real, comprobando cadena, dueño, permiso y cabezal en el área de datos. El botón Guardar de Inicio continúa deshabilitado.
 
-**Defecto de persistencia reproducido:** con disco de 200 bloques de datos y swap configurado, colocar el cabezal en el bloque físico 200, guardar con `saveFileSystemJson` y cargar el archivo falla con `diskConfig.initialHead fuera de rango [0, 199]`. El escritor guarda la posición física actual, pero el lector solo acepta el área de datos. No está corregido; debe resolverse la representación y el orden de carga de la configuración de swap sin perder información ni aceptar un cabezal fuera del disco físico. No confundir este guardado del sistema de archivos con un checkpoint completo de procesos suspendidos.
+**Defecto de persistencia reproducido en la base:** con disco de 200 bloques de datos y swap configurado, colocar el cabezal en el bloque físico 200, guardar con `saveFileSystemJson` y cargar el archivo fallaba con `diskConfig.initialHead fuera de rango [0, 199]`. Corregido en la rama de validación mediante `currentHead`, con el límite y pruebas indicados arriba. No confundir este guardado del sistema de archivos con un checkpoint completo de procesos suspendidos.
 
 **Comparación reproducible de políticas:** `ComparacionPoliticasTest` usa el anexo con cabezal inicial 50, velocidad 30, siete solicitudes simultáneas y bloques 82, 17, 43, 140, 24, 16 y 190. Resultados (desplazamiento en bloques; espera media en ciclos): FIFO 518 y 11,429; SSTF 208 y 7,714; SCAN 332 y 11,286; C-SCAN 192 y 9,143. Son resultados de esta carga, no una clasificación universal. El modelo no contabiliza el salto de retorno de C-SCAN; compararlo con movimientos físicos exige aclarar esa convención.
 
@@ -141,7 +152,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T40 | ⬜ | Restaurar bloques, cabezal, dueño y permisos; probar archivo de varios bloques. |
 | T41 | 🟨 | Validar JSON de procesos, políticas y rutas, con mensajes de error comprensibles. |
 | T42 | 🟨 | Validar los datos de disco y procesos antes de iniciar; permitir creación manual y carga JSON. La duda sobre prescindir de ambos JSON está cerrada por confirmación del estudiante; faltan casos funcionales por verificar. |
-| T43 | ⬜ | Guardar el estado modificado del sistema de archivos y volver a cargarlo. |
+| T43 | 🟨 | Rama de validación: guardar desde Inicio y recargar probado sin pantalla, incluidos metadatos y cabezal en swap; falta comprobación visual del selector y de errores. |
 | T44 | ⬜ | Reiniciar con nuevos procesos conservando el disco guardado. |
 
 ## Interfaz, métricas y cierre — #16, #17
@@ -173,7 +184,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Nin
 | T62 | ⬜ | Diseñar e implementar estado inicial sin disco configurado, creación manual o carga JSON y presentación de la vista vacía; impedir arranque sin disco válido. |
 | T63 | ⬜ | Configurar capacidad, swap, velocidad, política y cabezal inicial 0 por defecto; mantener opción para elegir posición inicial y respetar la posición del JSON. |
 | T64 | ⬜ | Definir y probar cambio de tamaño y swap, incluida preservación o pérdida explícita de datos y el caso de procesos suspendidos. |
-| T65 | ⬜ | Permitir ajustar velocidad del cabezal; validar rango, permisos, efecto durante ejecución y registro en log. |
+| T65 | 🟨 | Rama de validación: ajuste de velocidad, rango, permisos, efecto por ciclo y log implementados; pruebas automáticas del controlador y conexión de interfaz aprobadas, falta comprobación visual. |
 | T66 | ⬜ | Diseñar e implementar eliminación del disco con confirmación de pérdida, incluso con procesos en swap; determinar y probar el destino de esos procesos, E/S activa y pendientes, sin dejar referencias huérfanas. |
 | T67 | ⬜ | Diseñar control de sesión ADMIN/USER y nombre en Simulación, con ADMIN/admin inicial y reglas de acceso comprobadas en interfaz y backend. Persistencia de sesión entre ejecuciones pendiente de decidir. |
 

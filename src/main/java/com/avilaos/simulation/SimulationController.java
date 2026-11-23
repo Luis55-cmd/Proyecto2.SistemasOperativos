@@ -912,6 +912,16 @@ public class SimulationController implements IClockTickable {
             com.avilaos.io.ProcessConfigJsonSerializer.LoadedProcessConfig cfg =
                     com.avilaos.io.ProcessConfigJsonSerializer.loadFromString(json);
 
+            int newSwapSize = cfg.globalConfig().swapSizeBlocks();
+            if (this.disk != null && (this.disk.getFreeSwapBlocks() != this.disk.getSwapSizeBlocks()
+                    || this.disk.getActiveRequest() != null || this.disk.getQueueSize() != 0)) {
+                throw new IllegalStateException("No se puede reemplazar procesos con swap ocupado o solicitudes de disco pendientes.");
+            }
+            if (this.disk != null && this.disk.getSwapSizeBlocks() != newSwapSize) {
+                if ((long) this.disk.getHeadPosition() >= (long) this.disk.getTotalBlocks() + newSwapSize) {
+                    throw new IllegalStateException("La posición del cabezal queda fuera del disco con el nuevo tamaño de swap.");
+                }
+            }
             this.clock.stop();
             this.clock.setCycleCounter(0);
             this.clock.setCycleDurationMs(cfg.globalConfig().cycleDurationMs());
@@ -1040,6 +1050,22 @@ public class SimulationController implements IClockTickable {
     
     public void reconfigurarDisco(int totalBlocks, int swapSizeBlocks) {
         throw new IllegalStateException("Cambio de capacidad deshabilitado hasta proteger archivos, E/S y swap.");
+    }
+
+    /** La nueva velocidad se usa a partir del siguiente ciclo del disco. */
+    public void setDiskHeadSpeed(int speed) {
+        StateAccess.enter();
+        try {
+            if (currentMode != UserMode.ADMIN) {
+                throw new IllegalStateException("Solo el administrador puede cambiar la velocidad del cabezal.");
+            }
+            if (speed < 1 || speed > 500) {
+                throw new IllegalArgumentException("La velocidad debe estar entre 1 y 500 bloques por ciclo.");
+            }
+            disk.setHeadSpeedPerTick(speed);
+            logEvent("Velocidad del cabezal cambiada a " + speed + " bloques por ciclo.");
+            notifyGUI();
+        } finally { StateAccess.exit(); }
     }
     
     public UserMode getMode() {
