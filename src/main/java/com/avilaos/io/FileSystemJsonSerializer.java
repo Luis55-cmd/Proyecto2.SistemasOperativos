@@ -12,11 +12,14 @@ import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * Lector y escritor del JSON de Estado del Sistema de Archivos (Issue #11).
@@ -213,8 +216,17 @@ public final class FileSystemJsonSerializer {
 
     public static void saveToFile(File file, SimulatedDisk disk, FileSystemManager fsManager) throws IOException {
         String json = toJsonString(disk, fsManager);
-        try (FileWriter fw = new FileWriter(file, StandardCharsets.UTF_8)) {
-            fw.write(json);
+        Path destination = file.toPath().toAbsolutePath();
+        Path temporary = Files.createTempFile(destination.getParent(), ".avilaos-", ".json.tmp");
+        try {
+            Files.writeString(temporary, json, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 

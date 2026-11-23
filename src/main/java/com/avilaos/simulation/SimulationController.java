@@ -851,6 +851,17 @@ public class SimulationController implements IClockTickable {
         this.dualJsonGateActive = active;
     }
 
+    /** Evita abandonar solicitudes o procesos suspendidos al reemplazar componentes. */
+    private void requireDiskQuiescentForLoad() {
+        if (clock.isRunning()) {
+            throw new IllegalStateException("Detén la simulación antes de cargar una configuración.");
+        }
+        if (disk != null && (disk.getFreeSwapBlocks() != disk.getSwapSizeBlocks()
+                || disk.getActiveRequest() != null || disk.getQueueSize() != 0)) {
+            throw new IllegalStateException("No se puede cargar con swap ocupado o solicitudes de disco pendientes.");
+        }
+    }
+
     /**
      * Carga y valida el JSON #1 (Estado del Sistema de Archivos: diskConfig + fileSystem).
      */
@@ -859,6 +870,7 @@ public class SimulationController implements IClockTickable {
         try {
             com.avilaos.io.FileSystemJsonSerializer.LoadedFileSystem loaded =
                     com.avilaos.io.FileSystemJsonSerializer.loadFromString(json, configuredSwapSizeBlocks);
+            requireDiskQuiescentForLoad();
             com.avilaos.disk.DiskSchedulingPolicy currentPolicy = this.disk != null ? this.disk.getSchedulingPolicy() : null;
             this.disk = loaded.disk();
             if (currentPolicy != null) {
@@ -883,6 +895,7 @@ public class SimulationController implements IClockTickable {
         try {
             com.avilaos.io.FileSystemJsonSerializer.LoadedFileSystem loaded =
                     com.avilaos.io.FileSystemJsonSerializer.loadFromFile(file, configuredSwapSizeBlocks);
+            requireDiskQuiescentForLoad();
             com.avilaos.disk.DiskSchedulingPolicy currentPolicy = this.disk != null ? this.disk.getSchedulingPolicy() : null;
             this.disk = loaded.disk();
             if (currentPolicy != null) {
@@ -913,10 +926,7 @@ public class SimulationController implements IClockTickable {
                     com.avilaos.io.ProcessConfigJsonSerializer.loadFromString(json);
 
             int newSwapSize = cfg.globalConfig().swapSizeBlocks();
-            if (this.disk != null && (this.disk.getFreeSwapBlocks() != this.disk.getSwapSizeBlocks()
-                    || this.disk.getActiveRequest() != null || this.disk.getQueueSize() != 0)) {
-                throw new IllegalStateException("No se puede reemplazar procesos con swap ocupado o solicitudes de disco pendientes.");
-            }
+            requireDiskQuiescentForLoad();
             if (this.disk != null && this.disk.getSwapSizeBlocks() != newSwapSize) {
                 if ((long) this.disk.getHeadPosition() >= (long) this.disk.getTotalBlocks() + newSwapSize) {
                     throw new IllegalStateException("La posición del cabezal queda fuera del disco con el nuevo tamaño de swap.");

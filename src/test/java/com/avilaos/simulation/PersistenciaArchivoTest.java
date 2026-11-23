@@ -19,6 +19,7 @@ public class PersistenciaArchivoTest {
             int[] bloques = new int[cadena.size()];
             for (int i = 0; i < bloques.length; i++) bloques[i] = cadena.get(i);
             c.getDisk().setHeadPosition(42);
+            Files.writeString(archivo, "contenido anterior");
             c.saveFileSystemJson(archivo.toFile());
             c.loadFileSystemJson(archivo.toFile());
             var restaurado = c.getFileSystemManager().findNode("/usuario/reporte");
@@ -58,6 +59,24 @@ public class PersistenciaArchivoTest {
             }
             if (c.getDisk() != discoAnterior || c.getFileSystemManager() != arbolAnterior)
                 throw new AssertionError("La carga inválida cambió el sistema anterior");
+
+            var carpeta = Files.createTempDirectory("avila-destino-");
+            var destino = Files.createDirectory(carpeta.resolve("destino"));
+            var marca = Files.writeString(destino.resolve("conservar.txt"), "original");
+            try {
+                try {
+                    c.saveFileSystemJson(destino.toFile());
+                    throw new AssertionError("Guardar sobre un directorio no vacío debe fallar");
+                } catch (java.io.IOException esperado) { }
+                if (!"original".equals(Files.readString(marca))) throw new AssertionError("Se alteró el destino");
+                try (var contenido = Files.list(carpeta)) {
+                    if (contenido.count() != 1) throw new AssertionError("Quedó un archivo temporal");
+                }
+            } finally {
+                Files.deleteIfExists(marca);
+                Files.deleteIfExists(destino);
+                Files.deleteIfExists(carpeta);
+            }
             System.out.println("PASS: JSON real, metadatos y cabezal en datos y swap; rechaza swap insuficiente");
         } finally {
             Files.deleteIfExists(archivo);
