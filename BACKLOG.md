@@ -2,7 +2,7 @@
 
 ## Actualización de métricas — 23 de noviembre de 2026
 
-Ricardo abrió el [PR #48](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/48) hacia `develop` (cabecera revisada `31119309`); está abierto y aún no integrado. El #47, dirigido a `main`, fue cerrado. `develop` remoto está en `1c972d7` e incluye el PR #46. El checkout local permanece en `trabajo/flujo-creacion-procesos`, `6f70474`; esta actualización del backlog es local.
+El [PR #48](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/48) de Ricardo fue fusionado en `develop` el 23 de noviembre (commit de fusión `0516809`, cabecera probada `2c58a28`). El #47, dirigido a `main`, fue cerrado. `develop` también incluye el PR #46. El checkout local original permanece en `trabajo/flujo-creacion-procesos`, `6f70474` y no contiene la implementación del #48.
 
 El PR #48 agrega métricas por política de solicitudes atendidas, desplazamiento y espera media, histórico en snapshots, tablas y gráficos de disco y de suspensiones/reactivaciones. En una copia aislada de su código se compilaron todas las fuentes principales y de prueba con `javac --release 21`, usando JDK 26 y dependencias locales; `DiskPerformanceMetricsTest` pasó. No se ejecutó con un runtime Java 21 ni se verificó visualmente. GitHub no reporta estados de commit ni ejecuciones de workflow para la cabecera revisada.
 
