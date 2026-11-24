@@ -13,7 +13,7 @@
     {
       "path": "/pruebas/bloque-000.bin",
       "type": "FILE",
-      "startBlock": 0,
+      "startBlock": 2,
       "blocks": 1,
       "owner": "admin",
       "permissions": "public"

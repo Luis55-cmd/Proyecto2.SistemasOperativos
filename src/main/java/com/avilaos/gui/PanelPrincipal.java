@@ -85,6 +85,8 @@ public class PanelPrincipal extends JPanel {
     private String[] detallesBloques = new String[0];
     private int cabezalMapa = 0;
     private int limiteDatosMapa = 0;
+    private JDialog ventanaMapaAmpliado;
+    private Runnable refrescarMapaAmpliado;
     private final JPanel mapaDisco = new JPanel() {
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -253,7 +255,9 @@ public class PanelPrincipal extends JPanel {
         controller.addGUIListener(() -> {
             metricas.actualizarMetricas();
             actualizarListaComputadores();
-            if (destinoActual == Destino.DISCO) actualizarVistaDisco();
+            if (destinoActual == Destino.DISCO || (ventanaMapaAmpliado != null && ventanaMapaAmpliado.isVisible())) {
+                actualizarVistaDisco();
+            }
             if (destinoActual == Destino.ARCHIVOS) actualizarVistaArchivos();
 // [P2-LEGACY]             actualizarListaBuffers();
 // [P2-LEGACY]             actualizarOpcionesComputadoresBuffer();
@@ -972,6 +976,17 @@ public class PanelPrincipal extends JPanel {
         mapa.add(texto("Verde claro: rango mixto", 12, GRIS, false));
         mapa.add(texto("Rayado: área de swap", 12, GRIS, false));
         mapa.add(texto("Haz clic en una sección para inspeccionarla.", 12, GRIS, false));
+        mapa.add(Box.createVerticalStrut(6));
+        JButton btnAmpliarMapa = accion("Ampliar mapa ⤢", true);
+        btnAmpliarMapa.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+        btnAmpliarMapa.setBorder(new EmptyBorder(4, 10, 4, 10));
+        btnAmpliarMapa.setFocusPainted(false);
+        btnAmpliarMapa.setAlignmentX(LEFT_ALIGNMENT);
+        btnAmpliarMapa.setPreferredSize(new Dimension(128, 25));
+        btnAmpliarMapa.setMaximumSize(new Dimension(128, 25));
+        btnAmpliarMapa.setToolTipText("Abrir el mapa vertical del disco en una ventana grande interactiva");
+        btnAmpliarMapa.addActionListener(e -> abrirVentanaMapaAmpliado());
+        mapa.add(btnAmpliarMapa);
         mapa.add(Box.createVerticalStrut(8));
         mapaDisco.setBackground(PAPEL);
         mapaDisco.setAlignmentX(LEFT_ALIGNMENT);
@@ -1122,6 +1137,9 @@ boton.setForeground(seleccionada ? Color.WHITE : TINTA);
 }
 
 mapaDisco.repaint();
+if (refrescarMapaAmpliado != null && ventanaMapaAmpliado != null && ventanaMapaAmpliado.isVisible()) {
+    refrescarMapaAmpliado.run();
+}
 
 }, error -> {
 
@@ -1133,7 +1151,320 @@ discoOrigen.setText("No se pudo consultar el disco: " + error.getMessage());
 
 }
 
+    private void abrirVentanaMapaAmpliado() {
+        if (ventanaMapaAmpliado != null) {
+            ventanaMapaAmpliado.setVisible(true);
+            ventanaMapaAmpliado.toFront();
+            if (refrescarMapaAmpliado != null) refrescarMapaAmpliado.run();
+            return;
+        }
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        ventanaMapaAmpliado = new JDialog(owner, "Mapa del Disco Ampliado · ÁvilaOS", Dialog.ModalityType.MODELESS);
+        ventanaMapaAmpliado.setSize(980, 720);
+        ventanaMapaAmpliado.setMinimumSize(new Dimension(780, 520));
+        ventanaMapaAmpliado.setLocationRelativeTo(this);
 
+        JPanel root = new JPanel(new BorderLayout(16, 14));
+        root.setBackground(FONDO);
+        root.setBorder(new EmptyBorder(18, 22, 18, 22));
+
+        // --- Cabecera con estado en vivo y controles de zoom / cabezal ---
+        JPanel cabecera = tarjeta();
+        cabecera.setLayout(new BorderLayout(12, 8));
+        JPanel infoSuperior = new JPanel();
+        infoSuperior.setOpaque(false);
+        infoSuperior.setLayout(new BoxLayout(infoSuperior, BoxLayout.Y_AXIS));
+        JLabel lblTitulo = texto("MAPA VERTICAL AMPLIADO DEL DISCO", 12, ACENTO, true);
+        JLabel lblResumenCabezal = texto("Cabezal: bloque " + cabezalMapa, 16, TINTA, true);
+        JLabel lblResumenOcupacion = texto(discoOcupacion.getText(), 13, GRIS, false);
+        infoSuperior.add(lblTitulo);
+        infoSuperior.add(Box.createVerticalStrut(4));
+        infoSuperior.add(lblResumenCabezal);
+        infoSuperior.add(Box.createVerticalStrut(2));
+        infoSuperior.add(lblResumenOcupacion);
+
+        JPanel controlesZoom = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        controlesZoom.setOpaque(false);
+        controlesZoom.add(texto("Agrupación:", 12, GRIS, false));
+        JComboBox<String> comboAgrupacion = new JComboBox<>(new String[]{
+            "Automática (~80 franjas grandes)",
+            "4 bloques por franja",
+            "2 bloques por franja",
+            "1 bloque por franja (Detalle 1:1)"
+        });
+        JButton btnIrCabezal = accion("Centrar en Cabezal", false);
+        controlesZoom.add(comboAgrupacion);
+        controlesZoom.add(btnIrCabezal);
+
+        cabecera.add(infoSuperior, BorderLayout.WEST);
+        cabecera.add(controlesZoom, BorderLayout.EAST);
+        root.add(cabecera, BorderLayout.NORTH);
+
+        // --- Panel derecho de inspección fija de la franja seleccionada ---
+        JPanel panelInspeccion = tarjeta();
+        panelInspeccion.setLayout(new BorderLayout(0, 10));
+        panelInspeccion.setPreferredSize(new Dimension(380, 0));
+        JPanel encInspeccion = new JPanel();
+        encInspeccion.setOpaque(false);
+        encInspeccion.setLayout(new BoxLayout(encInspeccion, BoxLayout.Y_AXIS));
+        encInspeccion.add(texto("INSPECCIÓN DE FRANJA", 11, ACENTO, true));
+        encInspeccion.add(Box.createVerticalStrut(4));
+        JLabel lblRangoSeleccionado = texto("Haz clic en cualquier franja", 17, TINTA, true);
+        JLabel lblConteoRango = texto("Selecciona una barra a la izquierda para ver cada bloque.", 12, GRIS, false);
+        encInspeccion.add(lblRangoSeleccionado);
+        encInspeccion.add(Box.createVerticalStrut(2));
+        encInspeccion.add(lblConteoRango);
+        panelInspeccion.add(encInspeccion, BorderLayout.NORTH);
+
+        DefaultTableModel modeloDetalleFranja = new DefaultTableModel(
+                new String[]{"Bloque", "Zona", "Detalle / Propietario / Cadena"}, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+        JTable tablaDetalleFranja = new JTable(modeloDetalleFranja);
+        tablaDetalleFranja.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        tablaDetalleFranja.setFillsViewportHeight(true);
+        tablaDetalleFranja.setRowHeight(26);
+        tablaDetalleFranja.setBackground(PAPEL);
+        tablaDetalleFranja.setForeground(TINTA);
+        tablaDetalleFranja.getColumnModel().getColumn(0).setPreferredWidth(58);
+        tablaDetalleFranja.getColumnModel().getColumn(1).setPreferredWidth(62);
+        tablaDetalleFranja.getColumnModel().getColumn(2).setPreferredWidth(420);
+        JScrollPane scrollTablaDetalle = new JScrollPane(
+                tablaDetalleFranja,
+                ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollTablaDetalle.setBorder(BorderFactory.createLineBorder(BORDE));
+        panelInspeccion.add(scrollTablaDetalle, BorderLayout.CENTER);
+
+        // --- Lienzo vertical ampliado con franjas grandes ---
+        final int ALTO_FRANJA = 24;
+        final int[] franjaHover = {-1};
+        final int[] franjaSeleccionada = {0};
+
+        class LienzoMapaGrande extends JPanel {
+            int calcularFilas() {
+                int total = bloquesOcupados.length;
+                if (total == 0) return 1;
+                int modo = comboAgrupacion.getSelectedIndex();
+                return switch (modo) {
+                    case 1 -> Math.max(1, (total + 3) / 4);
+                    case 2 -> Math.max(1, (total + 1) / 2);
+                    case 3 -> total;
+                    default -> Math.min(total, 80);
+                };
+            }
+
+            void actualizarTablaInspeccion() {
+                int total = bloquesOcupados.length;
+                if (total == 0) return;
+                int filas = calcularFilas();
+                int fila = Math.max(0, Math.min(filas - 1, franjaSeleccionada[0]));
+                int inicio = (int) ((long) fila * total / filas);
+                int fin = Math.max(inicio + 1, (int) ((long) (fila + 1) * total / filas));
+                int ocupados = 0;
+                int reservados = 0;
+                for (int i = inicio; i < fin; i++) {
+                    if (bloquesOcupados[i]) ocupados++;
+                    if (bloquesReservados[i]) reservados++;
+                }
+                lblRangoSeleccionado.setText(inicio == fin - 1
+                        ? "Bloque " + inicio
+                        : "Bloques " + inicio + " – " + (fin - 1));
+                lblConteoRango.setText((fin - inicio - ocupados) + " libres · "
+                        + (ocupados - reservados) + " ocupados · " + reservados + " reservados");
+                modeloDetalleFranja.setRowCount(0);
+                FontMetrics fm = tablaDetalleFranja.getFontMetrics(tablaDetalleFranja.getFont());
+                int maxAnchoDetalle = 360;
+                for (int i = inicio; i < fin && i < detallesBloques.length; i++) {
+                    String zona = i >= limiteDatosMapa ? "Swap" : "Datos";
+                    String det = detallesBloques[i];
+                    int sep = det.indexOf(" · ");
+                    String resumenBloque = sep >= 0 ? det.substring(sep + 3) : det;
+                    if (fm != null) {
+                        maxAnchoDetalle = Math.max(maxAnchoDetalle, fm.stringWidth(resumenBloque) + 28);
+                    }
+                    modeloDetalleFranja.addRow(new Object[]{i, zona, resumenBloque});
+                }
+                tablaDetalleFranja.getColumnModel().getColumn(2).setPreferredWidth(maxAnchoDetalle);
+            }
+
+            @Override
+            public Dimension getPreferredSize() {
+                int filas = calcularFilas();
+                return new Dimension(500, Math.max(400, 24 + filas * ALTO_FRANJA));
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int total = bloquesOcupados.length;
+                if (total == 0) return;
+
+                int filas = calcularFilas();
+                int x = 86;
+                int ancho = Math.max(220, getWidth() - 250);
+
+                for (int i = 0; i < filas; i++) {
+                    int inicio = (int) ((long) i * total / filas);
+                    int fin = Math.max(inicio + 1, (int) ((long) (i + 1) * total / filas));
+                    int ocupados = 0;
+                    int reservados = 0;
+                    for (int j = inicio; j < fin; j++) {
+                        if (bloquesOcupados[j]) ocupados++;
+                        if (bloquesReservados[j]) reservados++;
+                    }
+                    int y = 12 + i * ALTO_FRANJA;
+                    int h = ALTO_FRANJA - 2;
+
+                    // Color base de la franja
+                    Color relleno = reservados > 0
+                            ? new Color(216, 178, 100)
+                            : ocupados == 0
+                                    ? Color.WHITE
+                                    : ocupados == (fin - inicio)
+                                            ? new Color(38, 90, 83)
+                                            : new Color(155, 190, 172);
+                    g2.setColor(relleno);
+                    g2.fillRect(x, y, ancho, h);
+
+                    // Sombreado diagonal si pertenece al área de Swap
+                    if (fin > limiteDatosMapa) {
+                        Graphics sombreado = g2.create(x, y, ancho, h);
+                        sombreado.setColor(new Color(156, 142, 107, 150));
+                        for (int linea = -h; linea < ancho + h; linea += 8) {
+                            sombreado.drawLine(linea, h, linea + h, 0);
+                        }
+                        sombreado.dispose();
+                    }
+
+                    // Etiqueta del rango a la izquierda de cada franja
+                    g2.setColor(TINTA);
+                    g2.setFont(new Font(Font.MONOSPACED, Font.BOLD, 11));
+                    String etqRango = inicio == fin - 1
+                            ? String.format("[%03d]", inicio)
+                            : String.format("%03d–%03d", inicio, fin - 1);
+                    g2.drawString(etqRango, 12, y + 15);
+
+                    // Texto de resumen dentro de la barra
+                    String resumenInterno;
+                    if (inicio >= limiteDatosMapa) {
+                        resumenInterno = ocupados == 0 ? "SWAP libre" : "SWAP (" + ocupados + "/" + (fin - inicio) + " ocup.)";
+                    } else if (ocupados == 0) {
+                        resumenInterno = "Libre";
+                    } else if (fin - inicio == 1 && inicio < detallesBloques.length) {
+                        resumenInterno = detallesBloques[inicio];
+                    } else {
+                        resumenInterno = ocupados + "/" + (fin - inicio) + " bloques ocupados";
+                    }
+                    g2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+                    g2.setColor(ocupados == (fin - inicio) && reservados == 0 ? Color.WHITE : TINTA);
+                    g2.drawString(resumenInterno, x + 10, y + 15);
+
+                    // Borde normal, hover o seleccionada
+                    boolean tieneCabezal = (cabezalMapa >= inicio && cabezalMapa < fin);
+                    if (tieneCabezal) {
+                        g2.setColor(new Color(195, 38, 34));
+                        g2.setStroke(new BasicStroke(2.6f));
+                        g2.drawRect(x - 2, y - 1, ancho + 4, h + 2);
+                        g2.setStroke(new BasicStroke(1f));
+                        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+                        g2.drawString("◄ CABEZAL (" + cabezalMapa + ")", x + ancho + 10, y + 16);
+                    } else if (i == franjaSeleccionada[0]) {
+                        g2.setColor(ACENTO);
+                        g2.setStroke(new BasicStroke(2.2f));
+                        g2.drawRect(x - 1, y, ancho + 2, h);
+                        g2.setStroke(new BasicStroke(1f));
+                    } else if (i == franjaHover[0]) {
+                        g2.setColor(new Color(100, 130, 85));
+                        g2.setStroke(new BasicStroke(1.6f));
+                        g2.drawRect(x, y, ancho, h);
+                        g2.setStroke(new BasicStroke(1f));
+                    } else {
+                        g2.setColor(BORDE);
+                        g2.drawRect(x, y, ancho, h);
+                    }
+                }
+            }
+        }
+
+        LienzoMapaGrande lienzo = new LienzoMapaGrande();
+        lienzo.setBackground(PAPEL);
+        JScrollPane scrollLienzo = new JScrollPane(lienzo);
+        scrollLienzo.setBorder(BorderFactory.createLineBorder(BORDE));
+        scrollLienzo.getVerticalScrollBar().setUnitIncrement(ALTO_FRANJA * 2);
+
+        java.awt.event.MouseAdapter raton = new java.awt.event.MouseAdapter() {
+            private int filaEnY(int y) {
+                int filas = lienzo.calcularFilas();
+                int idx = (y - 12) / ALTO_FRANJA;
+                if (idx < 0 || idx >= filas) return -1;
+                return idx;
+            }
+            @Override public void mouseMoved(java.awt.event.MouseEvent e) {
+                int f = filaEnY(e.getY());
+                if (f != franjaHover[0]) {
+                    franjaHover[0] = f;
+                    lienzo.repaint();
+                }
+            }
+            @Override public void mouseExited(java.awt.event.MouseEvent e) {
+                franjaHover[0] = -1;
+                lienzo.repaint();
+            }
+            @Override public void mousePressed(java.awt.event.MouseEvent e) {
+                int f = filaEnY(e.getY());
+                if (f >= 0) {
+                    franjaSeleccionada[0] = f;
+                    lienzo.actualizarTablaInspeccion();
+                    lienzo.repaint();
+                }
+            }
+        };
+        lienzo.addMouseListener(raton);
+        lienzo.addMouseMotionListener(raton);
+
+        Runnable centrarCabezal = () -> {
+            int total = Math.max(1, bloquesOcupados.length);
+            int filas = lienzo.calcularFilas();
+            int filaCabezal = Math.min(filas - 1, Math.max(0, (int) ((long) cabezalMapa * filas / total)));
+            franjaSeleccionada[0] = filaCabezal;
+            lienzo.actualizarTablaInspeccion();
+            int yObjetivo = Math.max(0, 12 + filaCabezal * ALTO_FRANJA - scrollLienzo.getViewport().getHeight() / 2);
+            scrollLienzo.getVerticalScrollBar().setValue(yObjetivo);
+            lienzo.repaint();
+        };
+
+        comboAgrupacion.addActionListener(e -> {
+            lienzo.revalidate();
+            centrarCabezal.run();
+        });
+        btnIrCabezal.addActionListener(e -> centrarCabezal.run());
+
+        refrescarMapaAmpliado = () -> {
+            lblResumenCabezal.setText(discoCabezal.getText().trim().isEmpty()
+                    ? "Cabezal: bloque " + cabezalMapa
+                    : discoCabezal.getText());
+            lblResumenOcupacion.setText(discoOcupacion.getText() + "   |   " + discoCapacidad.getText());
+            lienzo.revalidate();
+            lienzo.actualizarTablaInspeccion();
+            lienzo.repaint();
+        };
+
+        JSplitPane divisor = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, scrollLienzo, panelInspeccion);
+        divisor.setOpaque(false);
+        divisor.setBorder(null);
+        divisor.setContinuousLayout(true);
+        divisor.setOneTouchExpandable(true);
+        divisor.setDividerSize(8);
+        divisor.setResizeWeight(0.54);
+        root.add(divisor, BorderLayout.CENTER);
+
+        ventanaMapaAmpliado.setContentPane(root);
+        ventanaMapaAmpliado.setVisible(true);
+        SwingUtilities.invokeLater(centrarCabezal);
+    }
 
 private void cambiarPoliticaDisco(com.avilaos.disk.DiskSchedulingPolicyType politica) {
 
