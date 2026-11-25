@@ -28,6 +28,10 @@ public final class VistaSimulacionAlternativa extends JPanel {
     private final JTabbedPane vistas = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
     private final JButton botonModoUsuario = accion("Sesión: ADMIN · admin", false);
     private final JPanel resumenEquipos = new JPanel();
+    private final DefaultTableModel modeloColaDiscoResumen = tabla("Estado", "ID Solicitud", "Proceso", "Operación", "Ruta / Destino", "Bloque destino", "Bloques", "Ciclo llegada");
+    private final JTable tablaColaDiscoResumen = new JTable(modeloColaDiscoResumen);
+    private final JScrollPane scrollColaDiscoResumen = new JScrollPane(tablaColaDiscoResumen);
+    private final JLabel lblEstadoDiscoResumen = texto("Cabezal: bloque 0 · Política: FIFO", 13, GRIS, false);
 // [P2-LEGACY]     private final DefaultTableModel modeloBuffers = tabla("Buffer", "Computador", "Elementos", "Capacidad", "Latencia", "Mutex", "Llenos", "Vacíos");
 // [P2-LEGACY]     private final JTable buffers = new JTable(modeloBuffers);
 // [P2-LEGACY]     private final JScrollPane scrollBuffers = new JScrollPane(buffers);
@@ -188,6 +192,21 @@ public final class VistaSimulacionAlternativa extends JPanel {
         resumenEquipos.setLayout(new BoxLayout(resumenEquipos, BoxLayout.Y_AXIS));
         resumenEquipos.setOpaque(false); resumenEquipos.setAlignmentX(LEFT_ALIGNMENT);
         resumen.add(resumenEquipos);
+        resumen.add(Box.createVerticalStrut(14));
+        resumen.add(encabezado("Cola única de E/S del Disco", "Solicitud activa en el cabezal y solicitudes pendientes ordenadas según la política activa"));
+        lblEstadoDiscoResumen.setAlignmentX(LEFT_ALIGNMENT);
+        resumen.add(lblEstadoDiscoResumen);
+        resumen.add(Box.createVerticalStrut(6));
+        tablaColaDiscoResumen.setRowHeight(28);
+        tablaColaDiscoResumen.setBackground(PAPEL);
+        tablaColaDiscoResumen.setForeground(TINTA);
+        scrollColaDiscoResumen.setColumnHeaderView(tablaColaDiscoResumen.getTableHeader());
+        scrollColaDiscoResumen.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+        desplazarVistaDesdeTabla(scrollColaDiscoResumen);
+        scrollColaDiscoResumen.setPreferredSize(new Dimension(800, 56));
+        scrollColaDiscoResumen.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+        scrollColaDiscoResumen.setAlignmentX(LEFT_ALIGNMENT);
+        resumen.add(scrollColaDiscoResumen);
 // [P2-LEGACY]         resumen.add(Box.createVerticalStrut(16));
 // [P2-LEGACY]         resumen.add(encabezado("Buffers globales", "Ocupación, semáforos y procesos en espera"));
 // [P2-LEGACY]         buffers.setRowHeight(30); buffers.setBackground(PAPEL); buffers.setForeground(TINTA);
@@ -253,8 +272,30 @@ public final class VistaSimulacionAlternativa extends JPanel {
         }
 // [P2-LEGACY]         if (view.computers.size() < 2) resumenEquipos.add(texto("Crea al menos 2 computadores para comenzar la simulación.", 13, GRIS, false));
         if (view.computers.size() < 1) resumenEquipos.add(texto("Crea el computador para comenzar la simulación.", 13, GRIS, false)); // [P2]
-        resumenEquipos.revalidate(); resumenEquipos.repaint();
+        resumenEquipos.repaint();
+        actualizarTablaColaDisco(modeloColaDiscoResumen, scrollColaDiscoResumen);
+        if (view.disk != null) {
+            String dir = view.disk.activeHeadDirection() == com.avilaos.disk.HeadDirection.UP ? "creciente ↑" : "decreciente ↓";
+            lblEstadoDiscoResumen.setText("Cabezal: bloque " + view.disk.activeHeadPosition() + " (" + dir + ")  ·  Política: "
+                    + view.disk.activePolicy() + "  ·  En cola: " + view.disk.queueSize() + "  ·  Atendidas: " + view.disk.completedRequestsCount());
+        }
+        resumen.revalidate();
+        resumen.repaint();
 // [P2-LEGACY]         actualizarBuffers();
+    }
+
+    private void actualizarTablaColaDisco(DefaultTableModel modelo, JScrollPane scroll) {
+        modelo.setRowCount(0);
+        if (view != null && view.diskQueue != null) {
+            for (int i = 0; i < view.diskQueue.size(); i++) {
+                var r = view.diskQueue.get(i);
+                modelo.addRow(new Object[]{r.status(), r.id(), r.processName(), r.operation(), r.path(), r.targetBlock(), r.blockCount(), r.arrivalCycle()});
+            }
+        }
+        int filas = (view != null && view.diskQueue != null) ? view.diskQueue.size() : 0;
+        int altura = 28 + Math.max(1, filas) * 28;
+        scroll.setPreferredSize(new Dimension(800, altura));
+        scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, altura));
     }
 
     private void reconstruir() {
@@ -308,6 +349,8 @@ public final class VistaSimulacionAlternativa extends JPanel {
         private final JSpinner quantum = new JSpinner(new SpinnerNumberModel(3, 1, 99, 1));
         private final DefaultTableModel[] modelos = new DefaultTableModel[6];
         private final JScrollPane[] tablasColas = new JScrollPane[6];
+        private final DefaultTableModel modeloColaDiscoDetalle = tabla("Estado", "ID Solicitud", "Proceso", "Operación", "Ruta / Destino", "Bloque destino", "Bloques", "Ciclo llegada");
+        private final JScrollPane scrollColaDiscoDetalle;
         private boolean actualizandoDetalle;
         DetalleComputador(int id) {
             this.id = id; setLayout(new BoxLayout(this, BoxLayout.Y_AXIS)); setBackground(FONDO);
@@ -330,6 +373,19 @@ public final class VistaSimulacionAlternativa extends JPanel {
                 scroll.setPreferredSize(new Dimension(800, 56)); scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56)); scroll.setAlignmentX(LEFT_ALIGNMENT);
                 tablasColas[i]=scroll; add(scroll); add(Box.createVerticalStrut(14));
             }
+            add(texto("Cola única de E/S del Disco (Activa y en espera)", 15, TINTA, true));
+            add(Box.createVerticalStrut(6));
+            JTable tDisco = new JTable(modeloColaDiscoDetalle);
+            tDisco.setRowHeight(28); tDisco.setBackground(PAPEL); tDisco.setForeground(TINTA);
+            scrollColaDiscoDetalle = new JScrollPane(tDisco);
+            scrollColaDiscoDetalle.setColumnHeaderView(tDisco.getTableHeader());
+            scrollColaDiscoDetalle.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+            desplazarVistaDesdeTabla(scrollColaDiscoDetalle);
+            scrollColaDiscoDetalle.setPreferredSize(new Dimension(800, 56));
+            scrollColaDiscoDetalle.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+            scrollColaDiscoDetalle.setAlignmentX(LEFT_ALIGNMENT);
+            add(scrollColaDiscoDetalle);
+            add(Box.createVerticalStrut(14));
         }
         void actualizar(Node c) {
             actualizandoDetalle = true;
@@ -347,6 +403,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
                 tablasColas[i].setPreferredSize(new Dimension(800, altura));
                 tablasColas[i].setMaximumSize(new Dimension(Integer.MAX_VALUE, altura));
             }
+            actualizarTablaColaDisco(modeloColaDiscoDetalle, scrollColaDiscoDetalle);
             revalidate();
             actualizandoDetalle = false;
         }

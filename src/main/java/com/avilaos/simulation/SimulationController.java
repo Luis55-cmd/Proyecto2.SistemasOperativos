@@ -1021,17 +1021,24 @@ public class SimulationController implements IClockTickable {
 
     private static com.avilaos.disk.SimulatedDisk rebuildDiskPreservingDataBlocks(
             com.avilaos.disk.SimulatedDisk oldDisk, int newSwapSizeBlocks) {
-        int totalData = oldDisk.getTotalBlocks();
+        return rebuildDiskPreservingDataBlocks(oldDisk, oldDisk.getTotalBlocks(), newSwapSizeBlocks);
+    }
+
+    private static com.avilaos.disk.SimulatedDisk rebuildDiskPreservingDataBlocks(
+            com.avilaos.disk.SimulatedDisk oldDisk, int newTotalData, int newSwapSizeBlocks) {
+        int oldTotalData = oldDisk.getTotalBlocks();
         int head = oldDisk.getHeadPosition();
         com.avilaos.disk.SimulatedDisk rebuilt = new com.avilaos.disk.SimulatedDisk(
-                totalData, newSwapSizeBlocks, head, oldDisk.getHeadSpeedPerTick());
-        for (int i = 0; i < totalData; i++) {
+                newTotalData, newSwapSizeBlocks, head, oldDisk.getHeadSpeedPerTick());
+        int limit = Math.min(oldTotalData, newTotalData);
+        for (int i = 0; i < limit; i++) {
             com.avilaos.disk.DiskBlock src = oldDisk.getBlock(i);
             if (src.isOccupied()) {
                 rebuilt.allocateChainedBlocksFrom(i, src.getOccupiedBy(), 1, src.getOwnerProcessId());
                 rebuilt.getBlock(i).setNextBlock(src.getNextBlock());
             }
         }
+        rebuilt.setHeadDirection(oldDisk.getHeadDirection());
         rebuilt.setSchedulingPolicy(oldDisk.getSchedulingPolicy());
         return rebuilt;
     }
@@ -1059,7 +1066,97 @@ public class SimulationController implements IClockTickable {
     }
     
     public void reconfigurarDisco(int totalBlocks, int swapSizeBlocks) {
-        throw new IllegalStateException("Cambio de capacidad deshabilitado hasta proteger archivos, E/S y swap.");
+        reconfigurarDisco(totalBlocks, swapSizeBlocks, false);
+    }
+
+    /**
+     * Reconfigura de forma segura la capacidad del disco (bloques de datos y swap).
+     * <ul>
+     *   <li>Exige modo {@code ADMIN}, simulación detenida, sin solicitudes de E/S activas/en cola y sin procesos en swap.</li>
+     *   <li>Si {@code preservarArchivos == false} y existen archivos o reservas más allá de la raíz {@code /}, rechaza el cambio para proteger los datos ({@code DiskResizeProtectionTest}).</li>
+     *   <li>Si {@code preservarArchivos == true}, verifica que todos los bloques de datos ocupados/reservados y el cabezal quepan dentro del nuevo rango {@code [0, totalBlocks - 1]} y reconstruye el disco conservando intactos los archivos y cadenas.</li>
+     * </ul>
+     */
+    public void reconfigurarDisco(int totalBlocks, int swapSizeBlocks, boolean preservarArchivos) {
+        StateAccess.enter();
+        try {
+            if (currentMode != UserMode.ADMIN) {
+                throw new IllegalStateException("Solo el administrador puede cambiar la capacidad del disco.");
+            }
+            if (totalBlocks < 10 || totalBlocks > 5000) {
+                throw new IllegalArgumentException("La cantidad de bloques de datos debe estar entre 10 y 5000.");
+            }
+            if (swapSizeBlocks < 0 || swapSizeBlocks > 2000) {
+                throw new IllegalArgumentException("El tamaño del área de swap debe estar entre 0 y 2000 bloques.");
+            }
+            requireDiskQuiescentForLoad();
+
+            boolean tieneArchivosOReservas = false;
+            int maxBloqueOcupado = 0;
+            if (this.disk != null) {
+                int actualDatos = this.disk.getTotalBlocks();
+                for (int i = 1; i < actualDatos; i++) {
+                    com.avilaos.disk.DiskBlock b = this.disk.getBlock(i);
+                    if (b != null && (b.isOccupied() || b.isReserved())) {
+                        tieneArchivosOReservas = true;
+                        maxBloqueOcupado = i;
+                    }
+                }
+                if (this.disk.getBlock(0) != null && this.disk.getBlock(0).isReserved()) {
+                    tieneArchivosOReservas = true;
+                }
+            }
+            if (this.fileSystemManager != null
+                    && this.fileSystemManager.getTree().getRoot().getChildren().size() > 0) {
+                tieneArchivosOReservas = true;
+            }
+
+            if (tieneArchivosOReservas && !preservarArchivos) {
+                throw new IllegalStateException("No se puede reemplazar la capacidad sin conservar los archivos existentes en el disco.");
+            }
+
+            if (this.disk != null) {
+                for (int i = 0; i < this.disk.getTotalBlocks(); i++) {
+                    com.avilaos.disk.DiskBlock b = this.disk.getBlock(i);
+                    if (b != null && b.isReserved()) {
+                        throw new IllegalStateException("No se puede redimensionar el disco con reservas de creación pendientes.");
+                    }
+                }
+                if (tieneArchivosOReservas && maxBloqueOcupado >= totalBlocks) {
+                    throw new IllegalStateException("No se puede reducir a " + totalBlocks
+                            + " bloques porque el bloque " + maxBloqueOcupado + " está ocupado por un archivo.");
+                }
+                if (this.disk.getHeadPosition() >= totalBlocks + swapSizeBlocks) {
+                    throw new IllegalStateException("La posición actual del cabezal (" + this.disk.getHeadPosition()
+                            + ") queda fuera del nuevo tamaño total (" + (totalBlocks + swapSizeBlocks) + ").");
+                }
+            }
+
+            this.configuredSwapSizeBlocks = swapSizeBlocks;
+            if (this.disk != null && tieneArchivosOReservas) {
+                this.disk = rebuildDiskPreservingDataBlocks(this.disk, totalBlocks, swapSizeBlocks);
+                this.fileSystemManager.setDisk(this.disk);
+            } else {
+                int headInicial = (this.disk != null && this.disk.getHeadPosition() < totalBlocks + swapSizeBlocks)
+                        ? this.disk.getHeadPosition() : 0;
+                int speed = (this.disk != null) ? this.disk.getHeadSpeedPerTick() : 10;
+                com.avilaos.disk.DiskSchedulingPolicy currentPolicy =
+                        (this.disk != null) ? this.disk.getSchedulingPolicy() : null;
+                this.disk = new com.avilaos.disk.SimulatedDisk(totalBlocks, swapSizeBlocks, headInicial, speed);
+                if (currentPolicy != null) {
+                    this.disk.setSchedulingPolicy(currentPolicy);
+                }
+                this.fileSystemManager = new com.avilaos.filesystem.FileSystemManager(this.disk);
+            }
+            this.disk.setEventListener(this::logEvent);
+            this.disk.setCompletionListener(this::onDiskRequestCompleted);
+            updateComputersDiskReference();
+            logEvent("Capacidad del disco actualizada: " + totalBlocks + " bloques de datos, "
+                    + swapSizeBlocks + " bloques de swap.");
+            notifyGUI();
+        } finally {
+            StateAccess.exit();
+        }
     }
 
     /** La nueva velocidad se usa a partir del siguiente ciclo del disco. */

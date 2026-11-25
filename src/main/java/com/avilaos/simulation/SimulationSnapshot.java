@@ -44,8 +44,19 @@ public final class SimulationSnapshot {
             this(cycle, usage, DiskUsage.empty());
         }
     }
+    public record DiskRequestView(
+            int id,
+            String status,
+            String processName,
+            com.avilaos.core.model.IOOperationType operation,
+            String path,
+            int targetBlock,
+            int blockCount,
+            int arrivalCycle
+    ) { }
     public final Values<Sample> history;
     public final DiskUsage disk;
+    public final Values<DiskRequestView> diskQueue;
     
     public static final class Values<T> {
         private final Object[] items;
@@ -282,6 +293,34 @@ public final class SimulationSnapshot {
                 diskModel.getAverageWaitTimeCLOOK()
         );
         this.disk = currentDisk;
+        if (diskModel == null) {
+            this.diskQueue = new Values<>(new Object[0]);
+        } else {
+            var active = diskModel.getActiveRequest();
+            var queued = diskModel.getQueueSnapshot();
+            int totalReqs = (active != null ? 1 : 0) + (queued != null ? queued.size() : 0);
+            Object[] reqViews = new Object[totalReqs];
+            int idx = 0;
+            if (active != null) {
+                String proc = active.getPcb() != null ? active.getPcb().getName() + " (ID " + active.getPcb().getId() + ")" : "Sistema";
+                reqViews[idx++] = new DiskRequestView(
+                        active.getId(), "En atención", proc, active.getOperation(),
+                        active.getPath() != null ? active.getPath() : "—",
+                        active.getTargetBlock(), active.getBlockCount(), active.getArrivalCycle());
+            }
+            if (queued != null) {
+                for (int i = 0; i < queued.size(); i++) {
+                    var r = queued.get(i);
+                    if (r == null) continue;
+                    String proc = r.getPcb() != null ? r.getPcb().getName() + " (ID " + r.getPcb().getId() + ")" : "Sistema";
+                    reqViews[idx++] = new DiskRequestView(
+                            r.getId(), "En cola #" + (i + 1), proc, r.getOperation(),
+                            r.getPath() != null ? r.getPath() : "—",
+                            r.getTargetBlock(), r.getBlockCount(), r.getArrivalCycle());
+                }
+            }
+            this.diskQueue = new Values<>(reqViews);
+        }
         Object[] copiedNodes = new Object[nodes.size()];
         for (int i=0; i<nodes.size(); i++) {
             var c=nodes.get(i); var p=c.getCpu().getPCB(); var k=c.getKernel();

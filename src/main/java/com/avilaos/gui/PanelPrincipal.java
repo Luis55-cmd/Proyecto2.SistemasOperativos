@@ -46,6 +46,12 @@ public class PanelPrincipal extends JPanel {
     private final JLabel discoCabezal = texto(" ", 14, GRIS, false);
     private final JLabel discoPolitica = texto(" ", 14, GRIS, false);
     private final JLabel discoMetricas = texto(" ", 14, GRIS, false);
+    private final JSpinner spinBloques = new JSpinner(new SpinnerNumberModel(200, 10, 5000, 10));
+    private final JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(100, 0, 2000, 10));
+    private final DefaultTableModel tablaColaDisco = new DefaultTableModel(
+            new String[]{"Estado", "ID", "Proceso", "Operación", "Ruta / Destino", "Bloque", "Bloques"}, 0) {
+        @Override public boolean isCellEditable(int row, int column) { return false; }
+    };
     private boolean consultaDiscoPendiente = false;
     private final JTree arbolArchivos = new JTree();
     private final JTabbedPane vistasArchivos = new JTabbedPane();
@@ -947,27 +953,32 @@ public class PanelPrincipal extends JPanel {
         panelTamanos.setAlignmentX(LEFT_ALIGNMENT);
         
         panelTamanos.add(texto("Bloques:", 12, TINTA, false));
-        JSpinner spinBloques = new JSpinner(new SpinnerNumberModel(100, 10, 500, 10)); 
-        spinBloques.setEnabled(false);
         panelTamanos.add(spinBloques);
         
         panelTamanos.add(texto("Swap:", 12, TINTA, false));
-        JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(50, 0, 200, 10));
-        spinSwap.setEnabled(false);
         panelTamanos.add(spinSwap);
         
         JButton btnAplicarTamano = new JButton("Aplicar");
-        btnAplicarTamano.setEnabled(false);
-        btnAplicarTamano.setToolTipText("Deshabilitado para proteger archivos, E/S y swap.");
+        btnAplicarTamano.setToolTipText("Redimensionar capacidad conservando archivos existentes (requiere ADMIN y disco sin E/S activa)");
         btnAplicarTamano.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
         btnAplicarTamano.addActionListener(e -> {
-            int nuevosBloques = (Integer) spinBloques.getValue();
-            int nuevoSwap = (Integer) spinSwap.getValue();
+            final int nuevosBloques;
+            final int nuevoSwap;
+            try {
+                nuevosBloques = EditorProceso.numeroVisible(spinBloques);
+                nuevoSwap = EditorProceso.numeroVisible(spinSwap);
+                spinBloques.setValue(nuevosBloques);
+                spinSwap.setValue(nuevoSwap);
+            } catch (IllegalArgumentException ex) {
+                JOptionPane.showMessageDialog(this, "Indica valores enteros válidos (Bloques: 10–5000, Swap: 0–2000).",
+                        "Capacidad inválida", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             cambiarCapacidadDisco(nuevosBloques, nuevoSwap);
         });
         panelTamanos.add(btnAplicarTamano);
         configuracion.add(panelTamanos);
-        configuracion.add(texto("Cambio de capacidad deshabilitado para proteger los datos.", 12, GRIS, false));
+        configuracion.add(texto("Conserva los archivos existentes si caben en el nuevo rango y no hay E/S ni swap activo.", 12, GRIS, false));
         configuracion.add(Box.createVerticalStrut(12));
         JPanel panelVelocidad = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         panelVelocidad.setOpaque(false);
@@ -1023,7 +1034,29 @@ public class PanelPrincipal extends JPanel {
         columnaIzquierda.setMinimumSize(new Dimension(0, 0));
         columnaIzquierda.setLayout(new BoxLayout(columnaIzquierda, BoxLayout.Y_AXIS));
         columnaIzquierda.add(configuracion);
-        columnaIzquierda.add(Box.createVerticalStrut(20));
+        columnaIzquierda.add(Box.createVerticalStrut(16));
+
+        JPanel tarjetaColaDisco = tarjeta();
+        tarjetaColaDisco.setMaximumSize(new Dimension(Integer.MAX_VALUE, 260));
+        tarjetaColaDisco.add(texto("COLA ÚNICA DE E/S DEL DISCO", 11, ACENTO, true));
+        tarjetaColaDisco.add(Box.createVerticalStrut(6));
+        tarjetaColaDisco.add(texto("Solicitud en atención y solicitudes en espera", 17, TINTA, true));
+        tarjetaColaDisco.add(Box.createVerticalStrut(4));
+        tarjetaColaDisco.add(texto("Ordenadas en tiempo real según la política activa.", 12, GRIS, false));
+        tarjetaColaDisco.add(Box.createVerticalStrut(8));
+        JTable tColaDisco = new JTable(tablaColaDisco);
+        tColaDisco.setRowHeight(26);
+        tColaDisco.setBackground(PAPEL);
+        tColaDisco.setForeground(TINTA);
+        tColaDisco.setFillsViewportHeight(true);
+        JScrollPane scrollColaDisco = new JScrollPane(tColaDisco);
+        scrollColaDisco.setAlignmentX(LEFT_ALIGNMENT);
+        scrollColaDisco.setBorder(BorderFactory.createLineBorder(BORDE));
+        scrollColaDisco.setPreferredSize(new Dimension(480, 125));
+        scrollColaDisco.setMaximumSize(new Dimension(Integer.MAX_VALUE, 145));
+        tarjetaColaDisco.add(scrollColaDisco);
+        columnaIzquierda.add(tarjetaColaDisco);
+        columnaIzquierda.add(Box.createVerticalStrut(16));
         
         JPanel mapa = tarjeta();
         mapa.setMinimumSize(new Dimension(0, 0));
@@ -1153,7 +1186,27 @@ for (int i = 0; i < ocupados.length; i++) {
     "Métricas: Desplazamiento cabezal " + disco.getTotalHeadMovement() + " bloques · Espera prom. " + String.format("%.2f", disco.getAverageWaitTimeCycles()) + " ticks · Atendidas: " + disco.getCompletedRequestsCount() + " (" + disco.getDetallePorPolitica() + ")"
 };
 
-return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType(), reservados, detalles};
+    var activa = disco.getActiveRequest();
+    var cola = disco.getQueueSnapshot();
+    int totalSol = (activa != null ? 1 : 0) + (cola != null ? cola.size() : 0);
+    Object[][] filasCola = new Object[totalSol][7];
+    int idxSol = 0;
+    if (activa != null) {
+        String proc = activa.getPcb() != null ? activa.getPcb().getName() + " (ID " + activa.getPcb().getId() + ")" : "Sistema";
+        filasCola[idxSol++] = new Object[]{"En atención", activa.getId(), proc, activa.getOperation(),
+                activa.getPath() != null ? activa.getPath() : "—", activa.getTargetBlock(), activa.getBlockCount()};
+    }
+    if (cola != null) {
+        for (int i = 0; i < cola.size(); i++) {
+            var r = cola.get(i);
+            if (r == null) continue;
+            String proc = r.getPcb() != null ? r.getPcb().getName() + " (ID " + r.getPcb().getId() + ")" : "Sistema";
+            filasCola[idxSol++] = new Object[]{"En cola #" + (i + 1), r.getId(), proc, r.getOperation(),
+                    r.getPath() != null ? r.getPath() : "—", r.getTargetBlock(), r.getBlockCount()};
+        }
+    }
+
+return new Object[]{resumen, ocupados, disco.getHeadPosition(), datos, disco.getPolicyType(), reservados, detalles, filasCola, swap};
 
 }, datos -> {
 
@@ -1164,6 +1217,21 @@ String[] resumen = (String[]) datos[0];
 bloquesOcupados = (boolean[]) datos[1];
 bloquesReservados = (boolean[]) datos[5];
 detallesBloques = (String[]) datos[6];
+Object[][] filasCola = (Object[][]) datos[7];
+int datosActuales = (Integer) datos[3];
+int swapActual = (Integer) datos[8];
+if (!((JSpinner.DefaultEditor) spinBloques.getEditor()).getTextField().hasFocus()
+        && datosActuales >= 10 && datosActuales <= 5000) {
+    spinBloques.setValue(datosActuales);
+}
+if (!((JSpinner.DefaultEditor) spinSwap.getEditor()).getTextField().hasFocus()
+        && swapActual >= 0 && swapActual <= 2000) {
+    spinSwap.setValue(swapActual);
+}
+tablaColaDisco.setRowCount(0);
+for (int i = 0; i < filasCola.length; i++) {
+    if (filasCola[i][0] != null) tablaColaDisco.addRow(filasCola[i]);
+}
 
 cabezalMapa = (Integer) datos[2];
 
@@ -1564,16 +1632,12 @@ actualizarVistaDisco();
     private void cambiarCapacidadDisco(int nuevosBloques, int nuevoSwap) {
         GuiRequest.model(controller, () -> {
             controller.logEvent("Solicitud de cambio de capacidad: " + nuevosBloques + " bloques, " + nuevoSwap + " swap");
-            
-            // Asume que el controlador expone un método para recrear/reconfigurar el disco.
-            // Si el controlador no tiene este método aún, deberás implementarlo allí para
-            // instanciar un nuevo SimulatedDisk(nuevosBloques, nuevoSwap, initialHead).
-            controller.reconfigurarDisco(nuevosBloques, nuevoSwap); 
-            
+            controller.reconfigurarDisco(nuevosBloques, nuevoSwap, true);
             return true;
         }, ok -> {
             actualizarVistaDisco();
-            JOptionPane.showMessageDialog(this, "Capacidad del disco actualizada.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+            actualizarVistaArchivos();
+            JOptionPane.showMessageDialog(this, "Capacidad del disco actualizada conservando los datos.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
         }, error -> {
             String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
             controller.logEvent("Error al cambiar capacidad: " + motivo);
