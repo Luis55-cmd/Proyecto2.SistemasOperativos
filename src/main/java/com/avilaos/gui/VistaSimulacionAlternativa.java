@@ -121,6 +121,15 @@ public final class VistaSimulacionAlternativa extends JPanel {
         });
         archivos.add(guardar); archivos.add(cargar); archivos.add(exportar); archivos.add(reiniciar);
         principal.add(archivos);
+        principal.add(Box.createVerticalStrut(6));
+        JPanel filaFS = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        filaFS.setOpaque(false); filaFS.setAlignmentX(LEFT_ALIGNMENT);
+        JButton cargarFS = accion("Cargar Archivos JSON", true);
+        JButton guardarFS = accion("Guardar Archivos JSON", false);
+        cargarFS.addActionListener(e -> cargarSistemaArchivos(cargarFS));
+        guardarFS.addActionListener(e -> guardarSistemaArchivos(guardarFS));
+        filaFS.add(cargarFS); filaFS.add(guardarFS);
+        principal.add(filaFS);
         JPanel cabecera = new JPanel(new BorderLayout(12, 0));
         cabecera.setOpaque(false);
         cabecera.add(principal, BorderLayout.CENTER);
@@ -161,6 +170,81 @@ public final class VistaSimulacionAlternativa extends JPanel {
             break;
         }
     }
+
+    // ── Cargar / Guardar sistema de archivos JSON ─────────────────────────────
+
+    private void guardarSistemaArchivos(JButton boton) {
+        JFileChooser selector = new JFileChooser();
+        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        File archivo = selector.getSelectedFile();
+        if (!archivo.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".json"))
+            archivo = new File(archivo.getParentFile(), archivo.getName() + ".json");
+        if (archivo.exists() && JOptionPane.showConfirmDialog(this,
+                "El archivo ya existe. ¿Deseas reemplazarlo?", "Guardar sistema de archivos",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
+        final File destino = archivo;
+        boton.setEnabled(false);
+        GuiRequest.model(controller, () -> {
+            var disco = controller.getDisk();
+            if (disco.getActiveRequest() != null || disco.getQueueSize() != 0)
+                throw new IllegalStateException("Espera a que terminen las solicitudes de disco antes de guardar.");
+            controller.saveFileSystemJson(destino);
+            return true;
+        }, ok -> {
+            boton.setEnabled(true);
+            controller.logEvent("Sistema de archivos guardado: " + destino.getName());
+        }, error -> {
+            boton.setEnabled(true);
+            String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+            controller.logEvent("Error al guardar sistema de archivos: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo guardar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void cargarSistemaArchivos(JButton boton) {
+        JFileChooser selector = new JFileChooser();
+        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        final File archivo = selector.getSelectedFile();
+        boton.setEnabled(false);
+        GuiRequest.model(controller,
+                () -> controller.isFileSystemJsonLoaded() || !controller.getFileSystemManager().getAllNodesPreOrder().isEmpty(),
+                hayDatos -> {
+                    if (hayDatos) {
+                        int confirmacion = JOptionPane.showConfirmDialog(this,
+                                "La carga reemplazará el disco y los archivos actuales. ¿Deseas continuar?",
+                                "Cargar sistema de archivos", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                        if (confirmacion != JOptionPane.YES_OPTION) { boton.setEnabled(true); return; }
+                    }
+                    aplicarCargaSistemaArchivos(archivo, boton);
+                }, error -> {
+                    boton.setEnabled(true);
+                    controller.logEvent("Error al comprobar el sistema de archivos: " + error.getMessage());
+                    JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+                });
+    }
+
+    private void aplicarCargaSistemaArchivos(File archivo, JButton boton) {
+        GuiRequest.model(controller, () -> {
+            controller.logEvent("Intento de carga del sistema de archivos: " + archivo.getName());
+            if (controller.isRunning())
+                throw new IllegalStateException("Detén y reinicia la simulación antes de reemplazar el disco.");
+            controller.loadFileSystemJson(archivo);
+            return true;
+        }, ok -> {
+            boton.setEnabled(true);
+            controller.logEvent("Sistema de archivos cargado correctamente.");
+            actualizar();
+        }, error -> {
+            boton.setEnabled(true);
+            String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+            controller.logEvent("Error al cargar sistema de archivos: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void elegirArchivo(boolean guardar, JButton boton) {
         JFileChooser selector = new JFileChooser();
