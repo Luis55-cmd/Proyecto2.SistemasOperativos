@@ -118,12 +118,22 @@ public final class FileSystemJsonSerializer {
         SimulatedDisk disk = new SimulatedDisk(totalBlocks, effectiveSwap, restoredHead);
         FileSystemManager fsManager = new FileSystemManager(disk);
 
-        // Primero insertar directorios y archivos respetando el orden y validando bloques
+        // Pase 1: Crear directorios asegurando que los padres existan primero
         for (int i = 0; i < entries.size(); i++) {
             EntrySpec e = entries.get(i);
             if (e.type() == FsNodeType.DIRECTORY) {
-                fsManager.createDirectoryAtBlock(e.path(), e.owner(), e.permission(), "JSON", e.startBlock());
-            } else {
+                if (fsManager.findNode(e.path()) == null) {
+                    ensureParentDirectory(fsManager, e.path(), e.owner());
+                    fsManager.createDirectoryAtBlock(e.path(), e.owner(), e.permission(), "JSON", e.startBlock());
+                }
+            }
+        }
+
+        // Pase 2: Crear archivos asegurando que el directorio contenedor exista
+        for (int i = 0; i < entries.size(); i++) {
+            EntrySpec e = entries.get(i);
+            if (e.type() != FsNodeType.DIRECTORY) {
+                ensureParentDirectory(fsManager, e.path(), e.owner());
                 if (e.blocks() <= 0) {
                     throw new IllegalArgumentException("El archivo '" + e.path() + "' debe tener blocks >= 1.");
                 }
@@ -283,6 +293,15 @@ public final class FileSystemJsonSerializer {
             throw new IllegalArgumentException("Falta 'owner' en '" + path + "'.");
         }
         return new EntrySpec(path.trim(), type, startBlock, blocks, owner.trim(), perm, chain);
+    }
+
+    private static void ensureParentDirectory(FileSystemManager fsManager, String fullPath, String owner) {
+        String parentPath = FileSystemManager.parentOf(fullPath);
+        if ("/".equals(parentPath)) return;
+        if (fsManager.findNode(parentPath) == null) {
+            ensureParentDirectory(fsManager, parentPath, owner);
+            fsManager.createDirectory(parentPath, owner != null ? owner : "admin", FilePermission.PUBLIC, "JSON");
+        }
     }
 
     private static void allocateExplicitChain(SimulatedDisk disk, FileSystemManager fsManager, EntrySpec e) {

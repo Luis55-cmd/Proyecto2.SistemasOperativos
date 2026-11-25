@@ -423,6 +423,11 @@ public class SimulationController implements IClockTickable {
             if (computers.isEmpty()) throw new IllegalStateException("Crea primero un computador.");
             if (path == null || !path.startsWith("/") || path.length() < 2 || path.endsWith("/"))
                 throw new IllegalArgumentException("Indica una ruta absoluta y un nombre válido.");
+            String parentPath = com.avilaos.filesystem.FileSystemManager.parentOf(path);
+            var parentNode = fileSystemManager.findNode(parentPath);
+            if (parentNode == null || !parentNode.isDirectory()) {
+                throw new IllegalArgumentException("El directorio destino '" + parentPath + "' no existe en el sistema de archivos.");
+            }
             if (type == null || permission == null || blocks < 1 || (type == com.avilaos.filesystem.FsNodeType.DIRECTORY && blocks != 1))
                 throw new IllegalArgumentException("Tipo, permiso o tamaño inválido.");
             UserMode mode = currentMode;

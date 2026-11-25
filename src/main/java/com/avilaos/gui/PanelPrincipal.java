@@ -46,8 +46,11 @@ public class PanelPrincipal extends JPanel {
     private final JLabel discoCabezal = texto(" ", 14, GRIS, false);
     private final JLabel discoPolitica = texto(" ", 14, GRIS, false);
     private final JLabel discoMetricas = texto(" ", 14, GRIS, false);
-    private final JSpinner spinBloques = new JSpinner(new SpinnerNumberModel(200, 10, 5000, 10));
-    private final JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(100, 0, 2000, 10));
+    private final JSpinner spinBloques = new JSpinner(new SpinnerNumberModel(200, 100, 500, 10));
+    private final JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(50, 10, 200, 10));
+    private final JLabel lblPreviewCapacidadDisco = texto("Datos: 150 · Swap: 50 · Total físico: 200", 12, ACENTO, false);
+    private final JLabel lblEstadoCapacidadDisco = texto("Configurable antes de iniciar la simulación (modo Administrador).", 12, GRIS, false);
+    private JButton btnAplicarTamanoDisco;
     private final DefaultTableModel tablaColaDisco = new DefaultTableModel(
             new String[]{"Estado", "ID", "Proceso", "Operación", "Ruta / Destino", "Bloque", "Bloques"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
@@ -56,7 +59,7 @@ public class PanelPrincipal extends JPanel {
     private final JTree arbolArchivos = new JTree();
     private final JTabbedPane vistasArchivos = new JTabbedPane();
     private final DefaultTableModel tablaAsignacion = new DefaultTableModel(
-            new String[]{"Nombre", "Bloques", "Primer bloque", "Dueño", "Proceso creador"}, 0) {
+            new String[]{"Ruta", "Bloques", "Primer bloque", "Dueño", "Proceso creador"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
     private boolean actualizandoArbolArchivos;
@@ -736,11 +739,31 @@ public class PanelPrincipal extends JPanel {
             var fs = controller.getFileSystemManager();
             String estado = null;
             if (solicitud != null) {
-                if (solicitud.isCreationCompleted())
-                    estado = "Creación completada: " + solicitud.getTargetPath();
-                else if (solicitud.isTerminated()) estado = "Creación fallida; revisa el log.";
-                else if (solicitud.isCreationIssued()) estado = "Esperando disco · bloques reservados.";
-                else estado = "Proceso " + solicitud.getId() + " · esperando CPU.";
+                if (solicitud.getIoOperation() == com.avilaos.core.model.IOOperationType.CREATE) {
+                    if (solicitud.isCreationCompleted())
+                        estado = "Creación completada: " + solicitud.getTargetPath();
+                    else if (solicitud.isTerminated()) estado = "Creación fallida; revisa el log.";
+                    else if (solicitud.isCreationIssued()) estado = "Esperando disco · bloques reservados.";
+                    else estado = "Proceso " + solicitud.getId() + " · esperando CPU.";
+                } else if (solicitud.getIoOperation() == com.avilaos.core.model.IOOperationType.DELETE) {
+                    if (solicitud.isTerminated())
+                        estado = "Eliminación completada: " + solicitud.getTargetPath();
+                    else if (solicitud.getState() == com.avilaos.core.model.ProcessState.BLOQUEADO)
+                        estado = "Esperando atención del disco para eliminar " + solicitud.getTargetPath();
+                    else estado = "Proceso " + solicitud.getId() + " · esperando CPU para eliminación.";
+                } else if (solicitud.getIoOperation() == com.avilaos.core.model.IOOperationType.UPDATE) {
+                    if (solicitud.isTerminated())
+                        estado = "Renombrado completado: " + solicitud.getTargetPath() + " → " + solicitud.getNewFileName();
+                    else if (solicitud.getState() == com.avilaos.core.model.ProcessState.BLOQUEADO)
+                        estado = "Esperando atención del disco para renombrar " + solicitud.getTargetPath();
+                    else estado = "Proceso " + solicitud.getId() + " · esperando CPU para renombrado.";
+                } else if (solicitud.getIoOperation() == com.avilaos.core.model.IOOperationType.READ) {
+                    if (solicitud.isTerminated())
+                        estado = "Lectura completada: " + solicitud.getTargetPath();
+                    else if (solicitud.getState() == com.avilaos.core.model.ProcessState.BLOQUEADO)
+                        estado = "Esperando atención del disco para leer " + solicitud.getTargetPath();
+                    else estado = "Proceso " + solicitud.getId() + " · esperando CPU para lectura.";
+                }
             }
             return new Object[]{fs.snapshotTree(), estado};
         }, datos -> {
@@ -756,7 +779,9 @@ public class PanelPrincipal extends JPanel {
                 actualizandoArbolArchivos = true;
                 try {
                 arbolArchivos.setModel(new ModeloArbolArchivos(raiz));
-                arbolArchivos.expandRow(0);
+                for (int r = 0; r < arbolArchivos.getRowCount(); r++) {
+                    arbolArchivos.expandRow(r);
+                }
                 if (ruta != null) {
                     javax.swing.tree.TreePath seleccion = new javax.swing.tree.TreePath(raiz);
                     com.avilaos.filesystem.FSNode actual = raiz;
@@ -785,7 +810,7 @@ public class PanelPrincipal extends JPanel {
 
     private void agregarArchivosATabla(com.avilaos.filesystem.FSNode nodo) {
         if (nodo.isFile()) {
-            tablaAsignacion.addRow(new Object[]{nodo.getName(), nodo.getSizeBlocks(), nodo.getFirstBlock(), nodo.getOwner(), nodo.getCreatorProcess()});
+            tablaAsignacion.addRow(new Object[]{nodo.getPath(), nodo.getSizeBlocks(), nodo.getFirstBlock(), nodo.getOwner(), nodo.getCreatorProcess()});
         }
         for (int i = 0; i < nodo.getChildren().size(); i++) agregarArchivosATabla(nodo.getChildren().get(i));
     }
@@ -801,6 +826,23 @@ public class PanelPrincipal extends JPanel {
         for (int i = 0; i < nombres.length; i++) if (detallesArchivo[i] != null) detallesArchivo[i].setText(nombres[i] + "  ·  " + valores[i]);
     }
 
+    private String[] obtenerDirectoriosDisponibles() {
+        var fs = controller.getFileSystemManager();
+        if (fs == null) return new String[]{"/"};
+        var nodos = fs.getAllNodesPreOrder();
+        com.avilaos.core.structures.MyLinkedList<String> dirs = new com.avilaos.core.structures.MyLinkedList<>();
+        dirs.append("/");
+        for (int i = 0; i < nodos.size(); i++) {
+            var n = nodos.get(i);
+            if (n.isDirectory() && !"/".equals(n.getPath())) {
+                dirs.append(n.getPath());
+            }
+        }
+        String[] resultado = new String[dirs.size()];
+        for (int i = 0; i < dirs.size(); i++) resultado[i] = dirs.get(i);
+        return resultado;
+    }
+
     private void solicitarEliminacion() {
         Object selected = arbolArchivos.getLastSelectedPathComponent();
         var nodo = selected instanceof com.avilaos.filesystem.FSNode n ? n : null;
@@ -809,12 +851,15 @@ public class PanelPrincipal extends JPanel {
             return;
         }
         String ruta = nodo.getPath();
-        String mensaje = "¿Eliminar " + ruta + "?" + (nodo.isDirectory() ? "\nSe eliminarán todos sus archivos y subdirectorios." : "");
+        String mensaje = "¿Eliminar " + ruta + "?" + (nodo.isDirectory()
+                ? "\nSe eliminarán de forma recursiva todos sus archivos y subdirectorios, liberando todos sus bloques en el disco."
+                : "\nSe liberarán sus bloques en el disco.");
         if (JOptionPane.showConfirmDialog(this, mensaje, "Confirmar eliminación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
         estadoSolicitudArchivo.setText("Enviando solicitud de eliminación…");
         GuiRequest.model(controller, () -> controller.requestDelete(ruta), p -> {
-            solicitudArchivo = null;
-            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · eliminación pendiente.");
+            solicitudArchivo = p;
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · " + (controller.isRunning() ? "eliminación pendiente de CPU y disco." : "inicia la simulación para que el disco atienda la eliminación."));
+            actualizarVistaArchivos();
         }, error -> {
             estadoSolicitudArchivo.setText("Eliminación rechazada: " + error.getMessage());
             JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo eliminar", JOptionPane.ERROR_MESSAGE);
@@ -833,8 +878,9 @@ public class PanelPrincipal extends JPanel {
         if (nombre == null) return;
         estadoSolicitudArchivo.setText("Enviando solicitud de renombrado…");
         GuiRequest.model(controller, () -> controller.requestRename(ruta, nombre), p -> {
-            solicitudArchivo = null;
-            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · renombrado pendiente.");
+            solicitudArchivo = p;
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · " + (controller.isRunning() ? "renombrado pendiente de CPU y disco." : "inicia la simulación para que el disco atienda el renombrado."));
+            actualizarVistaArchivos();
         }, error -> {
             estadoSolicitudArchivo.setText("Renombrado rechazado: " + error.getMessage());
             JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo renombrar", JOptionPane.ERROR_MESSAGE);
@@ -851,7 +897,9 @@ public class PanelPrincipal extends JPanel {
         String ruta = nodo.getPath();
         estadoSolicitudArchivo.setText("Enviando solicitud de lectura…");
         GuiRequest.model(controller, () -> controller.requestRead(ruta), p -> {
-            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · lectura pendiente.");
+            solicitudArchivo = p;
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · " + (controller.isRunning() ? "lectura pendiente de CPU y disco." : "inicia la simulación para que el disco atienda la lectura."));
+            actualizarVistaArchivos();
         }, error -> {
             estadoSolicitudArchivo.setText("Lectura rechazada: " + error.getMessage());
             JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo solicitar la lectura", JOptionPane.ERROR_MESSAGE);
@@ -868,16 +916,25 @@ public class PanelPrincipal extends JPanel {
         formulario.add(Box.createVerticalStrut(12));
         Object selected = arbolArchivos.getLastSelectedPathComponent();
         var nodo = selected instanceof com.avilaos.filesystem.FSNode n ? n : null;
-        String directorio = nodo == null ? "/" : nodo.isDirectory() ? nodo.getPath() : nodo.getParent().getPath();
-        JTextField destino = new JTextField(directorio);
-        JTextField nombre = new JTextField();
+        String directorioInicial = nodo == null ? "/" : nodo.isDirectory() ? nodo.getPath() : (nodo.getParent() != null ? nodo.getParent().getPath() : "/");
+
+        String[] dirsDisponibles = obtenerDirectoriosDisponibles();
+        JComboBox<String> comboDestino = new JComboBox<>(dirsDisponibles);
+        comboDestino.setEditable(true);
+        comboDestino.setSelectedItem(directorioInicial);
+
+        JTextField campoNombre = new JTextField();
+        campoNombre.setToolTipText("Escribe el nombre (ej: video.mp4) o la ruta completa (ej: /usuarios/video.mp4)");
+
         JTextField dueno = new JTextField(controller.getAccessControl().getActiveUsername());
         dueno.setEditable(controller.getMode() == com.avilaos.core.model.UserMode.ADMIN);
         JSpinner bloques = new JSpinner(new SpinnerNumberModel(1, 1, 500, 1));
         JComboBox<String> permiso = new JComboBox<>(new String[]{"Público", "Privado"});
-        formulario.add(campo("Directorio destino", destino));
+
+        formulario.add(campo("Directorio destino (o selecciona de la lista)", comboDestino));
         formulario.add(Box.createVerticalStrut(10));
-        formulario.add(campo("Nombre", nombre));
+        formulario.add(campo(archivo ? "Nombre o ruta completa del archivo (ej: video.mp4 o /usuarios/video.mp4)"
+                : "Nombre o ruta completa del directorio (ej: musica o /usuarios/musica)", campoNombre));
         if (archivo) {
             formulario.add(Box.createVerticalStrut(10));
             formulario.add(campo("Tamaño en bloques", bloques));
@@ -887,26 +944,64 @@ public class PanelPrincipal extends JPanel {
         formulario.add(Box.createVerticalStrut(10));
         formulario.add(campo("Permiso", permiso));
         formulario.add(Box.createVerticalStrut(14));
-        formulario.add(texto("<html>El nombre del proceso se genera automáticamente.<br>El elemento aparecerá al terminar la E/S.</html>", 12, GRIS, false));
+        formulario.add(texto("<html>El nombre del proceso se genera automáticamente.<br>El elemento aparecerá al terminar la E/S en disco.</html>", 12, GRIS, false));
+
         int respuesta = JOptionPane.showConfirmDialog(this, formulario,
                 archivo ? "Crear archivo" : "Crear directorio", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (respuesta != JOptionPane.OK_OPTION) return;
-        String base = destino.getText().trim();
-        String nombreTexto = nombre.getText().trim();
-        if (!base.startsWith("/") || nombreTexto.isEmpty() || nombreTexto.contains("/") || nombreTexto.equals(".") || nombreTexto.equals("..")) {
-            JOptionPane.showMessageDialog(this, "Indica un directorio absoluto y un nombre válido.", "Datos inválidos", JOptionPane.ERROR_MESSAGE);
+
+        String input = campoNombre.getText().trim();
+        if (input.isEmpty() || input.equals(".") || input.equals("..")) {
+            JOptionPane.showMessageDialog(this, "Indica un nombre o ruta válida.", "Datos inválidos", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        while (base.length() > 1 && base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        String ruta = (base.equals("/") ? "" : base) + "/" + nombreTexto;
+
+        String base = comboDestino.getSelectedItem() != null ? comboDestino.getSelectedItem().toString().trim() : "/";
+        if (base.isEmpty() || !base.startsWith("/")) base = "/";
+
+        String ruta;
+        if (input.startsWith("/")) {
+            ruta = input;
+        } else if (input.contains("/")) {
+            while (base.length() > 1 && base.endsWith("/")) base = base.substring(0, base.length() - 1);
+            ruta = (base.equals("/") ? "" : base) + "/" + input;
+        } else {
+            while (base.length() > 1 && base.endsWith("/")) base = base.substring(0, base.length() - 1);
+            ruta = (base.equals("/") ? "" : base) + "/" + input;
+        }
+
+        ruta = ruta.replaceAll("/+", "/");
+        if (ruta.length() > 1 && ruta.endsWith("/")) {
+            ruta = ruta.substring(0, ruta.length() - 1);
+        }
+
+        int lastSlash = ruta.lastIndexOf('/');
+        String dirPadre = lastSlash == 0 ? "/" : ruta.substring(0, lastSlash);
+        String nombreFinal = ruta.substring(lastSlash + 1);
+
+        if (nombreFinal.isEmpty() || nombreFinal.equals(".") || nombreFinal.equals("..")) {
+            JOptionPane.showMessageDialog(this, "El nombre del elemento no es válido.", "Datos inválidos", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        var nodoPadre = controller.getFileSystemManager().findNode(dirPadre);
+        if (nodoPadre == null || !nodoPadre.isDirectory()) {
+            JOptionPane.showMessageDialog(this,
+                    "El directorio destino '" + dirPadre + "' no existe en el sistema de archivos.\n"
+                    + "Crea primero el directorio o selecciónalo del menú desplegable.",
+                    "Directorio no encontrado", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        final String rutaFinal = ruta;
         int cantidad = archivo ? (Integer) bloques.getValue() : 1;
         String propietario = dueno.getText().trim();
         var tipo = archivo ? com.avilaos.filesystem.FsNodeType.FILE : com.avilaos.filesystem.FsNodeType.DIRECTORY;
         var acceso = permiso.getSelectedIndex() == 0 ? com.avilaos.filesystem.FilePermission.PUBLIC : com.avilaos.filesystem.FilePermission.PRIVATE;
         estadoSolicitudArchivo.setText("Enviando solicitud…");
-        GuiRequest.model(controller, () -> controller.requestCreation(ruta, tipo, cantidad, propietario, acceso), p -> {
+        GuiRequest.model(controller, () -> controller.requestCreation(rutaFinal, tipo, cantidad, propietario, acceso), p -> {
             solicitudArchivo = p;
-            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · pendiente de CPU y disco.");
+            estadoSolicitudArchivo.setText("Proceso " + p.getId() + " creado · " + (controller.isRunning() ? "pendiente de CPU y disco." : "inicia la simulación para que el disco atienda la creación."));
             actualizarVistaArchivos();
         }, error -> {
             estadoSolicitudArchivo.setText("Solicitud rechazada.");
@@ -952,34 +1047,69 @@ public class PanelPrincipal extends JPanel {
         panelTamanos.setOpaque(false);
         panelTamanos.setAlignmentX(LEFT_ALIGNMENT);
         
-        panelTamanos.add(texto("Bloques:", 12, TINTA, false));
+        panelTamanos.add(texto("Total disco:", 12, TINTA, false));
         panelTamanos.add(spinBloques);
         
         panelTamanos.add(texto("Swap:", 12, TINTA, false));
         panelTamanos.add(spinSwap);
         
-        JButton btnAplicarTamano = new JButton("Aplicar");
-        btnAplicarTamano.setToolTipText("Redimensionar capacidad conservando archivos existentes (requiere ADMIN y disco sin E/S activa)");
-        btnAplicarTamano.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-        btnAplicarTamano.addActionListener(e -> {
-            final int nuevosBloques;
-            final int nuevoSwap;
+        btnAplicarTamanoDisco = new JButton("Aplicar");
+        btnAplicarTamanoDisco.setToolTipText("Redimensionar capacidad conservando archivos existentes (requiere ADMIN antes de iniciar la simulación)");
+        btnAplicarTamanoDisco.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+        btnAplicarTamanoDisco.addActionListener(e -> {
+            final int total;
+            final int swap;
             try {
-                nuevosBloques = EditorProceso.numeroVisible(spinBloques);
-                nuevoSwap = EditorProceso.numeroVisible(spinSwap);
-                spinBloques.setValue(nuevosBloques);
-                spinSwap.setValue(nuevoSwap);
+                total = EditorProceso.numeroVisible(spinBloques);
+                swap = EditorProceso.numeroVisible(spinSwap);
+                spinBloques.setValue(total);
+                spinSwap.setValue(swap);
             } catch (IllegalArgumentException ex) {
-                JOptionPane.showMessageDialog(this, "Indica valores enteros válidos (Bloques: 10–5000, Swap: 0–2000).",
+                JOptionPane.showMessageDialog(this, "Indica valores enteros válidos (Total: 100–500, Swap: 10–200).",
                         "Capacidad inválida", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            cambiarCapacidadDisco(nuevosBloques, nuevoSwap);
+            if (total < 100 || total > 500) {
+                JOptionPane.showMessageDialog(this, "El tamaño total del disco debe estar entre 100 y 500 bloques.",
+                        "Capacidad inválida", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (swap < 10 || swap > 200) {
+                JOptionPane.showMessageDialog(this, "El área de swap debe tener entre 10 y 200 bloques.",
+                        "Swap inválido", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (swap >= total) {
+                JOptionPane.showMessageDialog(this, "El área de swap (" + swap + ") debe ser menor que el total del disco (" + total + ").",
+                        "Swap inválido", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            int dataBlocks = total - swap;
+            if (dataBlocks < 20) {
+                JOptionPane.showMessageDialog(this, "El disco debe tener al menos 20 bloques para datos (quedarían " + dataBlocks + ").",
+                        "Datos insuficientes", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            cambiarCapacidadDisco(dataBlocks, swap);
         });
-        panelTamanos.add(btnAplicarTamano);
+        panelTamanos.add(btnAplicarTamanoDisco);
         configuracion.add(panelTamanos);
-        configuracion.add(texto("Conserva los archivos existentes si caben en el nuevo rango y no hay E/S ni swap activo.", 12, GRIS, false));
+        configuracion.add(Box.createVerticalStrut(4));
+        configuracion.add(lblPreviewCapacidadDisco);
+        configuracion.add(Box.createVerticalStrut(4));
+        configuracion.add(lblEstadoCapacidadDisco);
         configuracion.add(Box.createVerticalStrut(12));
+
+        Runnable actualizarPreview = () -> {
+            try {
+                int tot = EditorProceso.numeroVisible(spinBloques);
+                int sw = EditorProceso.numeroVisible(spinSwap);
+                int dat = tot - sw;
+                lblPreviewCapacidadDisco.setText("Datos: " + dat + " · Swap: " + sw + " · Total físico: " + tot);
+            } catch (Exception ignored) { }
+        };
+        spinBloques.addChangeListener(e -> actualizarPreview.run());
+        spinSwap.addChangeListener(e -> actualizarPreview.run());
         JPanel panelVelocidad = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         panelVelocidad.setOpaque(false);
         panelVelocidad.setAlignmentX(LEFT_ALIGNMENT);
@@ -1220,13 +1350,28 @@ detallesBloques = (String[]) datos[6];
 Object[][] filasCola = (Object[][]) datos[7];
 int datosActuales = (Integer) datos[3];
 int swapActual = (Integer) datos[8];
+int totalFisico = datosActuales + swapActual;
 if (!((JSpinner.DefaultEditor) spinBloques.getEditor()).getTextField().hasFocus()
-        && datosActuales >= 10 && datosActuales <= 5000) {
-    spinBloques.setValue(datosActuales);
+        && totalFisico >= 100 && totalFisico <= 500) {
+    spinBloques.setValue(totalFisico);
 }
 if (!((JSpinner.DefaultEditor) spinSwap.getEditor()).getTextField().hasFocus()
-        && swapActual >= 0 && swapActual <= 2000) {
+        && swapActual >= 10 && swapActual <= 200) {
     spinSwap.setValue(swapActual);
+}
+lblPreviewCapacidadDisco.setText("Datos: " + datosActuales + " · Swap: " + swapActual + " · Total físico: " + totalFisico);
+
+boolean puedeConfigurar = !controller.isRunning() && controller.getAccessControl().isAdmin();
+spinBloques.setEnabled(puedeConfigurar);
+spinSwap.setEnabled(puedeConfigurar);
+if (btnAplicarTamanoDisco != null) btnAplicarTamanoDisco.setEnabled(puedeConfigurar);
+
+if (controller.isRunning()) {
+    lblEstadoCapacidadDisco.setText("Cambio de capacidad deshabilitado durante la ejecución.");
+} else if (!controller.getAccessControl().isAdmin()) {
+    lblEstadoCapacidadDisco.setText("Solo el Administrador puede reconfigurar la capacidad del disco.");
+} else {
+    lblEstadoCapacidadDisco.setText("Configura la capacidad antes de iniciar la simulación.");
 }
 tablaColaDisco.setRowCount(0);
 for (int i = 0; i < filasCola.length; i++) {
