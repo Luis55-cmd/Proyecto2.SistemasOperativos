@@ -1,0 +1,5 @@
+{
+  "globalConfig": {"cycleDurationMs": 500, "swapSizeBlocks": 30, "initialDiskPolicy": "FIFO"},
+  "computer": {"ramCapacity": 32, "policy": "FCFS", "quantum": 2},
+  "processes": []
+}

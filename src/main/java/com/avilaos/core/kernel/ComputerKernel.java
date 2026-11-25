@@ -1192,6 +1192,7 @@ public class ComputerKernel {
                                 int liberados = fileSystemManager.deleteNode(request.getPath());
                                 event("Eliminación completada: " + request.getPath() + " · bloques liberados: " + liberados);
                             }
+                            p.setFileOperationCompleted(true);
                         }
                     } catch (RuntimeException ex) {
                         event("Operación fallida: " + ex.getMessage());

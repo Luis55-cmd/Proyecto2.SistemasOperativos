@@ -747,19 +747,22 @@ public class PanelPrincipal extends JPanel {
                     else estado = "Proceso " + solicitud.getId() + " · esperando CPU.";
                 } else if (solicitud.getIoOperation() == com.avilaos.core.model.IOOperationType.DELETE) {
                     if (solicitud.isTerminated())
-                        estado = "Eliminación completada: " + solicitud.getTargetPath();
+                        estado = solicitud.isFileOperationCompleted() ? "Eliminación completada: " + solicitud.getTargetPath()
+                                : "Eliminación no completada; revisa el log.";
                     else if (solicitud.getState() == com.avilaos.core.model.ProcessState.BLOQUEADO)
                         estado = "Esperando atención del disco para eliminar " + solicitud.getTargetPath();
                     else estado = "Proceso " + solicitud.getId() + " · esperando CPU para eliminación.";
                 } else if (solicitud.getIoOperation() == com.avilaos.core.model.IOOperationType.UPDATE) {
                     if (solicitud.isTerminated())
-                        estado = "Renombrado completado: " + solicitud.getTargetPath() + " → " + solicitud.getNewFileName();
+                        estado = solicitud.isFileOperationCompleted() ? "Renombrado completado: " + solicitud.getTargetPath() + " → " + solicitud.getNewFileName()
+                                : "Renombrado no completado; revisa el log.";
                     else if (solicitud.getState() == com.avilaos.core.model.ProcessState.BLOQUEADO)
                         estado = "Esperando atención del disco para renombrar " + solicitud.getTargetPath();
                     else estado = "Proceso " + solicitud.getId() + " · esperando CPU para renombrado.";
                 } else if (solicitud.getIoOperation() == com.avilaos.core.model.IOOperationType.READ) {
                     if (solicitud.isTerminated())
-                        estado = "Lectura completada: " + solicitud.getTargetPath();
+                        estado = solicitud.isFileOperationCompleted() ? "Lectura completada: " + solicitud.getTargetPath()
+                                : "Lectura no completada; revisa el log.";
                     else if (solicitud.getState() == com.avilaos.core.model.ProcessState.BLOQUEADO)
                         estado = "Esperando atención del disco para leer " + solicitud.getTargetPath();
                     else estado = "Proceso " + solicitud.getId() + " · esperando CPU para lectura.";

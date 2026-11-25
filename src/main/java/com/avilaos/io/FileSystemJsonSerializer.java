@@ -118,14 +118,19 @@ public final class FileSystemJsonSerializer {
         SimulatedDisk disk = new SimulatedDisk(totalBlocks, effectiveSwap, restoredHead);
         FileSystemManager fsManager = new FileSystemManager(disk);
 
-        // Pase 1: Crear directorios asegurando que los padres existan primero
+        // No omitir entradas duplicadas: podrían ocultar permisos o bloques distintos.
+        for (int i = 0; i < entries.size(); i++) {
+            for (int j = 0; j < i; j++) {
+                if (entries.get(i).path().equals(entries.get(j).path()))
+                    throw new IllegalArgumentException("Ruta duplicada en fileSystem: " + entries.get(i).path());
+            }
+        }
+
+        // Si el padre está declarado más adelante, usar sus metadatos explícitos.
         for (int i = 0; i < entries.size(); i++) {
             EntrySpec e = entries.get(i);
             if (e.type() == FsNodeType.DIRECTORY) {
-                if (fsManager.findNode(e.path()) == null) {
-                    ensureParentDirectory(fsManager, e.path(), e.owner());
-                    fsManager.createDirectoryAtBlock(e.path(), e.owner(), e.permission(), "JSON", e.startBlock());
-                }
+                ensureDirectory(fsManager, e.path(), e.owner(), entries);
             }
         }
 
@@ -133,7 +138,7 @@ public final class FileSystemJsonSerializer {
         for (int i = 0; i < entries.size(); i++) {
             EntrySpec e = entries.get(i);
             if (e.type() != FsNodeType.DIRECTORY) {
-                ensureParentDirectory(fsManager, e.path(), e.owner());
+                ensureDirectory(fsManager, FileSystemManager.parentOf(e.path()), e.owner(), entries);
                 if (e.blocks() <= 0) {
                     throw new IllegalArgumentException("El archivo '" + e.path() + "' debe tener blocks >= 1.");
                 }
@@ -295,13 +300,25 @@ public final class FileSystemJsonSerializer {
         return new EntrySpec(path.trim(), type, startBlock, blocks, owner.trim(), perm, chain);
     }
 
-    private static void ensureParentDirectory(FileSystemManager fsManager, String fullPath, String owner) {
-        String parentPath = FileSystemManager.parentOf(fullPath);
-        if ("/".equals(parentPath)) return;
-        if (fsManager.findNode(parentPath) == null) {
-            ensureParentDirectory(fsManager, parentPath, owner);
-            fsManager.createDirectory(parentPath, owner != null ? owner : "admin", FilePermission.PUBLIC, "JSON");
+    private static void ensureDirectory(FileSystemManager fsManager, String path, String fallbackOwner,
+                                        MyLinkedList<EntrySpec> entries) {
+        if ("/".equals(path)) return;
+        var existing = fsManager.findNode(path);
+        if (existing != null) {
+            if (!existing.isDirectory()) throw new IllegalArgumentException("No es directorio: " + path);
+            return;
         }
+        EntrySpec declared = null;
+        for (int i = 0; i < entries.size(); i++) {
+            if (entries.get(i).path().equals(path)) { declared = entries.get(i); break; }
+        }
+        if (declared != null && declared.type() != FsNodeType.DIRECTORY)
+            throw new IllegalArgumentException("La ruta padre no es directorio: " + path);
+        ensureDirectory(fsManager, FileSystemManager.parentOf(path), fallbackOwner, entries);
+        if (declared != null)
+            fsManager.createDirectoryAtBlock(path, declared.owner(), declared.permission(), "JSON", declared.startBlock());
+        else
+            fsManager.createDirectory(path, fallbackOwner != null ? fallbackOwner : "admin", FilePermission.PUBLIC, "JSON");
     }
 
     private static void allocateExplicitChain(SimulatedDisk disk, FileSystemManager fsManager, EntrySpec e) {
