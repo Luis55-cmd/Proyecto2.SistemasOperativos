@@ -423,6 +423,11 @@ public class SimulationController implements IClockTickable {
             if (computers.isEmpty()) throw new IllegalStateException("Crea primero un computador.");
             if (path == null || !path.startsWith("/") || path.length() < 2 || path.endsWith("/"))
                 throw new IllegalArgumentException("Indica una ruta absoluta y un nombre válido.");
+            String parentPath = com.avilaos.filesystem.FileSystemManager.parentOf(path);
+            var parentNode = fileSystemManager.findNode(parentPath);
+            if (parentNode == null || !parentNode.isDirectory()) {
+                throw new IllegalArgumentException("El directorio destino '" + parentPath + "' no existe en el sistema de archivos.");
+            }
             if (type == null || permission == null || blocks < 1 || (type == com.avilaos.filesystem.FsNodeType.DIRECTORY && blocks != 1))
                 throw new IllegalArgumentException("Tipo, permiso o tamaño inválido.");
             UserMode mode = currentMode;
@@ -432,6 +437,11 @@ public class SimulationController implements IClockTickable {
             var decision = new com.avilaos.filesystem.AccessControlManager(mode, actor).checkOperation(
                     fileSystemManager.getTree(), IOOperationType.CREATE, path, type);
             if (!decision.allowed()) throw new IllegalArgumentException(decision.message());
+            int libres = disk.getFreeDataBlocks();
+            if (blocks > libres) {
+                throw new IllegalArgumentException("Espacio insuficiente: se necesitan " + blocks
+                        + " bloques de datos y hay " + libres + " libres.");
+            }
             ProcessControlBlock p = createProcess("Crear " + path, computers.get(0).getId(), ProcessType.FILE_IO, 2, 2, 5, 10000);
             if (p == null) throw new IllegalStateException("No se pudo crear el proceso; revisa RAM y log.");
             p.setIoOperation(IOOperationType.CREATE);

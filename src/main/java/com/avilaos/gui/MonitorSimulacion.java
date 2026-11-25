@@ -343,9 +343,9 @@ public final class MonitorSimulacion extends JPanel {
         JButton btnLog = accion("Exportar log", false);
         btnLog.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
-            chooser.setSelectedFile(new File("avilaos-ciclo-" + controller.getCurrentCycle() + ".log"));
+            chooser.setSelectedFile(new java.io.File("avilaos-ciclo-" + controller.getCurrentCycle() + ".log"));
             if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-                File destino = chooser.getSelectedFile();
+                java.io.File destino = chooser.getSelectedFile();
                 String texto = areaLog.getText();
                 GuiCommands.submit(() -> {
                     java.nio.file.Files.writeString(destino.toPath(), texto, java.nio.charset.StandardCharsets.UTF_8);
@@ -355,6 +355,12 @@ public final class MonitorSimulacion extends JPanel {
             }
         });
         panel.add(btnLog);
+        JButton btnCargarFS = accion("Cargar Archivos JSON", true);
+        JButton btnGuardarFS = accion("Guardar Archivos JSON", false);
+        btnCargarFS.addActionListener(e -> cargarSistemaArchivosMonitor(btnCargarFS));
+        btnGuardarFS.addActionListener(e -> guardarSistemaArchivosMonitor(btnGuardarFS));
+        panel.add(btnCargarFS);
+        panel.add(btnGuardarFS);
         JButton btnReiniciar = accion("Reiniciar todo", false);
         btnReiniciar.addActionListener(e -> {
             btnReiniciar.setEnabled(false);
@@ -375,13 +381,97 @@ public final class MonitorSimulacion extends JPanel {
     }
 
     /** Delegación conservada para las pruebas del monitor anterior. */
-    boolean guardarEstado(File archivo) {
+    boolean guardarEstado(java.io.File archivo) {
         return new ConfiguracionSimulacion(controller).guardarEstado(archivo);
     }
 
     boolean cargarEstado(File archivo) {
         return new ConfiguracionSimulacion(controller).cargarEstado(archivo);
     }
+
+    // ── Cargar / Guardar sistema de archivos JSON ─────────────────────────────
+
+    private void guardarSistemaArchivosMonitor(JButton boton) {
+        JFileChooser selector = new JFileChooser();
+        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        java.io.File archivo = selector.getSelectedFile();
+        if (!archivo.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".json"))
+            archivo = new java.io.File(archivo.getParentFile(), archivo.getName() + ".json");
+        if (archivo.exists() && JOptionPane.showConfirmDialog(this,
+                "El archivo ya existe. ¿Deseas reemplazarlo?", "Guardar sistema de archivos",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
+        final java.io.File destino = archivo;
+        boton.setEnabled(false);
+        StateAccess.enter();
+        try {
+            var disco = controller.getDisk();
+            if (disco.getActiveRequest() != null || disco.getQueueSize() != 0) {
+                boton.setEnabled(true);
+                JOptionPane.showMessageDialog(this,
+                        "Espera a que terminen las solicitudes de disco antes de guardar.",
+                        "No se pudo guardar", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            controller.saveFileSystemJson(destino);
+            boton.setEnabled(true);
+            controller.logEvent("Sistema de archivos guardado: " + destino.getName());
+        } catch (Exception ex) {
+            boton.setEnabled(true);
+            controller.logEvent("Error al guardar sistema de archivos: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "No se pudo guardar", JOptionPane.ERROR_MESSAGE);
+        } finally {
+            StateAccess.exit();
+        }
+    }
+
+    private void cargarSistemaArchivosMonitor(JButton boton) {
+        JFileChooser selector = new JFileChooser();
+        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        final java.io.File archivo = selector.getSelectedFile();
+        boton.setEnabled(false);
+        GuiCommands.submit(() -> {
+            StateAccess.enter();
+            try {
+                boolean hayDatos = controller.isFileSystemJsonLoaded()
+                        || !controller.getFileSystemManager().getAllNodesPreOrder().isEmpty();
+                return hayDatos;
+            } finally { StateAccess.exit(); }
+        }, hayDatos -> {
+            if (hayDatos) {
+                int confirmacion = JOptionPane.showConfirmDialog(this,
+                        "La carga reemplazará el disco y los archivos actuales. ¿Deseas continuar?",
+                        "Cargar sistema de archivos", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                if (confirmacion != JOptionPane.YES_OPTION) { boton.setEnabled(true); return; }
+            }
+            GuiCommands.submit(() -> {
+                StateAccess.enter();
+                try {
+                    controller.logEvent("Intento de carga del sistema de archivos: " + archivo.getName());
+                    if (controller.isRunning())
+                        throw new IllegalStateException("Detén y reinicia la simulación antes de reemplazar el disco.");
+                    controller.loadFileSystemJson(archivo);
+                    return true;
+                } finally { StateAccess.exit(); }
+            }, ok -> {
+                boton.setEnabled(true);
+                controller.logEvent("Sistema de archivos cargado correctamente.");
+                actualizarVista();
+            }, error -> {
+                boton.setEnabled(true);
+                String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+                controller.logEvent("Error al cargar sistema de archivos: " + motivo);
+                JOptionPane.showMessageDialog(this, motivo, "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+            });
+        }, error -> {
+            boton.setEnabled(true);
+            controller.logEvent("Error al comprobar el sistema de archivos: " + error.getMessage());
+            JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo cargar", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     private static class ScrollablePanel extends JPanel implements Scrollable {
         public ScrollablePanel(LayoutManager layout) { super(layout); }

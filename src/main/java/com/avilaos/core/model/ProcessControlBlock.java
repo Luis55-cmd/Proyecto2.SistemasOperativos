@@ -672,6 +672,7 @@ public class ProcessControlBlock {
     private int reservedStart = -1;
     private boolean creationIssued;
     private boolean creationCompleted;
+    private boolean fileOperationCompleted;
 
     public com.avilaos.filesystem.FsNodeType getCreationType() { return creationType; }
     public void setCreationType(com.avilaos.filesystem.FsNodeType type) { creationType = type; }
@@ -687,6 +688,8 @@ public class ProcessControlBlock {
     public void setCreationIssued(boolean issued) { creationIssued = issued; }
     public boolean isCreationCompleted() { return creationCompleted; }
     public void setCreationCompleted(boolean completed) { creationCompleted = completed; }
+    public boolean isFileOperationCompleted() { return fileOperationCompleted; }
+    public void setFileOperationCompleted(boolean completed) { fileOperationCompleted = completed; }
     private int swapStartBlock = -1;
     private boolean diskRequestIssued = false;
 

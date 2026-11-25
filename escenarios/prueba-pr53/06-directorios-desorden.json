@@ -1,0 +1,8 @@
+{
+  "diskConfig": {"totalBlocks": 120, "initialHead": 50},
+  "fileSystem": [
+    {"path": "/a/b", "type": "DIRECTORY", "startBlock": 5, "owner": "cesar", "permissions": "public"},
+    {"path": "/a", "type": "DIRECTORY", "startBlock": 10, "owner": "ana", "permissions": "private"},
+    {"path": "/a/nota.txt", "type": "FILE", "startBlock": 20, "blocks": 2, "owner": "ana", "permissions": "public"}
+  ]
+}
