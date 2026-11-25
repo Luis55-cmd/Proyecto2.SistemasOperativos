@@ -12,11 +12,14 @@ import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * Lector y escritor del JSON de Estado del Sistema de Archivos (Issue #11).
@@ -56,6 +59,7 @@ public final class FileSystemJsonSerializer {
         }
         int totalBlocks = -1;
         int initialHead = -1;
+        Integer currentHead = null;
         boolean hasDiskConfig = false;
         boolean hasFileSystem = false;
         MyLinkedList<EntrySpec> entries = new MyLinkedList<>();
@@ -73,6 +77,8 @@ public final class FileSystemJsonSerializer {
                             totalBlocks = reader.nextInt();
                         } else if ("initialHead".equals(k)) {
                             initialHead = reader.nextInt();
+                        } else if ("currentHead".equals(k)) {
+                            currentHead = reader.nextInt();
                         } else {
                             reader.skipValue();
                         }
@@ -105,7 +111,11 @@ public final class FileSystemJsonSerializer {
         }
 
         int effectiveSwap = Math.max(0, swapSizeBlocks);
-        SimulatedDisk disk = new SimulatedDisk(totalBlocks, effectiveSwap, initialHead);
+        int restoredHead = currentHead != null ? currentHead : initialHead;
+        if (restoredHead < 0 || (long) restoredHead >= (long) totalBlocks + effectiveSwap) {
+            throw new IllegalArgumentException("diskConfig.currentHead fuera del disco físico para el swap configurado.");
+        }
+        SimulatedDisk disk = new SimulatedDisk(totalBlocks, effectiveSwap, restoredHead);
         FileSystemManager fsManager = new FileSystemManager(disk);
 
         // Primero insertar directorios y archivos respetando el orden y validando bloques
@@ -120,7 +130,10 @@ public final class FileSystemJsonSerializer {
                 if (e.startBlock() < 0 || e.startBlock() >= totalBlocks) {
                     throw new IllegalArgumentException("startBlock fuera de rango en '" + e.path() + "': " + e.startBlock());
                 }
-                if (e.explicitChain() != null && e.explicitChain().size() == e.blocks()) {
+                if (e.explicitChain() != null && e.explicitChain().size() != e.blocks()) {
+                    throw new IllegalArgumentException("La longitud de 'chain' no coincide con blocks en " + e.path());
+                }
+                if (e.explicitChain() != null) {
                     allocateExplicitChain(disk, fsManager, e);
                 } else {
                     fsManager.createFileAtStartBlock(
@@ -129,7 +142,7 @@ public final class FileSystemJsonSerializer {
             }
         }
 
-        return new LoadedFileSystem(totalBlocks, initialHead, disk, fsManager);
+        return new LoadedFileSystem(totalBlocks, restoredHead, disk, fsManager);
     }
 
     public static LoadedFileSystem loadFromFile(File file, int swapSizeBlocks) throws IOException {
@@ -161,7 +174,11 @@ public final class FileSystemJsonSerializer {
 
             writer.name("diskConfig").beginObject();
             writer.name("totalBlocks").value(disk.getTotalBlocks());
-            writer.name("initialHead").value(disk.getHeadPosition());
+            int head = disk.getHeadPosition();
+            // initialHead conserva el formato oficial, limitado al área de datos.
+            // currentHead permite recuperar una posición física situada en swap.
+            writer.name("initialHead").value(Math.min(head, disk.getTotalBlocks() - 1));
+            if (head >= disk.getTotalBlocks()) writer.name("currentHead").value(head);
             writer.endObject();
 
             writer.name("fileSystem").beginArray();
@@ -199,8 +216,17 @@ public final class FileSystemJsonSerializer {
 
     public static void saveToFile(File file, SimulatedDisk disk, FileSystemManager fsManager) throws IOException {
         String json = toJsonString(disk, fsManager);
-        try (FileWriter fw = new FileWriter(file, StandardCharsets.UTF_8)) {
-            fw.write(json);
+        Path destination = file.toPath().toAbsolutePath();
+        Path temporary = Files.createTempFile(destination.getParent(), ".avilaos-", ".json.tmp");
+        try {
+            Files.writeString(temporary, json, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 

@@ -851,6 +851,17 @@ public class SimulationController implements IClockTickable {
         this.dualJsonGateActive = active;
     }
 
+    /** Evita abandonar solicitudes o procesos suspendidos al reemplazar componentes. */
+    private void requireDiskQuiescentForLoad() {
+        if (clock.isRunning()) {
+            throw new IllegalStateException("Detén la simulación antes de cargar una configuración.");
+        }
+        if (disk != null && (disk.getFreeSwapBlocks() != disk.getSwapSizeBlocks()
+                || disk.getActiveRequest() != null || disk.getQueueSize() != 0)) {
+            throw new IllegalStateException("No se puede cargar con swap ocupado o solicitudes de disco pendientes.");
+        }
+    }
+
     /**
      * Carga y valida el JSON #1 (Estado del Sistema de Archivos: diskConfig + fileSystem).
      */
@@ -859,6 +870,7 @@ public class SimulationController implements IClockTickable {
         try {
             com.avilaos.io.FileSystemJsonSerializer.LoadedFileSystem loaded =
                     com.avilaos.io.FileSystemJsonSerializer.loadFromString(json, configuredSwapSizeBlocks);
+            requireDiskQuiescentForLoad();
             com.avilaos.disk.DiskSchedulingPolicy currentPolicy = this.disk != null ? this.disk.getSchedulingPolicy() : null;
             this.disk = loaded.disk();
             if (currentPolicy != null) {
@@ -883,6 +895,7 @@ public class SimulationController implements IClockTickable {
         try {
             com.avilaos.io.FileSystemJsonSerializer.LoadedFileSystem loaded =
                     com.avilaos.io.FileSystemJsonSerializer.loadFromFile(file, configuredSwapSizeBlocks);
+            requireDiskQuiescentForLoad();
             com.avilaos.disk.DiskSchedulingPolicy currentPolicy = this.disk != null ? this.disk.getSchedulingPolicy() : null;
             this.disk = loaded.disk();
             if (currentPolicy != null) {
@@ -912,6 +925,13 @@ public class SimulationController implements IClockTickable {
             com.avilaos.io.ProcessConfigJsonSerializer.LoadedProcessConfig cfg =
                     com.avilaos.io.ProcessConfigJsonSerializer.loadFromString(json);
 
+            int newSwapSize = cfg.globalConfig().swapSizeBlocks();
+            requireDiskQuiescentForLoad();
+            if (this.disk != null && this.disk.getSwapSizeBlocks() != newSwapSize) {
+                if ((long) this.disk.getHeadPosition() >= (long) this.disk.getTotalBlocks() + newSwapSize) {
+                    throw new IllegalStateException("La posición del cabezal queda fuera del disco con el nuevo tamaño de swap.");
+                }
+            }
             this.clock.stop();
             this.clock.setCycleCounter(0);
             this.clock.setCycleDurationMs(cfg.globalConfig().cycleDurationMs());
@@ -1040,6 +1060,22 @@ public class SimulationController implements IClockTickable {
     
     public void reconfigurarDisco(int totalBlocks, int swapSizeBlocks) {
         throw new IllegalStateException("Cambio de capacidad deshabilitado hasta proteger archivos, E/S y swap.");
+    }
+
+    /** La nueva velocidad se usa a partir del siguiente ciclo del disco. */
+    public void setDiskHeadSpeed(int speed) {
+        StateAccess.enter();
+        try {
+            if (currentMode != UserMode.ADMIN) {
+                throw new IllegalStateException("Solo el administrador puede cambiar la velocidad del cabezal.");
+            }
+            if (speed < 1 || speed > 500) {
+                throw new IllegalArgumentException("La velocidad debe estar entre 1 y 500 bloques por ciclo.");
+            }
+            disk.setHeadSpeedPerTick(speed);
+            logEvent("Velocidad del cabezal cambiada a " + speed + " bloques por ciclo.");
+            notifyGUI();
+        } finally { StateAccess.exit(); }
     }
     
     public UserMode getMode() {

@@ -372,10 +372,11 @@ public class PanelPrincipal extends JPanel {
             JButton guardar = accion("Guardar JSON", false);
             if (i == 0) {
                 cargar.addActionListener(e -> cargarSistemaArchivos(cargar));
+                guardar.addActionListener(e -> guardarSistemaArchivos(guardar));
             } else {
                 cargar.addActionListener(e -> cargarProcesosConfiguracion(cargar));
+                guardar.setEnabled(false);
             }
-            guardar.setEnabled(false);
             botones.add(cargar);
             botones.add(guardar);
             tarjeta.add(botones);
@@ -385,8 +386,42 @@ public class PanelPrincipal extends JPanel {
         }
         panel.add(opciones);
         panel.add(Box.createVerticalStrut(10));
-        panel.add(texto("Carga de JSON disponible. Guardado pendiente de conectar.", 12, GRIS, false));
+        panel.add(texto("El sistema de archivos puede guardarse en JSON.", 12, GRIS, false));
         return panel;
+    }
+
+    private void guardarSistemaArchivos(JButton boton) {
+        JFileChooser selector = new JFileChooser();
+        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        java.io.File archivo = selector.getSelectedFile();
+        if (!archivo.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".json")) {
+            archivo = new java.io.File(archivo.getParentFile(), archivo.getName() + ".json");
+        }
+        if (archivo.exists() && JOptionPane.showConfirmDialog(this,
+                "El archivo ya existe. ¿Deseas reemplazarlo?", "Guardar sistema de archivos",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
+        aplicarGuardadoSistemaArchivos(archivo, boton);
+    }
+
+    void aplicarGuardadoSistemaArchivos(java.io.File archivo, JButton boton) {
+        boton.setEnabled(false);
+        GuiRequest.model(controller, () -> {
+            var disco = controller.getDisk();
+            if (disco.getActiveRequest() != null || disco.getQueueSize() != 0) {
+                throw new IllegalStateException("Espera a que terminen las solicitudes de disco antes de guardar.");
+            }
+            controller.saveFileSystemJson(archivo);
+            return true;
+        }, resultado -> {
+            boton.setEnabled(true);
+            estadoCargaArchivos.setText("Sistema de archivos guardado correctamente.");
+        }, error -> {
+            boton.setEnabled(true);
+            String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+            controller.logEvent("Error al guardar sistema de archivos: " + motivo);
+            JOptionPane.showMessageDialog(this, motivo, "No se pudo guardar", JOptionPane.ERROR_MESSAGE);
+        });
     }
 
     private void cargarSistemaArchivos(JButton boton) {
@@ -887,7 +922,7 @@ public class PanelPrincipal extends JPanel {
         panel.add(Box.createVerticalStrut(28));
         
         JPanel configuracion = tarjeta();
-        configuracion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 420));
+        configuracion.setMaximumSize(new Dimension(Integer.MAX_VALUE, 500));
         configuracion.add(texto("ESTADO DEL DISCO", 11, ACENTO, true));
         configuracion.add(Box.createVerticalStrut(8));
         configuracion.add(discoOrigen);
@@ -933,6 +968,32 @@ public class PanelPrincipal extends JPanel {
         panelTamanos.add(btnAplicarTamano);
         configuracion.add(panelTamanos);
         configuracion.add(texto("Cambio de capacidad deshabilitado para proteger los datos.", 12, GRIS, false));
+        configuracion.add(Box.createVerticalStrut(12));
+        JPanel panelVelocidad = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        panelVelocidad.setOpaque(false);
+        panelVelocidad.setAlignmentX(LEFT_ALIGNMENT);
+        panelVelocidad.add(texto("Velocidad del cabezal (bloques/ciclo):", 12, TINTA, false));
+        JSpinner velocidad = new JSpinner(new SpinnerNumberModel(10, 1, 500, 1));
+        panelVelocidad.add(velocidad);
+        JButton aplicarVelocidad = new JButton("Aplicar velocidad");
+        aplicarVelocidad.addActionListener(e -> {
+            final int valor;
+            try {
+                valor = EditorProceso.numeroVisible(velocidad);
+                velocidad.setValue(valor);
+            } catch (IllegalArgumentException ex) {
+                JOptionPane.showMessageDialog(this, "Indica una velocidad entera entre 1 y 500.", "Velocidad inválida", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            GuiRequest.model(controller, () -> { controller.setDiskHeadSpeed(valor); return true; },
+                    ok -> actualizarVistaDisco(), error -> {
+                        String motivo = error.getMessage() == null ? error.toString() : error.getMessage();
+                        controller.logEvent("No se pudo cambiar la velocidad: " + motivo);
+                        JOptionPane.showMessageDialog(this, motivo, "No se pudo cambiar la velocidad", JOptionPane.ERROR_MESSAGE);
+                    });
+        });
+        panelVelocidad.add(aplicarVelocidad);
+        configuracion.add(panelVelocidad);
         configuracion.add(Box.createVerticalStrut(12));
         // ----------------------------------------------
 

@@ -98,6 +98,13 @@ public final class ProcessConfigJsonSerializer {
         if (processes == null) {
             throw new IllegalArgumentException("Falta el arreglo 'processes' en el JSON de procesos.");
         }
+        for (int i = 0; i < processes.size(); i++) {
+            ProcessSpec process = processes.get(i);
+            if (process.memory() > computer.ramCapacity()) {
+                throw new IllegalArgumentException("El proceso '" + process.name()
+                        + "' requiere más memoria que la capacidad del computador.");
+            }
+        }
         return new LoadedProcessConfig(globalConfig, computer, processes);
     }
 

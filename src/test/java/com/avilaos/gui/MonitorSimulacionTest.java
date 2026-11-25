@@ -13,8 +13,8 @@ public class MonitorSimulacionTest {
             var controller = SimulationController.getInstance();
             controller.reset();
             var panel = new PanelPrincipal();
-            var simulacion = (JButton) CreacionComputadoresGuiTest.buscar(panel, JButton.class, "05   Simulación");
-            var metricas = (JButton) CreacionComputadoresGuiTest.buscar(panel, JButton.class, "06   Métricas");
+            var simulacion = (JButton) CreacionComputadoresGuiTest.buscar(panel, JButton.class, "06   Simulación");
+            var metricas = (JButton) CreacionComputadoresGuiTest.buscar(panel, JButton.class, "07   Métricas");
             check(simulacion != null && metricas != null, "Entradas principales del menú");
             check(CreacionComputadoresGuiTest.buscar(panel, JButton.class, "07   Nueva vista") == null, "Menú sin duplicado de simulación");
             check(CreacionComputadoresGuiTest.buscar(panel, JButton.class, "08   Métricas copia") == null, "Menú sin duplicado de métricas");

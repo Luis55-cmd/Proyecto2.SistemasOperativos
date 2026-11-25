@@ -69,11 +69,12 @@ public class ThreadCoordinationTest {
         var before=ctrl.snapshot();
         ctrl.createComputer("Uno",128,SchedulingPolicyType.FCFS);
         var first=ctrl.snapshot();
-        ctrl.createComputer("Dos",256,SchedulingPolicyType.EDF);
         check(before.computers.size()==0,"Snapshot anterior cambió");
         check(first.computers.size()==1,"Snapshot intermedio cambió/no se publicó");
-        check(ctrl.snapshot().computers.size()==2,"Falta publicación");
         ctrl.setComputerPolicy(1,SchedulingPolicyType.PRIORITY_PREEMPTIVE);
+        check(ctrl.snapshot().computers.size()==1,"Falta publicación");
+        check(ctrl.snapshot().computers.get(0).getPolitica()==SchedulingPolicyType.PRIORITY_PREEMPTIVE,
+                "La política nueva no se publicó");
         check(first.computers.get(0).getPolitica()==SchedulingPolicyType.FCFS,"Objeto vivo en snapshot");
     }
     private static void pause() throws Exception {
