@@ -994,7 +994,14 @@ public class PanelPrincipal extends JPanel {
         }
 
         final String rutaFinal = ruta;
-        int cantidad = archivo ? (Integer) bloques.getValue() : 1;
+        final int cantidad;
+        try {
+            cantidad = archivo ? EditorProceso.numeroVisible(bloques) : 1;
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Indica un tamaño entero entre 1 y 500 bloques.",
+                    "Tamaño inválido", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         String propietario = dueno.getText().trim();
         var tipo = archivo ? com.avilaos.filesystem.FsNodeType.FILE : com.avilaos.filesystem.FsNodeType.DIRECTORY;
         var acceso = permiso.getSelectedIndex() == 0 ? com.avilaos.filesystem.FilePermission.PUBLIC : com.avilaos.filesystem.FilePermission.PRIVATE;
