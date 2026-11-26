@@ -107,7 +107,9 @@ public final class FileSystemJsonSerializer {
             throw new IllegalArgumentException("diskConfig.totalBlocks debe ser mayor que 0.");
         }
         if (initialHead < 0 || initialHead >= totalBlocks) {
-            throw new IllegalArgumentException("diskConfig.initialHead fuera de rango [0, " + (totalBlocks - 1) + "].");
+            throw new IllegalArgumentException("La posición inicial del cabezal (" + initialHead
+                    + ") no es válida para " + totalBlocks + " bloques de datos. "
+                    + "En el JSON, diskConfig.initialHead debe estar entre 0 y " + (totalBlocks - 1) + ".");
         }
 
         int effectiveSwap = Math.max(0, swapSizeBlocks);

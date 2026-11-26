@@ -1099,7 +1099,15 @@ public class SimulationController implements IClockTickable {
             if (swapSizeBlocks < 0 || swapSizeBlocks > 2000) {
                 throw new IllegalArgumentException("El tamaño del área de swap debe estar entre 0 y 2000 bloques.");
             }
-            requireDiskQuiescentForLoad();
+            if (clock.isRunning() && !clock.isPaused()) {
+                throw new IllegalStateException("Pausa la simulación antes de cambiar la capacidad del disco.");
+            }
+            if (disk != null && disk.getFreeSwapBlocks() != disk.getSwapSizeBlocks()) {
+                throw new IllegalStateException("No se puede cambiar la capacidad mientras haya swap ocupado.");
+            }
+
+            if (this.disk != null && this.disk.getTotalBlocks() == totalBlocks
+                    && this.disk.getSwapSizeBlocks() == swapSizeBlocks) return;
 
             boolean tieneArchivosOReservas = false;
             int maxBloqueOcupado = 0;
@@ -1142,9 +1150,18 @@ public class SimulationController implements IClockTickable {
                 }
             }
 
+            // Validar las solicitudes antes de modificar cualquier parte de la sesión.
+            if (this.disk != null) {
+                com.avilaos.disk.SimulatedDisk comprobacion = new com.avilaos.disk.SimulatedDisk(
+                        totalBlocks, swapSizeBlocks, this.disk.getHeadPosition(), this.disk.getHeadSpeedPerTick());
+                comprobacion.conservarLecturasPendientesDe(this.disk);
+            }
             this.configuredSwapSizeBlocks = swapSizeBlocks;
             if (this.disk != null && tieneArchivosOReservas) {
+                com.avilaos.disk.SimulatedDisk anterior = this.disk;
                 this.disk = rebuildDiskPreservingDataBlocks(this.disk, totalBlocks, swapSizeBlocks);
+                this.disk.conservarMetricasDe(anterior);
+                this.disk.conservarLecturasPendientesDe(anterior);
                 this.fileSystemManager.setDisk(this.disk);
             } else {
                 int headInicial = (this.disk != null && this.disk.getHeadPosition() < totalBlocks + swapSizeBlocks)
@@ -1152,7 +1169,13 @@ public class SimulationController implements IClockTickable {
                 int speed = (this.disk != null) ? this.disk.getHeadSpeedPerTick() : 10;
                 com.avilaos.disk.DiskSchedulingPolicy currentPolicy =
                         (this.disk != null) ? this.disk.getSchedulingPolicy() : null;
+                com.avilaos.disk.SimulatedDisk anterior = this.disk;
                 this.disk = new com.avilaos.disk.SimulatedDisk(totalBlocks, swapSizeBlocks, headInicial, speed);
+                if (anterior != null) {
+                    this.disk.setHeadDirection(anterior.getHeadDirection());
+                    this.disk.conservarMetricasDe(anterior);
+                    this.disk.conservarLecturasPendientesDe(anterior);
+                }
                 if (currentPolicy != null) {
                     this.disk.setSchedulingPolicy(currentPolicy);
                 }

@@ -51,7 +51,7 @@ public class PanelPrincipal extends JPanel {
     private final JLabel discoPolitica = texto(" ", 14, GRIS, false);
     private final JLabel discoMetricas = texto(" ", 14, GRIS, false);
     private final JSpinner spinBloques = new JSpinner(new SpinnerNumberModel(200, 100, 500, 10));
-    private final JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(50, 10, 200, 10));
+    private final JSpinner spinSwap = new JSpinner(new SpinnerNumberModel(50, 10, 480, 10));
     private final JLabel lblPreviewCapacidadDisco = texto("Datos: 150 · Swap: 50 · Total físico: 200", 12, ACENTO, false);
     private final JLabel lblEstadoCapacidadDisco = texto("Configurable antes de iniciar la simulación (modo Administrador).", 12, GRIS, false);
     private JButton btnAplicarTamanoDisco;
@@ -1170,7 +1170,7 @@ public class PanelPrincipal extends JPanel {
         panelTamanos.add(spinSwap);
         
         btnAplicarTamanoDisco = new JButton("Aplicar");
-        btnAplicarTamanoDisco.setToolTipText("Redimensionar capacidad conservando archivos existentes (requiere ADMIN antes de iniciar la simulación)");
+        btnAplicarTamanoDisco.setToolTipText("Redimensionar conservando archivos; requiere ADMIN y el reloj pausado o detenido");
         btnAplicarTamanoDisco.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
         btnAplicarTamanoDisco.addActionListener(e -> {
             final int total;
@@ -1181,7 +1181,7 @@ public class PanelPrincipal extends JPanel {
                 spinBloques.setValue(total);
                 spinSwap.setValue(swap);
             } catch (IllegalArgumentException ex) {
-                JOptionPane.showMessageDialog(this, "Indica valores enteros válidos (Total: 100–500, Swap: 10–200).",
+                JOptionPane.showMessageDialog(this, "Indica valores enteros válidos (Total: 100–500, Swap: 10–480).",
                         "Capacidad inválida", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -1190,8 +1190,8 @@ public class PanelPrincipal extends JPanel {
                         "Capacidad inválida", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            if (swap < 10 || swap > 200) {
-                JOptionPane.showMessageDialog(this, "El área de swap debe tener entre 10 y 200 bloques.",
+            if (swap < 10 || swap > 480) {
+                JOptionPane.showMessageDialog(this, "El área de swap debe tener entre 10 y 480 bloques y dejar al menos 20 para datos.",
                         "Swap inválido", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -1216,9 +1216,17 @@ public class PanelPrincipal extends JPanel {
         configuracion.add(lblEstadoCapacidadDisco);
         configuracion.add(Box.createVerticalStrut(12));
 
+        javax.swing.text.NumberFormatter formatoSwap = (javax.swing.text.NumberFormatter)
+                ((JSpinner.DefaultEditor) spinSwap.getEditor()).getTextField().getFormatter();
+        formatoSwap.setAllowsInvalid(false);
         Runnable actualizarPreview = () -> {
             try {
                 int tot = EditorProceso.numeroVisible(spinBloques);
+                int maxSwap = Math.max(10, Math.min(480, tot - 20));
+                SpinnerNumberModel modeloSwap = (SpinnerNumberModel) spinSwap.getModel();
+                if (((Number) modeloSwap.getValue()).intValue() > maxSwap) spinSwap.setValue(maxSwap);
+                modeloSwap.setMaximum(maxSwap);
+                formatoSwap.setMaximum(maxSwap);
                 int sw = EditorProceso.numeroVisible(spinSwap);
                 int dat = tot - sw;
                 lblPreviewCapacidadDisco.setText("Datos: " + dat + " · Swap: " + sw + " · Total físico: " + tot);
@@ -1226,6 +1234,7 @@ public class PanelPrincipal extends JPanel {
         };
         spinBloques.addChangeListener(e -> actualizarPreview.run());
         spinSwap.addChangeListener(e -> actualizarPreview.run());
+        actualizarPreview.run();
         JPanel panelVelocidad = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         panelVelocidad.setOpaque(false);
         panelVelocidad.setAlignmentX(LEFT_ALIGNMENT);
@@ -1472,22 +1481,22 @@ if (!((JSpinner.DefaultEditor) spinBloques.getEditor()).getTextField().hasFocus(
     spinBloques.setValue(totalFisico);
 }
 if (!((JSpinner.DefaultEditor) spinSwap.getEditor()).getTextField().hasFocus()
-        && swapActual >= 10 && swapActual <= 200) {
+        && swapActual >= 10 && swapActual <= 480) {
     spinSwap.setValue(swapActual);
 }
 lblPreviewCapacidadDisco.setText("Datos: " + datosActuales + " · Swap: " + swapActual + " · Total físico: " + totalFisico);
 
-boolean puedeConfigurar = !controller.isRunning() && controller.getAccessControl().isAdmin();
+boolean puedeConfigurar = (!controller.isRunning() || controller.isPaused()) && controller.getAccessControl().isAdmin();
 spinBloques.setEnabled(puedeConfigurar);
 spinSwap.setEnabled(puedeConfigurar);
 if (btnAplicarTamanoDisco != null) btnAplicarTamanoDisco.setEnabled(puedeConfigurar);
 
-if (controller.isRunning()) {
-    lblEstadoCapacidadDisco.setText("Cambio de capacidad deshabilitado durante la ejecución.");
+if (controller.isRunning() && !controller.isPaused()) {
+    lblEstadoCapacidadDisco.setText("Pausa la simulación para cambiar la capacidad.");
 } else if (!controller.getAccessControl().isAdmin()) {
     lblEstadoCapacidadDisco.setText("Solo el Administrador puede reconfigurar la capacidad del disco.");
 } else {
-    lblEstadoCapacidadDisco.setText("Configura la capacidad antes de iniciar la simulación.");
+    lblEstadoCapacidadDisco.setText("El cambio protege archivos, swap y solicitudes pendientes.");
 }
 tablaColaDisco.setRowCount(0);
 for (int i = 0; i < filasCola.length; i++) {
