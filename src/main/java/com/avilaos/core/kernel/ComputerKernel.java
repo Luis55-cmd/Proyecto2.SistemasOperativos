@@ -1187,10 +1187,12 @@ public class ComputerKernel {
                             if (request.getOperation() == IOOperationType.READ) {
                                 event("Lectura completada: " + request.getPath());
                             } else if (request.getOperation() == IOOperationType.UPDATE) {
-                                if (p.getNewFileName() == null || p.getNewFileName().trim().isEmpty())
-                                    throw new IllegalArgumentException("Falta el nuevo nombre");
-                                fileSystemManager.renameNode(request.getPath(), p.getNewFileName().trim());
-                                event("Renombrado completado: " + request.getPath() + " → " + p.getNewFileName().trim());
+                                boolean automatico = p.getNewFileName() == null || p.getNewFileName().trim().isEmpty();
+                                FSNode renombrado = automatico
+                                        ? fileSystemManager.renameNodeAutomatically(request.getPath())
+                                        : fileSystemManager.renameNode(request.getPath(), p.getNewFileName().trim());
+                                event("Renombrado completado: " + request.getPath() + " → " + renombrado.getName()
+                                        + (automatico ? " (nombre generado automáticamente)" : ""));
                             } else if (request.getOperation() == IOOperationType.DELETE) {
                                 int liberados = fileSystemManager.deleteNode(request.getPath());
                                 event("Eliminación completada: " + request.getPath() + " · bloques liberados: " + liberados);

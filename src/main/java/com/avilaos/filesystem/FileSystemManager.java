@@ -236,6 +236,31 @@ public class FileSystemManager {
         }
     }
 
+    /** Para UPDATE sin nombre: genera un nombre libre en el mismo directorio. */
+    public FSNode renameNodeAutomatically(String path) {
+        fsMutex.acquireUninterruptibly();
+        try {
+            FSNode node = tree.find(path);
+            if (node == null || node.getParent() == null) {
+                throw new IllegalArgumentException("No se puede renombrar la ruta: " + path);
+            }
+            String nombre = node.getName();
+            int punto = node.getType() == FsNodeType.FILE ? nombre.lastIndexOf('.') : -1;
+            String base = punto > 0 ? nombre.substring(0, punto) : nombre;
+            String extension = punto > 0 ? nombre.substring(punto) : "";
+            String candidato = base + "_actualizado" + extension;
+            int numero = 2;
+            while (node.getParent().findChild(candidato) != null) {
+                candidato = base + "_actualizado_" + numero++ + extension;
+            }
+            tree.rename(path, candidato);
+            if (disk != null) syncOccupiedByRecursiveUnlocked(node);
+            return node;
+        } finally {
+            fsMutex.release();
+        }
+    }
+
     /**
      * Elimina un archivo (liberando su cadena de bloques en el SD) o un directorio de forma
      * recursiva (eliminando todos sus subdirectorios y archivos y liberando todos sus bloques en el SD).
