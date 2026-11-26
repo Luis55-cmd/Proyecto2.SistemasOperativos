@@ -18,20 +18,18 @@ import com.avilaos.core.model.UserMode;
 /** Vista de simulación y sus controles. */
 public final class VistaSimulacionAlternativa extends JPanel {
     private final SimulationController controller;
-    private final ConfiguracionSimulacion configuracion;
-    private final JLabel reloj = texto("Ciclo 0 · Detenida", 20, TINTA, true);
+    private final JLabel reloj = texto("Ciclo 0 · Detenida", 18, TINTA, true);
     private final RelojAnimado relojAnimado = new RelojAnimado();
-    private final JButton iniciar = accion("Iniciar", true);
-    private final JButton pausar = accion("Pausar", false);
-    private final JButton paso = accion("+1 ciclo", false);
     private final JComboBox<Integer> intervalo = new JComboBox<>(new Integer[]{100, 250, 500, 1000});
     private final JTabbedPane vistas = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
     private final JButton botonModoUsuario = accion("Sesión: ADMIN · admin", false);
-    private final JPanel resumenEquipos = new JPanel();
+    private final JPanel panelCPU = new JPanel(new BorderLayout());
     private final DefaultTableModel modeloColaDiscoResumen = tabla("Estado", "ID Solicitud", "Proceso", "Operación", "Ruta / Destino", "Bloque destino", "Bloques", "Ciclo llegada");
     private final JTable tablaColaDiscoResumen = new JTable(modeloColaDiscoResumen);
     private final JScrollPane scrollColaDiscoResumen = new JScrollPane(tablaColaDiscoResumen);
     private final JLabel lblEstadoDiscoResumen = texto("Cabezal: bloque 0 · Política: FIFO", 13, GRIS, false);
+    private final JLabel ocupacionDisco = texto(" ", 13, GRIS, false);
+    private final JLabel estadoColaDisco = texto("No hay solicitudes de E/S pendientes.", 12, GRIS, false);
 // [P2-LEGACY]     private final DefaultTableModel modeloBuffers = tabla("Buffer", "Computador", "Elementos", "Capacidad", "Latencia", "Mutex", "Llenos", "Vacíos");
 // [P2-LEGACY]     private final JTable buffers = new JTable(modeloBuffers);
 // [P2-LEGACY]     private final JScrollPane scrollBuffers = new JScrollPane(buffers);
@@ -43,7 +41,7 @@ public final class VistaSimulacionAlternativa extends JPanel {
     private int[] ids = new int[0];
     private DetalleComputador[] detalles = new DetalleComputador[0];
     private SimulationSnapshot view;
-    private final Runnable irACrearComputador;
+    private final Runnable irAArchivos;
     private long session;
     private boolean actualizando;
 
@@ -51,11 +49,10 @@ public final class VistaSimulacionAlternativa extends JPanel {
         this(controller, () -> {});
     }
 
-    public VistaSimulacionAlternativa(SimulationController controller, Runnable irACrearComputador) {
+    public VistaSimulacionAlternativa(SimulationController controller, Runnable irAArchivos) {
         super(new BorderLayout(0, 12));
         this.controller = controller;
-        this.irACrearComputador = irACrearComputador;
-        this.configuracion = new ConfiguracionSimulacion(controller);
+        this.irAArchivos = irAArchivos;
         this.view = controller.snapshot();
         this.session = view.session;
         intervalo.setSelectedItem(view.interval);
@@ -64,9 +61,12 @@ public final class VistaSimulacionAlternativa extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(22, 28, 20, 28));
         add(cabecera(), BorderLayout.NORTH);
         construirResumen();
-        vistas.addTab("Resumen", desplazable(resumen));
+        panelCPU.setBackground(FONDO);
+        vistas.addTab("CPU y procesos", panelCPU);
+        vistas.addTab("Disco y E/S", desplazable(resumen));
+        vistas.addTab("Eventos", panelEventos());
         add(vistas, BorderLayout.CENTER);
-        add(panelEventos(), BorderLayout.SOUTH);
+        add(reflexion(), BorderLayout.SOUTH);
         controller.addGUIListener(this::actualizar);
         controller.addLogListener(texto -> {
             long sesionActual = controller.session();
@@ -74,62 +74,72 @@ public final class VistaSimulacionAlternativa extends JPanel {
             eventos.append(texto + "\n");
             eventos.setCaretPosition(eventos.getDocument().getLength());
         });
+        reconstruir();
         actualizar();
+    }
+
+    private JPanel reflexion() {
+        JPanel tarjeta = new JPanel(new BorderLayout(16, 0));
+        tarjeta.setBackground(PAPEL);
+        tarjeta.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDE),
+                BorderFactory.createEmptyBorder(10, 16, 10, 16)));
+        JPanel contenido = new JPanel();
+        contenido.setOpaque(false);
+        contenido.setLayout(new BoxLayout(contenido, BoxLayout.Y_AXIS));
+        contenido.add(texto("SOBRE EL CAMBIO", 11, ACENTO, true));
+        contenido.add(Box.createVerticalStrut(4));
+        contenido.add(texto("“Observa constantemente que todo ocurre mediante el cambio.”", 15, TINTA, true));
+        contenido.add(Box.createVerticalStrut(4));
+        contenido.add(texto("Marco Aurelio · Meditaciones IV.36 · traducción libre", 12, GRIS, false));
+        tarjeta.add(contenido, BorderLayout.CENTER);
+        java.net.URL imagen = getClass().getResource("/imagenes/marco-aurelio.png");
+        if (imagen != null) {
+            Image retrato = new ImageIcon(imagen).getImage().getScaledInstance(64, 65, Image.SCALE_SMOOTH);
+            JLabel retratoLabel = new JLabel(new ImageIcon(retrato));
+            retratoLabel.setToolTipText("Retrato de Marco Aurelio");
+            tarjeta.add(retratoLabel, BorderLayout.EAST);
+        }
+        return tarjeta;
     }
 
     private JPanel cabecera() {
         JPanel principal = columna();
         principal.add(texto("SIMULACIÓN", 11, ACENTO, true));
-        principal.add(Box.createVerticalStrut(6));
-        principal.add(reloj);
-        principal.add(Box.createVerticalStrut(10));
-        JPanel controles = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        controles.setOpaque(false);
-        controles.setAlignmentX(LEFT_ALIGNMENT);
-        iniciar.addActionListener(e -> { if (controller.snapshot().computers.size() == 0) { irACrearComputador.run(); return; } GuiRequest.control(controller, controller::startSimulation); });
-        pausar.addActionListener(e -> GuiRequest.control(controller, controller::pauseSimulation));
-        paso.addActionListener(e -> { if (controller.snapshot().computers.size() == 0) return; GuiRequest.control(controller, controller::stepSimulation); });
-        controles.add(iniciar); controles.add(pausar); controles.add(paso);
-        controles.add(texto("Intervalo (ms)", 12, GRIS, false));
-        controles.add(intervalo);
+        principal.add(Box.createVerticalStrut(4));
+        JPanel fila = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        fila.setOpaque(false);
+        fila.setAlignmentX(LEFT_ALIGNMENT);
+        fila.add(reloj);
+        fila.add(texto("Intervalo (ms)", 12, GRIS, false));
+        fila.add(intervalo);
         JButton aplicar = accion("Aplicar", false);
-        aplicar.addActionListener(e -> { Integer ms = (Integer) intervalo.getSelectedItem(); if (ms != null) GuiRequest.control(controller, () -> controller.setCycleDurationMs(ms)); });
-        controles.add(aplicar);
+        aplicar.addActionListener(e -> {
+            Integer ms = (Integer) intervalo.getSelectedItem();
+            if (ms != null) GuiRequest.control(controller, () -> controller.setCycleDurationMs(ms));
+        });
+        fila.add(aplicar);
         botonModoUsuario.addActionListener(e -> mostrarSesion());
-        controles.add(botonModoUsuario);
-        principal.add(controles);
-        principal.add(Box.createVerticalStrut(8));
-        JPanel archivos = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        archivos.setOpaque(false); archivos.setAlignmentX(LEFT_ALIGNMENT);
-        JButton guardar = accion("Guardar configuración", false);
-        JButton cargar = accion("Cargar configuración", false);
-        JButton exportar = accion("Exportar log", false);
-        JButton reiniciar = accion("Reiniciar todo", false);
-        guardar.addActionListener(e -> elegirArchivo(true, guardar));
-        cargar.addActionListener(e -> elegirArchivo(false, cargar));
-        exportar.addActionListener(e -> exportarLog());
+        fila.add(botonModoUsuario);
+        JButton reiniciar = accion("Reiniciar", false);
         reiniciar.addActionListener(e -> {
+            int respuesta = JOptionPane.showConfirmDialog(this,
+                    "Se reiniciará la simulación y se perderán los cambios no guardados. ¿Deseas continuar?",
+                    "Reiniciar todo", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (respuesta != JOptionPane.YES_OPTION) return;
             reiniciar.setEnabled(false);
-            eventos.setText("");
             GuiCommands.submit(() -> { controller.reset(); return true; }, ok -> {
                 reiniciar.setEnabled(true);
                 actualizar();
             }, error -> {
                 reiniciar.setEnabled(true);
                 controller.logEvent("Error al reiniciar: " + error.getMessage());
+                JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo reiniciar", JOptionPane.ERROR_MESSAGE);
             });
         });
-        archivos.add(guardar); archivos.add(cargar); archivos.add(exportar); archivos.add(reiniciar);
-        principal.add(archivos);
-        principal.add(Box.createVerticalStrut(6));
-        JPanel filaFS = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        filaFS.setOpaque(false); filaFS.setAlignmentX(LEFT_ALIGNMENT);
-        JButton cargarFS = accion("Cargar Archivos JSON", true);
-        JButton guardarFS = accion("Guardar Archivos JSON", false);
-        cargarFS.addActionListener(e -> cargarSistemaArchivos(cargarFS));
-        guardarFS.addActionListener(e -> guardarSistemaArchivos(guardarFS));
-        filaFS.add(cargarFS); filaFS.add(guardarFS);
-        principal.add(filaFS);
+        fila.add(reiniciar);
+        principal.add(fila);
+        relojAnimado.setPreferredSize(new Dimension(72, 72));
         JPanel cabecera = new JPanel(new BorderLayout(12, 0));
         cabecera.setOpaque(false);
         cabecera.add(principal, BorderLayout.CENTER);
@@ -246,21 +256,6 @@ public final class VistaSimulacionAlternativa extends JPanel {
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void elegirArchivo(boolean guardar, JButton boton) {
-        JFileChooser selector = new JFileChooser();
-        selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
-        int respuesta = guardar ? selector.showSaveDialog(this) : selector.showOpenDialog(this);
-        if (respuesta != JFileChooser.APPROVE_OPTION) return;
-        File elegido = selector.getSelectedFile();
-        if (guardar && !elegido.getName().toLowerCase().endsWith(".json")) elegido = new File(elegido.getAbsolutePath() + ".json");
-        File archivo = elegido;
-        boton.setEnabled(false);
-        GuiCommands.submit(() -> guardar ? configuracion.guardarEstado(archivo) : configuracion.cargarEstado(archivo), ok -> {
-            boton.setEnabled(true);
-            if (!ok) JOptionPane.showMessageDialog(this, "No se pudo completar la operación. Consulta el log.", "Configuración", JOptionPane.ERROR_MESSAGE);
-        }, error -> { boton.setEnabled(true); JOptionPane.showMessageDialog(this, error.getMessage(), "Configuración", JOptionPane.ERROR_MESSAGE); });
-    }
-
     private void exportarLog() {
         JFileChooser selector = new JFileChooser();
         selector.setSelectedFile(new File("avilaos-ciclo-" + view.cycle + ".log"));
@@ -272,14 +267,15 @@ public final class VistaSimulacionAlternativa extends JPanel {
     }
 
     private void construirResumen() {
-        resumen.add(encabezado("Computadores", "Estado de CPU y memoria por equipo"));
-        resumenEquipos.setLayout(new BoxLayout(resumenEquipos, BoxLayout.Y_AXIS));
-        resumenEquipos.setOpaque(false); resumenEquipos.setAlignmentX(LEFT_ALIGNMENT);
-        resumen.add(resumenEquipos);
-        resumen.add(Box.createVerticalStrut(14));
-        resumen.add(encabezado("Cola única de E/S del Disco", "Solicitud activa en el cabezal y solicitudes pendientes ordenadas según la política activa"));
+        resumen.setBorder(BorderFactory.createEmptyBorder(16, 8, 16, 8));
+        resumen.add(encabezado("Disco y E/S", "Solicitud activa y solicitudes pendientes según la política de disco"));
         lblEstadoDiscoResumen.setAlignmentX(LEFT_ALIGNMENT);
         resumen.add(lblEstadoDiscoResumen);
+        ocupacionDisco.setAlignmentX(LEFT_ALIGNMENT);
+        resumen.add(ocupacionDisco);
+        resumen.add(Box.createVerticalStrut(12));
+        resumen.add(texto("Cola única de E/S del disco", 15, TINTA, true));
+        resumen.add(texto("Incluye la solicitud en atención y todas las solicitudes en espera.", 12, GRIS, false));
         resumen.add(Box.createVerticalStrut(6));
         tablaColaDiscoResumen.setRowHeight(28);
         tablaColaDiscoResumen.setBackground(PAPEL);
@@ -291,40 +287,30 @@ public final class VistaSimulacionAlternativa extends JPanel {
         scrollColaDiscoResumen.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
         scrollColaDiscoResumen.setAlignmentX(LEFT_ALIGNMENT);
         resumen.add(scrollColaDiscoResumen);
-// [P2-LEGACY]         resumen.add(Box.createVerticalStrut(16));
-// [P2-LEGACY]         resumen.add(encabezado("Buffers globales", "Ocupación, semáforos y procesos en espera"));
-// [P2-LEGACY]         buffers.setRowHeight(30); buffers.setBackground(PAPEL); buffers.setForeground(TINTA);
-// [P2-LEGACY]         buffers.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-// [P2-LEGACY]         scrollBuffers.setColumnHeaderView(buffers.getTableHeader());
-// [P2-LEGACY]         scrollBuffers.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
-// [P2-LEGACY]         desplazarVistaDesdeTabla(scrollBuffers);
-// [P2-LEGACY]         scrollBuffers.setPreferredSize(new Dimension(800, 90)); scrollBuffers.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
-// [P2-LEGACY]         scrollBuffers.setAlignmentX(LEFT_ALIGNMENT); resumen.add(scrollBuffers);
-// [P2-LEGACY]         esperaBuffers.setEditable(false); esperaBuffers.setLineWrap(true); esperaBuffers.setWrapStyleWord(true);
-// [P2-LEGACY]         esperaBuffers.setBackground(PAPEL); esperaBuffers.setForeground(TINTA);
-// [P2-LEGACY]         esperaBuffers.setText("Selecciona un buffer para ver las colas de sus semáforos.");
-// [P2-LEGACY]         JScrollPane espera = new JScrollPane(esperaBuffers);
-// [P2-LEGACY]         espera.setPreferredSize(new Dimension(800, 70)); espera.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
-// [P2-LEGACY]         espera.setAlignmentX(LEFT_ALIGNMENT); resumen.add(Box.createVerticalStrut(8)); resumen.add(espera);
-// [P2-LEGACY]         JPanel ajuste = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0)); ajuste.setOpaque(false); ajuste.setAlignmentX(LEFT_ALIGNMENT);
-// [P2-LEGACY]         ajuste.add(texto("Latencia del buffer seleccionado (ticks)", 12, GRIS, false)); ajuste.add(latencia); ajuste.add(aplicarLatencia);
-// [P2-LEGACY]         resumen.add(Box.createVerticalStrut(8)); resumen.add(ajuste);
-// [P2-LEGACY]         buffers.getSelectionModel().addListSelectionListener(e -> { if (!e.getValueIsAdjusting() && !actualizando) mostrarBuffer(); });
-// [P2-LEGACY]         aplicarLatencia.addActionListener(e -> {
-// [P2-LEGACY]             int fila = buffers.getSelectedRow();
-// [P2-LEGACY]             if (fila < 0 || fila >= view.buffers.size()) return;
-// [P2-LEGACY]             try { latencia.setValue(EditorProceso.numeroVisible(latencia)); } catch (IllegalArgumentException ex) { esperaBuffers.setText("Escribe una latencia válida."); return; }
-// [P2-LEGACY]             int id = view.buffers.get(fila).id(), valor = (Integer) latencia.getValue();
-// [P2-LEGACY]             GuiRequest.control(controller, () -> { /* [P2-LEGACY] controller.setBufferLatency(id, valor) */ });
-// [P2-LEGACY]         });
+        estadoColaDisco.setAlignmentX(LEFT_ALIGNMENT);
+        resumen.add(estadoColaDisco);
+        resumen.add(Box.createVerticalStrut(12));
+        JButton verArchivos = accion("Ver archivos", false);
+        verArchivos.addActionListener(e -> irAArchivos.run());
+        resumen.add(verArchivos);
     }
 
     private JPanel panelEventos() {
-        JPanel panel = new JPanel(new BorderLayout(0, 4)); panel.setOpaque(false);
-        panel.add(texto("Eventos", 14, TINTA, true), BorderLayout.NORTH);
-        eventos.setEditable(false); eventos.setLineWrap(true); eventos.setWrapStyleWord(true); eventos.setBackground(PAPEL);
-        JScrollPane scroll = new JScrollPane(eventos); scroll.setPreferredSize(new Dimension(400, 105));
-        panel.add(scroll, BorderLayout.CENTER);
+        JPanel panel = new JPanel(new BorderLayout(0, 8));
+        panel.setBackground(FONDO);
+        panel.setBorder(BorderFactory.createEmptyBorder(16, 8, 8, 8));
+        JPanel cabecera = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        cabecera.setOpaque(false);
+        cabecera.add(texto("Eventos de la simulación", 16, TINTA, true));
+        JButton exportar = accion("Exportar log", false);
+        exportar.addActionListener(e -> exportarLog());
+        cabecera.add(exportar);
+        panel.add(cabecera, BorderLayout.NORTH);
+        eventos.setEditable(false);
+        eventos.setLineWrap(true);
+        eventos.setWrapStyleWord(true);
+        eventos.setBackground(PAPEL);
+        panel.add(new JScrollPane(eventos), BorderLayout.CENTER);
         return panel;
     }
 
@@ -332,36 +318,21 @@ public final class VistaSimulacionAlternativa extends JPanel {
         SimulationSnapshot anterior = view;
         view = controller.snapshot();
         if (session != view.session) { eventos.setText(""); session = view.session; }
-        reloj.setText("Ciclo " + view.cycle + " · " + (!view.running ? "Detenida" : view.paused ? "Pausada" : "En ejecución"));
-        boolean activo = view.running && !view.paused;
-        relojAnimado.setActivo(activo);
-        iniciar.setText(view.running && view.paused ? "Reanudar" : "Iniciar");
-        iniciar.setEnabled(!activo); pausar.setEnabled(activo); paso.setEnabled(!activo && view.computers.size() > 0);
+        reloj.setText("Ciclo " + view.cycle + " · " + (!view.running ? "Detenida" : view.paused ? "Pausada" : "Activa"));
+        relojAnimado.setActivo(view.running && !view.paused);
         if (anterior.interval != view.interval || anterior.session != view.session) intervalo.setSelectedItem(view.interval);
         if (anterior.session != view.session) botonModoUsuario.setText("Sesión: ADMIN · admin");
         boolean cambio = ids.length != view.computers.size() || anterior.session != view.session;
         if (!cambio) for (int i=0; i<ids.length; i++) if (ids[i] != view.computers.get(i).id()) { cambio=true; break; }
         if (cambio) reconstruir();
-        resumenEquipos.removeAll();
-        for (int i=0; i<view.computers.size(); i++) {
-            Node c = view.computers.get(i);
-            var p = c.cpu().PCB();
-            String cpu = p == null ? "CPU libre" : p.name() + " · PC " + c.cpu().PC()
-                    + " · MAR " + (p.programCounter() == 0 ? "—" : p.memoryAddressRegister()) + " · " + c.cpu().mode();
-            JPanel card = tarjeta(); card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 95));
-            card.add(texto(c.name() + " · " + c.politica(), 15, TINTA, true));
-            card.add(texto(cpu + "  |  RAM " + c.memoryManager().usedMemory() + "/" + c.memoryManager().totalMemory(), 12, GRIS, false));
-            resumenEquipos.add(card); resumenEquipos.add(Box.createVerticalStrut(8));
-            detalles[i].actualizar(c);
-        }
-// [P2-LEGACY]         if (view.computers.size() < 2) resumenEquipos.add(texto("Crea al menos 2 computadores para comenzar la simulación.", 13, GRIS, false));
-        if (view.computers.size() < 1) resumenEquipos.add(texto("Crea el computador para comenzar la simulación.", 13, GRIS, false)); // [P2]
-        resumenEquipos.repaint();
+        for (int i = 0; i < detalles.length; i++) detalles[i].actualizar(view.computers.get(i));
         actualizarTablaColaDisco(modeloColaDiscoResumen, scrollColaDiscoResumen);
         if (view.disk != null) {
             String dir = view.disk.activeHeadDirection() == com.avilaos.disk.HeadDirection.UP ? "creciente ↑" : "decreciente ↓";
             lblEstadoDiscoResumen.setText("Cabezal: bloque " + view.disk.activeHeadPosition() + " (" + dir + ")  ·  Política: "
                     + view.disk.activePolicy() + "  ·  En cola: " + view.disk.queueSize() + "  ·  Atendidas: " + view.disk.completedRequestsCount());
+            ocupacionDisco.setText("Datos: " + (view.bloquesDatos - view.bloquesDatosLibres) + "/" + view.bloquesDatos
+                    + " bloques ocupados  ·  Swap: " + (view.bloquesSwap - view.bloquesSwapLibres) + "/" + view.bloquesSwap + " bloques ocupados");
         }
         resumen.revalidate();
         resumen.repaint();
@@ -377,20 +348,29 @@ public final class VistaSimulacionAlternativa extends JPanel {
             }
         }
         int filas = (view != null && view.diskQueue != null) ? view.diskQueue.size() : 0;
+        estadoColaDisco.setVisible(filas == 0);
         int altura = 28 + Math.max(1, filas) * 28;
         scroll.setPreferredSize(new Dimension(800, altura));
         scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, altura));
     }
 
     private void reconstruir() {
-        int seleccionado = vistas.getSelectedIndex();
-        while (vistas.getTabCount() > 1) vistas.removeTabAt(1);
-        ids = new int[view.computers.size()]; detalles = new DetalleComputador[ids.length];
-        for (int i=0; i<ids.length; i++) {
-            Node c = view.computers.get(i); ids[i] = c.id();
-            detalles[i] = new DetalleComputador(c.id()); vistas.addTab(c.name(), desplazable(detalles[i]));
+        panelCPU.removeAll();
+        ids = new int[view.computers.size()];
+        detalles = new DetalleComputador[ids.length];
+        if (ids.length == 0) {
+            JPanel vacio = columna();
+            vacio.setBorder(BorderFactory.createEmptyBorder(18, 8, 8, 8));
+            vacio.add(texto("Crea o carga un computador para ver la CPU y sus procesos.", 14, GRIS, false));
+            panelCPU.add(vacio, BorderLayout.NORTH);
+        } else {
+            Node c = view.computers.get(0);
+            ids[0] = c.id();
+            detalles[0] = new DetalleComputador(c.id());
+            panelCPU.add(desplazable(detalles[0]), BorderLayout.CENTER);
         }
-        vistas.setSelectedIndex(Math.min(seleccionado, vistas.getTabCount()-1));
+        panelCPU.revalidate();
+        panelCPU.repaint();
     }
 
 // [P2-LEGACY]     private void actualizarBuffers() {
@@ -433,8 +413,6 @@ public final class VistaSimulacionAlternativa extends JPanel {
         private final JSpinner quantum = new JSpinner(new SpinnerNumberModel(3, 1, 99, 1));
         private final DefaultTableModel[] modelos = new DefaultTableModel[6];
         private final JScrollPane[] tablasColas = new JScrollPane[6];
-        private final DefaultTableModel modeloColaDiscoDetalle = tabla("Estado", "ID Solicitud", "Proceso", "Operación", "Ruta / Destino", "Bloque destino", "Bloques", "Ciclo llegada");
-        private final JScrollPane scrollColaDiscoDetalle;
         private boolean actualizandoDetalle;
         DetalleComputador(int id) {
             this.id = id; setLayout(new BoxLayout(this, BoxLayout.Y_AXIS)); setBackground(FONDO);
@@ -457,19 +435,6 @@ public final class VistaSimulacionAlternativa extends JPanel {
                 scroll.setPreferredSize(new Dimension(800, 56)); scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56)); scroll.setAlignmentX(LEFT_ALIGNMENT);
                 tablasColas[i]=scroll; add(scroll); add(Box.createVerticalStrut(14));
             }
-            add(texto("Cola única de E/S del Disco (Activa y en espera)", 15, TINTA, true));
-            add(Box.createVerticalStrut(6));
-            JTable tDisco = new JTable(modeloColaDiscoDetalle);
-            tDisco.setRowHeight(28); tDisco.setBackground(PAPEL); tDisco.setForeground(TINTA);
-            scrollColaDiscoDetalle = new JScrollPane(tDisco);
-            scrollColaDiscoDetalle.setColumnHeaderView(tDisco.getTableHeader());
-            scrollColaDiscoDetalle.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
-            desplazarVistaDesdeTabla(scrollColaDiscoDetalle);
-            scrollColaDiscoDetalle.setPreferredSize(new Dimension(800, 56));
-            scrollColaDiscoDetalle.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
-            scrollColaDiscoDetalle.setAlignmentX(LEFT_ALIGNMENT);
-            add(scrollColaDiscoDetalle);
-            add(Box.createVerticalStrut(14));
         }
         void actualizar(Node c) {
             actualizandoDetalle = true;
@@ -487,7 +452,6 @@ public final class VistaSimulacionAlternativa extends JPanel {
                 tablasColas[i].setPreferredSize(new Dimension(800, altura));
                 tablasColas[i].setMaximumSize(new Dimension(Integer.MAX_VALUE, altura));
             }
-            actualizarTablaColaDisco(modeloColaDiscoDetalle, scrollColaDiscoDetalle);
             revalidate();
             actualizandoDetalle = false;
         }

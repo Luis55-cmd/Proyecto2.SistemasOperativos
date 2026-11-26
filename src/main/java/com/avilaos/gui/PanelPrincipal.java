@@ -30,6 +30,10 @@ public class PanelPrincipal extends JPanel {
     private final EditorProceso editorProceso;
     private final PanelMetricasCopia metricas;
     private final SimulationController controller = SimulationController.getInstance();
+    private final JButton controlReloj = accion("", false);
+    private final JButton avanceReloj = accion("+", false);
+    private final JLabel cicloLateral = texto("Ciclo 0", 11, new Color(225, 220, 201), true);
+    private boolean controlRelojPendiente;
     
     private final CardLayout estadoComputadorLayout = new CardLayout();
     private final JPanel estadoComputadorPanel = new JPanel(estadoComputadorLayout);
@@ -64,6 +68,8 @@ public class PanelPrincipal extends JPanel {
     };
     private boolean actualizandoArbolArchivos;
     private final JLabel[] detallesArchivo = new JLabel[7];
+    private final JLabel tituloDetalleArchivo = texto("Selecciona un elemento", 20, TINTA, true);
+    private final JLabel subtituloDetalleArchivo = texto("Sus propiedades aparecerán aquí.", 13, GRIS, false);
     private final JTextArea estadoSolicitudArchivo = crearEstadoSolicitudArchivo();
     private JButton botonRenombrarArchivo;
     private com.avilaos.core.model.ProcessControlBlock solicitudArchivo;
@@ -231,6 +237,8 @@ public class PanelPrincipal extends JPanel {
             lateral.add(Box.createVerticalStrut(8));
         }
         lateral.add(Box.createVerticalGlue());
+        lateral.add(controlesRelojLateral());
+        lateral.add(Box.createVerticalStrut(14));
         JLabel pie = texto("ENTORNO DE DISEÑO", 10, new Color(192, 181, 148), true);
         pie.setAlignmentX(LEFT_ALIGNMENT);
         lateral.add(pie);
@@ -249,12 +257,26 @@ public class PanelPrincipal extends JPanel {
         
         editorProceso = new EditorProceso(() -> mostrarPanel(Destino.COMPUTADOR));
         pantallas.add(editorProceso, Destino.PROCESO.name());
-        pantallas.add(new VistaSimulacionAlternativa(controller, () -> mostrarPanel(Destino.COMPUTADOR)), Destino.SIMULACION.name());
+        pantallas.add(new VistaSimulacionAlternativa(controller, () -> mostrarPanel(Destino.ARCHIVOS)), Destino.SIMULACION.name());
         metricas = new PanelMetricasCopia(controller);
         JPanel vistaMetricas = new JPanel(new BorderLayout(0, 16));
         vistaMetricas.setBackground(FONDO);
         vistaMetricas.setBorder(new EmptyBorder(24, 24, 24, 24));
-        vistaMetricas.add(texto("Métricas del sistema", 26, TINTA, true), BorderLayout.NORTH);
+        JPanel cabeceraMetricas = new JPanel(new BorderLayout());
+        cabeceraMetricas.setOpaque(false);
+        cabeceraMetricas.add(texto("Métricas del sistema", 26, TINTA, true), BorderLayout.CENTER);
+        java.net.URL imagenShrek = getClass().getResource("/imagenes/shrek-easter-egg.png");
+        if (imagenShrek != null) {
+            Image imagen = new ImageIcon(imagenShrek).getImage().getScaledInstance(48, 62, Image.SCALE_SMOOTH);
+            JLabel shrek = new JLabel(new ImageIcon(imagen));
+            shrek.setToolTipText("Alguien está revisando las métricas");
+            JPanel sorpresa = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+            sorpresa.setOpaque(false);
+            sorpresa.add(texto("“Los ogros no son como los pasteles.”", 12, GRIS, false));
+            sorpresa.add(shrek);
+            cabeceraMetricas.add(sorpresa, BorderLayout.EAST);
+        }
+        vistaMetricas.add(cabeceraMetricas, BorderLayout.NORTH);
         vistaMetricas.add(metricas, BorderLayout.CENTER);
         pantallas.add(vistaMetricas, Destino.METRICAS.name());
         add(pantallas, BorderLayout.CENTER);
@@ -262,6 +284,7 @@ public class PanelPrincipal extends JPanel {
         // --- CONEXIÓN AL OBSERVER ---
         // Se actualizan las tablas automáticamente cuando el SimulationController cambia
         controller.addGUIListener(() -> {
+            actualizarControlesReloj();
             metricas.actualizarMetricas();
             actualizarListaComputadores();
             if (destinoActual == Destino.DISCO || (ventanaMapaAmpliado != null && ventanaMapaAmpliado.isVisible())) {
@@ -272,7 +295,87 @@ public class PanelPrincipal extends JPanel {
 // [P2-LEGACY]             actualizarOpcionesComputadoresBuffer();
         });
 
+        actualizarControlesReloj();
         mostrarPanel(Destino.MENU);
+    }
+
+    private JPanel controlesRelojLateral() {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setAlignmentX(LEFT_ALIGNMENT);
+        panel.setMaximumSize(new Dimension(180, 70));
+        JLabel titulo = texto("SIMULACIÓN", 10, new Color(192, 181, 148), true);
+        titulo.setAlignmentX(LEFT_ALIGNMENT);
+        panel.add(titulo);
+        panel.add(Box.createVerticalStrut(5));
+        JPanel fila = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        fila.setOpaque(false);
+        fila.setAlignmentX(LEFT_ALIGNMENT);
+        controlReloj.setPreferredSize(new Dimension(48, 34));
+        controlReloj.setBorder(BorderFactory.createLineBorder(BORDE));
+        avanceReloj.setPreferredSize(new Dimension(48, 34));
+        avanceReloj.setBorder(BorderFactory.createLineBorder(BORDE));
+        avanceReloj.setMargin(new Insets(0, 0, 0, 0));
+        avanceReloj.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+        avanceReloj.setToolTipText("Avanzar un ciclo con la simulación pausada");
+        avanceReloj.getAccessibleContext().setAccessibleName("Avanzar un ciclo");
+        controlReloj.addActionListener(e -> {
+            SimulationSnapshot estado = controller.snapshot();
+            enviarControlReloj(estado.running && !estado.paused
+                    ? controller::pauseSimulation : controller::startSimulation);
+        });
+        avanceReloj.addActionListener(e -> enviarControlReloj(controller::stepSimulation));
+        fila.add(controlReloj);
+        fila.add(avanceReloj);
+        fila.add(cicloLateral);
+        panel.add(fila);
+        return panel;
+    }
+
+    private void enviarControlReloj(Runnable accion) {
+        controlRelojPendiente = true;
+        actualizarControlesReloj();
+        GuiRequest.model(controller, () -> { accion.run(); return true; }, resultado -> {
+            controlRelojPendiente = false;
+            actualizarControlesReloj();
+        }, error -> {
+            controlRelojPendiente = false;
+            actualizarControlesReloj();
+            JOptionPane.showMessageDialog(this, error.getMessage(), "Simulación", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void actualizarControlesReloj() {
+        SimulationSnapshot estado = controller.snapshot();
+        boolean activo = estado.running && !estado.paused;
+        boolean hayComputador = estado.computers.size() > 0;
+        controlReloj.setBackground(activo ? new Color(63, 123, 72) : new Color(159, 64, 58));
+        controlReloj.setIcon(iconoEncendido());
+        controlReloj.setDisabledIcon(iconoEncendido());
+        controlReloj.getAccessibleContext().setAccessibleName(activo ? "Simulación encendida" : "Simulación apagada");
+        controlReloj.setToolTipText(!hayComputador ? "Crea un computador primero"
+                : activo ? "Pausar simulación" : "Iniciar o reanudar simulación");
+        controlReloj.setEnabled(!controlRelojPendiente && (hayComputador || activo));
+        avanceReloj.setEnabled(!controlRelojPendiente && hayComputador && !activo);
+        cicloLateral.setText("Ciclo " + estado.cycle);
+    }
+
+    private static Icon iconoEncendido() {
+        return new Icon() {
+            @Override public int getIconWidth() { return 20; }
+            @Override public int getIconHeight() { return 20; }
+            @Override public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D dibujo = (Graphics2D) g.create();
+                try {
+                    dibujo.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    dibujo.setColor(Color.WHITE);
+                    dibujo.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    dibujo.drawArc(x + 3, y + 4, 14, 14, 45, -270);
+                    dibujo.drawLine(x + 10, y + 1, x + 10, y + 10);
+                } finally { dibujo.dispose(); }
+            }
+        };
     }
 
     public void mostrarPanel(Destino destino) {
@@ -588,9 +691,9 @@ public class PanelPrincipal extends JPanel {
         detalles.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         detalles.add(texto("DETALLES", 11, ACENTO, true));
         detalles.add(Box.createVerticalStrut(8));
-        detalles.add(texto("Selecciona un elemento", 20, TINTA, true));
+        detalles.add(tituloDetalleArchivo);
         detalles.add(Box.createVerticalStrut(8));
-        detalles.add(texto("Sus propiedades aparecerán aquí.", 13, GRIS, false));
+        detalles.add(subtituloDetalleArchivo);
         detalles.add(Box.createVerticalStrut(16));
         String[] campos = {"Nombre", "Ruta", "Tipo", "Dueño", "Permisos", "Tamaño en bloques", "Primer bloque"};
         for (int i = 0; i < campos.length; i++) {
@@ -826,6 +929,9 @@ public class PanelPrincipal extends JPanel {
             nodo.getName().isEmpty() ? "/" : nodo.getName(), nodo.getPath(), nodo.isDirectory() ? "Directorio" : "Archivo",
             nodo.getOwner(), nodo.getPermission().toString(), Integer.toString(nodo.getSizeBlocks()),
             nodo.getFirstBlock() < 0 ? "—" : Integer.toString(nodo.getFirstBlock())};
+        tituloDetalleArchivo.setText(nodo == null ? "Selecciona un elemento" : valores[0]);
+        tituloDetalleArchivo.setToolTipText(nodo == null ? null : nodo.getPath());
+        subtituloDetalleArchivo.setText(nodo == null ? "Sus propiedades aparecerán aquí." : valores[2]);
         for (int i = 0; i < nombres.length; i++) if (detallesArchivo[i] != null) detallesArchivo[i].setText(nombres[i] + "  ·  " + valores[i]);
     }
 

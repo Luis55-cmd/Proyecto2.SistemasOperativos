@@ -719,9 +719,12 @@ public class ComputerKernel {
             }
         }
 
-        // 5.5 Tiempo de espera: todo proceso admitido que no ejecutó en este ciclo (listo, bloqueado o suspendido)
+        // 5.5 Registrar también la espera de admisión, sin alterar el criterio del planificador.
         for (int i = 0; i < this.processList.size(); i++) {
             ProcessControlBlock w = this.processList.get(i);
+            if (w != null && w != executedThisCycle && w.getState() == ProcessState.NUEVO) {
+                w.incrementWaitingNewTicks();
+            }
             if (w != null && w != executedThisCycle
                     && (w.getState() == ProcessState.LISTO || w.getState() == ProcessState.BLOQUEADO
                     || w.getState() == ProcessState.SUSPENDIDO_LISTO || w.getState() == ProcessState.SUSPENDIDO_BLOQUEADO)) {
