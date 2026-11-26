@@ -54,6 +54,7 @@ public class ProcessControlBlock {
     private int completionCycle;
     /** Ciclos acumulados sin ejecutar (listo o bloqueado) desde su admisión. */
     private int waitingTime;
+    private int waitingNewTicks;
     private int readyWaitTicks;
     private int blockedWaitTicks;
     private int semaphoreWaitTicks;
@@ -514,6 +515,9 @@ public class ProcessControlBlock {
     public int getWaitingTime() {
         return waitingTime;
     }
+
+    public int getWaitingNewTicks() { return waitingNewTicks; }
+    public void incrementWaitingNewTicks() { waitingNewTicks++; }
 
     /** Suma un ciclo de espera (listo o bloqueado sin ejecutar). */
     public void incrementWaitingTime() {
