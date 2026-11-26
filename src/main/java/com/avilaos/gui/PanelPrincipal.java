@@ -27,6 +27,8 @@ public class PanelPrincipal extends JPanel {
     private Timer avisoCargaTimer;
     private final JLabel estadoCargaProcesos = texto(" ", 12, ACENTO, true);
     private Timer avisoProcesosTimer;
+    private final JLabel archivoActivoFS = texto("Archivo actual: Ninguno", 11, GRIS, false);
+    private final JLabel archivoActivoProc = texto("Archivo actual: Ninguno", 11, GRIS, false);
     private final EditorProceso editorProceso;
     private final PanelMetricasCopia metricas;
     private final SimulationController controller = SimulationController.getInstance();
@@ -493,6 +495,8 @@ public class PanelPrincipal extends JPanel {
             botones.add(guardar);
             tarjeta.add(botones);
             tarjeta.add(Box.createVerticalStrut(8));
+            tarjeta.add(i == 0 ? archivoActivoFS : archivoActivoProc);
+            tarjeta.add(Box.createVerticalStrut(4));
             tarjeta.add(i == 0 ? estadoCargaArchivos : estadoCargaProcesos);
             opciones.add(tarjeta);
         }
@@ -504,6 +508,8 @@ public class PanelPrincipal extends JPanel {
 
     private void guardarSistemaArchivos(JButton boton) {
         JFileChooser selector = new JFileChooser();
+        java.io.File dirInicial = new java.io.File("escenarios/carga-json/sistema-archivos");
+        if (dirInicial.isDirectory()) selector.setCurrentDirectory(dirInicial);
         selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
         if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         java.io.File archivo = selector.getSelectedFile();
@@ -527,6 +533,7 @@ public class PanelPrincipal extends JPanel {
             return true;
         }, resultado -> {
             boton.setEnabled(true);
+            archivoActivoFS.setText("Archivo actual: " + archivo.getName());
             estadoCargaArchivos.setText("Sistema de archivos guardado correctamente.");
         }, error -> {
             boton.setEnabled(true);
@@ -538,6 +545,8 @@ public class PanelPrincipal extends JPanel {
 
     private void cargarSistemaArchivos(JButton boton) {
         JFileChooser selector = new JFileChooser();
+        java.io.File dirInicial = new java.io.File("escenarios/carga-json/sistema-archivos");
+        if (dirInicial.isDirectory()) selector.setCurrentDirectory(dirInicial);
         selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
         if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
         java.io.File archivo = selector.getSelectedFile();
@@ -573,6 +582,7 @@ public class PanelPrincipal extends JPanel {
             return true;
         }, resultado -> {
             boton.setEnabled(true);
+            archivoActivoFS.setText("Archivo actual: " + archivo.getName());
             estadoCargaArchivos.setText("Sistema de archivos cargado correctamente.");
             if (avisoCargaTimer != null) avisoCargaTimer.stop();
             avisoCargaTimer = new Timer(2500, e -> estadoCargaArchivos.setText(" "));
@@ -588,6 +598,8 @@ public class PanelPrincipal extends JPanel {
 
     private void cargarProcesosConfiguracion(JButton boton) {
         JFileChooser selector = new JFileChooser();
+        java.io.File dirInicial = new java.io.File("escenarios/carga-json/procesos");
+        if (dirInicial.isDirectory()) selector.setCurrentDirectory(dirInicial);
         selector.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
         if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
         java.io.File archivo = selector.getSelectedFile();
@@ -624,6 +636,7 @@ public class PanelPrincipal extends JPanel {
             return true;
         }, resultado -> {
             boton.setEnabled(true);
+            archivoActivoProc.setText("Archivo actual: " + archivo.getName());
             estadoCargaProcesos.setText("Procesos y configuración cargados correctamente.");
             if (avisoProcesosTimer != null) avisoProcesosTimer.stop();
             avisoProcesosTimer = new Timer(2500, e -> estadoCargaProcesos.setText(" "));
