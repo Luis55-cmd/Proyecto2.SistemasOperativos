@@ -31,7 +31,7 @@ public class PanelMetricasCopia extends JPanel {
         "Utilización de CPU",
         "Procesos completados por tick",
         "Deadlines cumplidos",
-        "Espera combinada anterior (promedio)",
+        "Tiempo sin CPU por proceso completado",
         "Suspensiones",
         "Reactivaciones",
         "Desplazamiento acumulado del cabezal por política",
@@ -43,7 +43,7 @@ public class PanelMetricasCopia extends JPanel {
         "Utilización acumulada del procesador",
         "Throughput acumulado por computador",
         "Tasa de éxito: deadlines cumplidos",
-        "Espera combinada anterior por proceso completado",
+        "Tiempo promedio sin CPU por proceso completado",
         "Acumulado histórico de suspensiones",
         "Acumulado histórico de reactivaciones",
         "Desplazamiento acumulado del cabezal de disco por política",
@@ -84,8 +84,6 @@ public class PanelMetricasCopia extends JPanel {
     private final XYSeries seriesDiskSSTF = new XYSeries("SSTF", true, false);
     private final XYSeries seriesDiskSCAN = new XYSeries("SCAN", true, false);
     private final XYSeries seriesDiskCSCAN = new XYSeries("C-SCAN", true, false);
-    private final XYSeries seriesDiskLOOK = new XYSeries("LOOK", true, false);
-    private final XYSeries seriesDiskCLOOK = new XYSeries("C-LOOK", true, false);
 
     // Series históricas del disco - Tiempo de espera
     private final XYSeries seriesDiskWait = new XYSeries("Espera Promedio Global", true, false);
@@ -93,8 +91,6 @@ public class PanelMetricasCopia extends JPanel {
     private final XYSeries seriesWaitSSTF = new XYSeries("SSTF (espera)", true, false);
     private final XYSeries seriesWaitSCAN = new XYSeries("SCAN (espera)", true, false);
     private final XYSeries seriesWaitCSCAN = new XYSeries("C-SCAN (espera)", true, false);
-    private final XYSeries seriesWaitLOOK = new XYSeries("LOOK (espera)", true, false);
-    private final XYSeries seriesWaitCLOOK = new XYSeries("C-LOOK (espera)", true, false);
    
     private final JLabel lblRendimientoGlobal = new JLabel("Resumen del sistema");
     private final JLabel lblTiempos = new JLabel("Sin procesos completados");
@@ -103,13 +99,13 @@ public class PanelMetricasCopia extends JPanel {
     
     // TABLA EQUIPOS ACTUALIZADA CON SUSPENSIONES Y REACTIVACIONES
     private final DefaultTableModel tablaEquipos = new DefaultTableModel(
-            new Object[]{"Computador", "CPU usada (%)", "Completados", "Completados/tick", "Respuesta promedio (ticks)", "Deadlines cumplidos", "Listo total (ticks)", "Bloqueado total (ticks)", "Semáforos total (ticks)", "Suspensiones", "Reactivaciones"}, 0) {
+            new Object[]{"Computador", "CPU usada (%)", "Completados", "Completados/tick", "Respuesta promedio (ticks)", "Deadlines cumplidos", "Listo total (ticks)", "Bloqueado total (ticks)", "Suspensiones", "Reactivaciones"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
     
     // TABLA PROCESOS ACTUALIZADA CON SUSPENSIONES Y REACTIVACIONES
     private final DefaultTableModel tablaProcesos = new DefaultTableModel(
-            new Object[]{"ID", "Proceso", "Computador", "Estado", "En listo (ticks)", "Bloqueado (ticks)", "En semáforos (ticks)", "Suspensiones", "Reactivaciones"}, 0) {
+            new Object[]{"ID", "Proceso", "Computador", "Estado", "En listo (ticks)", "Bloqueado (ticks)", "Suspensiones", "Reactivaciones"}, 0) {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
 
@@ -127,8 +123,8 @@ public class PanelMetricasCopia extends JPanel {
 
         XYSeries[] allDiskSeries = {
             seriesDiskTotal, seriesDiskWait,
-            seriesDiskFIFO, seriesDiskSSTF, seriesDiskSCAN, seriesDiskCSCAN, seriesDiskLOOK, seriesDiskCLOOK,
-            seriesWaitFIFO, seriesWaitSSTF, seriesWaitSCAN, seriesWaitCSCAN, seriesWaitLOOK, seriesWaitCLOOK
+            seriesDiskFIFO, seriesDiskSSTF, seriesDiskSCAN, seriesDiskCSCAN,
+            seriesWaitFIFO, seriesWaitSSTF, seriesWaitSCAN, seriesWaitCSCAN
         };
         for (XYSeries s : allDiskSeries) {
             s.setMaximumItemCount(2000);
@@ -144,6 +140,8 @@ public class PanelMetricasCopia extends JPanel {
                 dataset, org.jfree.chart.plot.PlotOrientation.VERTICAL,
                 true, true, false
         );
+        chart.getTitle().setFont(chart.getTitle().getFont().deriveFont(
+                chart.getTitle().getFont().getSize2D() - 1.5f));
         ejeUso = (org.jfree.chart.axis.NumberAxis) chart.getXYPlot().getRangeAxis();
         ejeUso.setRangeType(org.jfree.data.RangeType.POSITIVE);
         ejeUso.setAutoRangeIncludesZero(false);
@@ -219,6 +217,14 @@ public class PanelMetricasCopia extends JPanel {
     /** Muestra en el único gráfico las series de la métrica activa y ajusta título y eje. */
     private void aplicarMetricaActiva() {
         dataset.removeAllSeries();
+        if (metricaActiva == 4 || metricaActiva == 5) {
+            org.jfree.chart.renderer.xy.XYStepRenderer escalonado = new org.jfree.chart.renderer.xy.XYStepRenderer();
+            escalonado.setStepPoint(1.0);
+            renderer = escalonado;
+        } else {
+            renderer = new org.jfree.chart.renderer.xy.XYLineAndShapeRenderer(true, false);
+        }
+        chart.getXYPlot().setRenderer(renderer);
         if (metricaActiva < 6) {
             java.awt.Color[] colores = {
                 new java.awt.Color(52, 104, 75), new java.awt.Color(183, 108, 39),
@@ -240,8 +246,6 @@ public class PanelMetricasCopia extends JPanel {
             dataset.addSeries(seriesDiskSSTF);
             dataset.addSeries(seriesDiskSCAN);
             dataset.addSeries(seriesDiskCSCAN);
-            dataset.addSeries(seriesDiskLOOK);
-            dataset.addSeries(seriesDiskCLOOK);
             dataset.addSeries(seriesDiskTotal);
 
             java.awt.Color[] coloresDisco = {
@@ -249,8 +253,6 @@ public class PanelMetricasCopia extends JPanel {
                 new java.awt.Color(230, 81, 0),    // SSTF: Naranja
                 new java.awt.Color(21, 101, 192),  // SCAN: Azul
                 new java.awt.Color(106, 27, 154),  // C-SCAN: Púrpura
-                new java.awt.Color(0, 131, 143),   // LOOK: Cian
-                new java.awt.Color(93, 64, 55),    // C-LOOK: Marrón
                 new java.awt.Color(183, 28, 28)    // Total: Carmesí
             };
             for (int i = 0; i < coloresDisco.length; i++) {
@@ -272,8 +274,6 @@ public class PanelMetricasCopia extends JPanel {
             dataset.addSeries(seriesWaitSSTF);
             dataset.addSeries(seriesWaitSCAN);
             dataset.addSeries(seriesWaitCSCAN);
-            dataset.addSeries(seriesWaitLOOK);
-            dataset.addSeries(seriesWaitCLOOK);
             dataset.addSeries(seriesDiskWait);
 
             java.awt.Color[] coloresEspera = {
@@ -281,8 +281,6 @@ public class PanelMetricasCopia extends JPanel {
                 new java.awt.Color(230, 81, 0),
                 new java.awt.Color(21, 101, 192),
                 new java.awt.Color(106, 27, 154),
-                new java.awt.Color(0, 131, 143),
-                new java.awt.Color(93, 64, 55),
                 new java.awt.Color(33, 33, 33)     // Global: Gris oscuro
             };
             for (int i = 0; i < coloresEspera.length; i++) {
@@ -315,14 +313,10 @@ public class PanelMetricasCopia extends JPanel {
             seriesDiskSSTF.clear();
             seriesDiskSCAN.clear();
             seriesDiskCSCAN.clear();
-            seriesDiskLOOK.clear();
-            seriesDiskCLOOK.clear();
             seriesWaitFIFO.clear();
             seriesWaitSSTF.clear();
             seriesWaitSCAN.clear();
             seriesWaitCSCAN.clear();
-            seriesWaitLOOK.clear();
-            seriesWaitCLOOK.clear();
             dataset.removeAllSeries();
             session = view.session;
             lastSample = -1;
@@ -372,21 +366,18 @@ public class PanelMetricasCopia extends JPanel {
             if (sample.diskUsage() != null) {
                 double x = (double) sample.cycle();
                 var d = sample.diskUsage();
-                seriesDiskTotal.addOrUpdate(x, (double) d.totalHeadMovement());
-                seriesDiskWait.addOrUpdate(x, d.averageWaitTime());
-                seriesDiskFIFO.addOrUpdate(x, (double) d.fifoMovement());
-                seriesDiskSSTF.addOrUpdate(x, (double) d.sstfMovement());
-                seriesDiskSCAN.addOrUpdate(x, (double) d.scanMovement());
-                seriesDiskCSCAN.addOrUpdate(x, (double) d.cscanMovement());
-                seriesDiskLOOK.addOrUpdate(x, (double) d.lookMovement());
-                seriesDiskCLOOK.addOrUpdate(x, (double) d.clookMovement());
+                agregarSiHayDatos(seriesDiskTotal, x, d.totalHeadMovement(),
+                        d.completedRequestsCount() > 0 || d.totalHeadMovement() > 0);
+                agregarSiHayDatos(seriesDiskWait, x, d.averageWaitTime(), d.completedRequestsCount() > 0);
+                agregarSiHayDatos(seriesDiskFIFO, x, d.fifoMovement(), d.fifoServed() > 0 || d.fifoMovement() > 0);
+                agregarSiHayDatos(seriesDiskSSTF, x, d.sstfMovement(), d.sstfServed() > 0 || d.sstfMovement() > 0);
+                agregarSiHayDatos(seriesDiskSCAN, x, d.scanMovement(), d.scanServed() > 0 || d.scanMovement() > 0);
+                agregarSiHayDatos(seriesDiskCSCAN, x, d.cscanMovement(), d.cscanServed() > 0 || d.cscanMovement() > 0);
 
-                seriesWaitFIFO.addOrUpdate(x, d.fifoAvgWait());
-                seriesWaitSSTF.addOrUpdate(x, d.sstfAvgWait());
-                seriesWaitSCAN.addOrUpdate(x, d.scanAvgWait());
-                seriesWaitCSCAN.addOrUpdate(x, d.cscanAvgWait());
-                seriesWaitLOOK.addOrUpdate(x, d.lookAvgWait());
-                seriesWaitCLOOK.addOrUpdate(x, d.clookAvgWait());
+                agregarSiHayDatos(seriesWaitFIFO, x, d.fifoAvgWait(), d.fifoServed() > 0);
+                agregarSiHayDatos(seriesWaitSSTF, x, d.sstfAvgWait(), d.sstfServed() > 0);
+                agregarSiHayDatos(seriesWaitSCAN, x, d.scanAvgWait(), d.scanServed() > 0);
+                agregarSiHayDatos(seriesWaitCSCAN, x, d.cscanAvgWait(), d.cscanServed() > 0);
             }
         }
 
@@ -398,8 +389,6 @@ public class PanelMetricasCopia extends JPanel {
         tablaEquipos.setRowCount(0);
         tablaProcesos.setRowCount(0);
         tablaDisco.setRowCount(0);
-        double maxUtil = -1.0;
-        double minUtil = 101.0;
         
         // Actualizar datos de Computadores y Gráfico
         for (int i = 0; i < cantidadComputadores; i++) {
@@ -410,14 +399,13 @@ public class PanelMetricasCopia extends JPanel {
             activosGlobal += c.getCiclosActivos();
             observadosGlobal += c.getCiclosObservados();
             
-            int listos = 0, bloqueados = 0, semaforos = 0, suspensiones = 0, reactivaciones = 0;
+            int listos = 0, bloqueados = 0, suspensiones = 0, reactivaciones = 0;
             
             for (int p = 0; p < view.processes.size(); p++) {
                 var fila = view.processes.get(p);
                 if (fila.computerId() != c.getId()) continue;
                 listos += fila.process().readyWaitTicks();
                 bloqueados += fila.process().blockedWaitTicks();
-                semaforos += fila.process().semaphoreWaitTicks();
                 suspensiones += fila.process().suspensions();
                 reactivaciones += fila.process().reactivations();
             }
@@ -427,11 +415,9 @@ public class PanelMetricasCopia extends JPanel {
                 String.format("%.4f", c.getCiclosObservados() == 0 ? 0.0 : (double) c.getProcesosCompletados() / c.getCiclosObservados()),
                 String.format("%.1f", c.getProcesosCompletados() == 0 ? 0.0 : (double) c.getTotalTiempoRespuesta() / c.getProcesosCompletados()),
                 c.getDeadlinesCumplidos() + " de " + c.getProcesosFinalizados(), 
-                listos, bloqueados, semaforos, suspensiones, reactivaciones
+                listos, bloqueados, suspensiones, reactivaciones
             });
             
-            if (utilizacion > maxUtil) maxUtil = utilizacion;
-            if (utilizacion < minUtil) minUtil = utilizacion;
             
             finalizadosGlobal += c.getProcesosFinalizados();
             procesosCompletadosGlobal += c.getProcesosCompletados();
@@ -445,7 +431,6 @@ public class PanelMetricasCopia extends JPanel {
         double throughput = cicloActual == 0 ? 0.0 : (double) procesosCompletadosGlobal / cicloActual;
         double ratioDeadlines = finalizadosGlobal > 0
                 ? ((double) deadlinesCumplidosGlobal / finalizadosGlobal) * 100 : 0.0;
-        double equidad = (cantidadComputadores > 1 && maxUtil >= 0) ? (maxUtil - minUtil) : 0.0;
         double tiempoRespuestaPromedio = procesosCompletadosGlobal > 0 
                 ? (double) tiempoRespuestaTotalGlobal / procesosCompletadosGlobal : 0.0;
 
@@ -453,26 +438,18 @@ public class PanelMetricasCopia extends JPanel {
                 observadosGlobal == 0 ? 0.0 : 100.0 * activosGlobal / observadosGlobal,
                 procesosCompletadosGlobal, throughput, deadlinesCumplidosGlobal, finalizadosGlobal, ratioDeadlines));
         
-        int participantes = 0, esperaSemaforos = 0;
         for (int i = 0; i < view.processes.size(); i++) {
             var fila = view.processes.get(i);
             var p = fila.process();
             
             tablaProcesos.addRow(new Object[]{
                 p.id(), p.name(), fila.computerName(), fila.state(),
-                p.readyWaitTicks(), p.blockedWaitTicks(), p.semaphoreWaitTicks(),
+                p.readyWaitTicks(), p.blockedWaitTicks(),
                 p.suspensions(), p.reactivations()
             });
-            if (p.type() == com.avilaos.core.model.ProcessType.PRODUCER
-                    || p.type() == com.avilaos.core.model.ProcessType.CONSUMER) {
-                participantes++;
-                esperaSemaforos += p.semaphoreWaitTicks();
-            }
         }
-        
-        String promedioSemaforos = participantes == 0 ? "—" : String.format("%.1f", (double) esperaSemaforos / participantes);
-        lblTiempos.setText(String.format("Respuesta promedio (completados): %.1f ticks   ·   Bloqueo en semáforos promedio: %s ticks/proceso   ·   Brecha de CPU: %.1f puntos",
-                tiempoRespuestaPromedio, promedioSemaforos, equidad));
+
+        lblTiempos.setText(String.format("Respuesta promedio (completados): %.1f ticks", tiempoRespuestaPromedio));
 
         // Actualizar datos del Disco
         var d = view.disk;
@@ -489,8 +466,6 @@ public class PanelMetricasCopia extends JPanel {
                 {"SSTF", d.sstfServed(), d.sstfMovement(), d.sstfAvgWait(), activa == DiskSchedulingPolicyType.SSTF},
                 {"SCAN", d.scanServed(), d.scanMovement(), d.scanAvgWait(), activa == DiskSchedulingPolicyType.SCAN},
                 {"C-SCAN", d.cscanServed(), d.cscanMovement(), d.cscanAvgWait(), activa == DiskSchedulingPolicyType.C_SCAN},
-                {"LOOK", d.lookServed(), d.lookMovement(), d.lookAvgWait(), activa == DiskSchedulingPolicyType.LOOK},
-                {"C-LOOK", d.clookServed(), d.clookMovement(), d.clookAvgWait(), activa == DiskSchedulingPolicyType.C_LOOK}
             };
 
             for (Object[] pol : politicas) {
@@ -516,5 +491,9 @@ public class PanelMetricasCopia extends JPanel {
         }
 
         lblDetalle.setText("Métricas de la ejecución actual · compare políticas con cargas iniciales equivalentes");
+    }
+
+    private static void agregarSiHayDatos(XYSeries serie, double ciclo, double valor, boolean hayDatos) {
+        serie.addOrUpdate(Double.valueOf(ciclo), hayDatos ? Double.valueOf(valor) : null);
     }
 }

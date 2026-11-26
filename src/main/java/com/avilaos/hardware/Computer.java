@@ -70,7 +70,7 @@ public class Computer {
         if (!completo) return;
         procesosCompletados++;
         totalTiempoRespuesta += Math.max(0, pcb.getStartCycle() - pcb.getArrivalCycle());
-        totalTiempoEspera += pcb.getWaitingTime();
+        totalTiempoEspera += pcb.getWaitingTime() + pcb.getWaitingNewTicks();
         if (pcb.getRemainingDeadline() > 0) deadlinesCumplidos++;
     }
 
