@@ -831,6 +831,55 @@ public class SimulatedDisk implements IClockTickable {
         return totalHeadMovement;
     }
 
+    /** Conserva los contadores al sustituir un disco sin solicitudes pendientes. */
+    public void conservarMetricasDe(SimulatedDisk anterior) {
+        totalHeadMovement = anterior.totalHeadMovement;
+        completedRequestsCount = anterior.completedRequestsCount;
+        totalWaitTimeCycles = anterior.totalWaitTimeCycles;
+        atendidasFIFO = anterior.atendidasFIFO; atendidasSSTF = anterior.atendidasSSTF;
+        atendidasSCAN = anterior.atendidasSCAN; atendidasCSCAN = anterior.atendidasCSCAN;
+        atendidasLOOK = anterior.atendidasLOOK; atendidasCLOOK = anterior.atendidasCLOOK;
+        movementFIFO = anterior.movementFIFO; movementSSTF = anterior.movementSSTF;
+        movementSCAN = anterior.movementSCAN; movementCSCAN = anterior.movementCSCAN;
+        movementLOOK = anterior.movementLOOK; movementCLOOK = anterior.movementCLOOK;
+        waitTimeFIFO = anterior.waitTimeFIFO; waitTimeSSTF = anterior.waitTimeSSTF;
+        waitTimeSCAN = anterior.waitTimeSCAN; waitTimeCSCAN = anterior.waitTimeCSCAN;
+        waitTimeLOOK = anterior.waitTimeLOOK; waitTimeCLOOK = anterior.waitTimeCLOOK;
+        nextRequestId = anterior.nextRequestId;
+    }
+
+    /** Traslada lecturas y su progreso solo si todos sus destinos siguen siendo datos. */
+    public void conservarLecturasPendientesDe(SimulatedDisk anterior) {
+        if (anterior.pendingBoundaryBlock >= 0) {
+            throw new IllegalStateException("Espera a que termine el barrido de disco en curso antes de cambiar la capacidad.");
+        }
+        anterior.queueMutex.acquireUninterruptibly();
+        try {
+            validarLecturaParaRedimension(anterior.activeRequest);
+            for (int i = 0; i < anterior.ioQueue.size(); i++) validarLecturaParaRedimension(anterior.ioQueue.get(i));
+            activeRequest = anterior.activeRequest;
+            activeRequestPolicy = anterior.activeRequestPolicy;
+            remainingTransferCycles = anterior.remainingTransferCycles;
+            activeTransferIndex = anterior.activeTransferIndex;
+            for (int i = 0; i < anterior.ioQueue.size(); i++) ioQueue.append(anterior.ioQueue.get(i));
+        } finally {
+            anterior.queueMutex.release();
+        }
+    }
+
+    private void validarLecturaParaRedimension(IORequest solicitud) {
+        if (solicitud == null) return;
+        if (solicitud.getOperation() != IOOperationType.READ) {
+            throw new IllegalStateException("Espera a que termine la operación de disco pendiente antes de cambiar la capacidad.");
+        }
+        for (int i = 0; i < solicitud.getBlockCount(); i++) {
+            int bloque = solicitud.getTransferBlock(i);
+            if (bloque < 0 || bloque >= totalBlocks) {
+                throw new IllegalStateException("La lectura pendiente usa el bloque " + bloque + ", fuera de la nueva área de datos.");
+            }
+        }
+    }
+
     public int getCompletedRequestsCount() {
         return completedRequestsCount;
     }
