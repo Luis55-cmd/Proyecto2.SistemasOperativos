@@ -5,6 +5,8 @@ import java.lang.reflect.Field;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.swing.JTextArea;
+import javax.swing.JLabel;
+import javax.swing.JTabbedPane;
 import javax.swing.SwingUtilities;
 
 /** Evita pérdida de eventos por saturación o recorte y verifica el estado del reloj. */
@@ -23,6 +25,10 @@ public class LogCompletoYRelojTest {
             c.reset();
             monitor[0]=new MonitorSimulacion(c,()->{});
             vista[0]=new VistaSimulacionAlternativa(c);
+            JTabbedPane pestañas = (JTabbedPane) campo(vista[0], "vistas");
+            check(pestañas.getTabCount() == 3 && pestañas.getTitleAt(0).equals("CPU y procesos")
+                    && pestañas.getTitleAt(1).equals("Disco y E/S") && pestañas.getTitleAt(2).equals("Eventos"),
+                    "Faltan las pestañas de simulación");
             c.addLogListener(s -> { if (s.contains("FIN-PRUEBA-LOG")) recibido.countDown(); });
         });
         // El EDT no puede procesar la cola hasta que termine este bloque.
@@ -45,14 +51,16 @@ public class LogCompletoYRelojTest {
         });
         SwingUtilities.invokeAndWait(() -> {});
         SwingUtilities.invokeAndWait(() -> {
-            var reloj=(RelojAnimado)campo(vista[0],"relojAnimado");
-            check(reloj.estaActivo(),"El reloj no refleja simulación activa");
+            var reloj=(JLabel)campo(vista[0],"reloj");
+            check(reloj.getText().contains("Activa"),"El reloj no refleja simulación activa");
+            check(((RelojAnimado) campo(vista[0], "relojAnimado")).estaActivo(), "El reloj animado no está activo");
             c.pauseSimulation();
         });
         SwingUtilities.invokeAndWait(() -> {});
         SwingUtilities.invokeAndWait(() -> {
-            var reloj=(RelojAnimado)campo(vista[0],"relojAnimado");
-            check(!reloj.estaActivo(),"El reloj no se pausó");
+            var reloj=(JLabel)campo(vista[0],"reloj");
+            check(reloj.getText().contains("Pausada"),"El reloj no se pausó");
+            check(!((RelojAnimado) campo(vista[0], "relojAnimado")).estaActivo(), "El reloj animado no se pausó");
             c.reset();
             c.logEvent("PRIMER-EVENTO-DE-SESION");
         });

@@ -299,45 +299,10 @@ public final class MonitorSimulacion extends JPanel {
         JButton btnGuardar = accion("Guardar configuración", false);
         JButton btnCargar = accion("Cargar configuración", false);
 
-        btnGuardar.addActionListener(e -> {
-            JFileChooser chooser = new JFileChooser();
-            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
-            
-            if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-                File archivo = chooser.getSelectedFile();
-                if (!archivo.getName().toLowerCase().endsWith(".json")) {
-                    archivo = new File(archivo.getAbsolutePath() + ".json");
-                }
-
-                File destino = archivo;
-                btnGuardar.setEnabled(false);
-                GuiCommands.submit(() -> guardarEstado(destino), ok -> { btnGuardar.setEnabled(true); if (!ok) JOptionPane.showMessageDialog(this, "No se pudo guardar la configuración. Consulta el log.", "Error al guardar", JOptionPane.ERROR_MESSAGE); },
-                        error -> { btnGuardar.setEnabled(true); controller.logEvent(error.getMessage()); });
-            }
-        });
-        btnCargar.addActionListener(e -> {
-            JFileChooser chooser = new JFileChooser();
-            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
-
-            if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-                File archivo = chooser.getSelectedFile();
-
-                btnCargar.setEnabled(false);
-                GuiCommands.submit(() -> cargarEstado(archivo), ok -> {
-                    btnCargar.setEnabled(true);
-                    if (!ok) {
-                        JOptionPane.showMessageDialog(this,
-                                "No se pudo cargar el archivo. Consulta el log para conocer el error.",
-                                "Error de carga", JOptionPane.ERROR_MESSAGE);
-                    }
-                }, error -> {
-                    btnCargar.setEnabled(true);
-                    controller.logEvent(error.getMessage());
-                    JOptionPane.showMessageDialog(this, "No se pudo cargar el archivo: " + error.getMessage(),
-                            "Error de carga", JOptionPane.ERROR_MESSAGE);
-                });
-            }
-        });
+        btnGuardar.setEnabled(false);
+        btnGuardar.setToolTipText("Guardar configuración no está disponible.");
+        btnCargar.setEnabled(false);
+        btnCargar.setToolTipText("Carga procesos y configuración desde Inicio.");
         panel.add(btnGuardar);
         panel.add(btnCargar);
         JButton btnLog = accion("Exportar log", false);
@@ -357,7 +322,8 @@ public final class MonitorSimulacion extends JPanel {
         panel.add(btnLog);
         JButton btnCargarFS = accion("Cargar Archivos JSON", true);
         JButton btnGuardarFS = accion("Guardar Archivos JSON", false);
-        btnCargarFS.addActionListener(e -> cargarSistemaArchivosMonitor(btnCargarFS));
+        btnCargarFS.setEnabled(false);
+        btnCargarFS.setToolTipText("Carga el sistema de archivos desde Inicio.");
         btnGuardarFS.addActionListener(e -> guardarSistemaArchivosMonitor(btnGuardarFS));
         panel.add(btnCargarFS);
         panel.add(btnGuardarFS);

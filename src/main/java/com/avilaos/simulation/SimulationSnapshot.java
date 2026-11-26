@@ -56,6 +56,7 @@ public final class SimulationSnapshot {
     ) { }
     public final Values<Sample> history;
     public final DiskUsage disk;
+    public final int bloquesDatos, bloquesDatosLibres, bloquesSwap, bloquesSwapLibres;
     public final Values<DiskRequestView> diskQueue;
     
     public static final class Values<T> {
@@ -265,6 +266,10 @@ public final class SimulationSnapshot {
     public SimulationSnapshot(long session, int cycle, boolean running, boolean paused, int interval,
             MyLinkedList<Computer> nodes, com.avilaos.disk.SimulatedDisk diskModel, SimulationSnapshot previous) { // [P2]
         this.session=session; this.cycle=cycle; this.running=running; this.paused=paused; this.interval=interval;
+        this.bloquesDatos = diskModel == null ? 0 : diskModel.getTotalBlocks();
+        this.bloquesDatosLibres = diskModel == null ? 0 : diskModel.getFreeDataBlocks();
+        this.bloquesSwap = diskModel == null ? 0 : diskModel.getSwapSizeBlocks();
+        this.bloquesSwapLibres = diskModel == null ? 0 : diskModel.getFreeSwapBlocks();
         DiskUsage currentDisk = diskModel == null ? DiskUsage.empty() : new DiskUsage(
                 diskModel.getTotalHeadMovement(),
                 diskModel.getAverageWaitTimeCycles(),

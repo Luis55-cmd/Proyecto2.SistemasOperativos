@@ -30,6 +30,10 @@ public class PanelPrincipal extends JPanel {
     private final EditorProceso editorProceso;
     private final PanelMetricasCopia metricas;
     private final SimulationController controller = SimulationController.getInstance();
+    private final JButton controlReloj = accion("", false);
+    private final JButton avanceReloj = accion("+", false);
+    private final JLabel cicloLateral = texto("Ciclo 0", 11, new Color(225, 220, 201), true);
+    private boolean controlRelojPendiente;
     
     private final CardLayout estadoComputadorLayout = new CardLayout();
     private final JPanel estadoComputadorPanel = new JPanel(estadoComputadorLayout);
@@ -231,6 +235,8 @@ public class PanelPrincipal extends JPanel {
             lateral.add(Box.createVerticalStrut(8));
         }
         lateral.add(Box.createVerticalGlue());
+        lateral.add(controlesRelojLateral());
+        lateral.add(Box.createVerticalStrut(14));
         JLabel pie = texto("ENTORNO DE DISEÑO", 10, new Color(192, 181, 148), true);
         pie.setAlignmentX(LEFT_ALIGNMENT);
         lateral.add(pie);
@@ -249,7 +255,7 @@ public class PanelPrincipal extends JPanel {
         
         editorProceso = new EditorProceso(() -> mostrarPanel(Destino.COMPUTADOR));
         pantallas.add(editorProceso, Destino.PROCESO.name());
-        pantallas.add(new VistaSimulacionAlternativa(controller, () -> mostrarPanel(Destino.COMPUTADOR)), Destino.SIMULACION.name());
+        pantallas.add(new VistaSimulacionAlternativa(controller, () -> mostrarPanel(Destino.ARCHIVOS)), Destino.SIMULACION.name());
         metricas = new PanelMetricasCopia(controller);
         JPanel vistaMetricas = new JPanel(new BorderLayout(0, 16));
         vistaMetricas.setBackground(FONDO);
@@ -262,6 +268,7 @@ public class PanelPrincipal extends JPanel {
         // --- CONEXIÓN AL OBSERVER ---
         // Se actualizan las tablas automáticamente cuando el SimulationController cambia
         controller.addGUIListener(() -> {
+            actualizarControlesReloj();
             metricas.actualizarMetricas();
             actualizarListaComputadores();
             if (destinoActual == Destino.DISCO || (ventanaMapaAmpliado != null && ventanaMapaAmpliado.isVisible())) {
@@ -272,7 +279,87 @@ public class PanelPrincipal extends JPanel {
 // [P2-LEGACY]             actualizarOpcionesComputadoresBuffer();
         });
 
+        actualizarControlesReloj();
         mostrarPanel(Destino.MENU);
+    }
+
+    private JPanel controlesRelojLateral() {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setAlignmentX(LEFT_ALIGNMENT);
+        panel.setMaximumSize(new Dimension(180, 70));
+        JLabel titulo = texto("SIMULACIÓN", 10, new Color(192, 181, 148), true);
+        titulo.setAlignmentX(LEFT_ALIGNMENT);
+        panel.add(titulo);
+        panel.add(Box.createVerticalStrut(5));
+        JPanel fila = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        fila.setOpaque(false);
+        fila.setAlignmentX(LEFT_ALIGNMENT);
+        controlReloj.setPreferredSize(new Dimension(48, 34));
+        controlReloj.setBorder(BorderFactory.createLineBorder(BORDE));
+        avanceReloj.setPreferredSize(new Dimension(48, 34));
+        avanceReloj.setBorder(BorderFactory.createLineBorder(BORDE));
+        avanceReloj.setMargin(new Insets(0, 0, 0, 0));
+        avanceReloj.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+        avanceReloj.setToolTipText("Avanzar un ciclo con la simulación pausada");
+        avanceReloj.getAccessibleContext().setAccessibleName("Avanzar un ciclo");
+        controlReloj.addActionListener(e -> {
+            SimulationSnapshot estado = controller.snapshot();
+            enviarControlReloj(estado.running && !estado.paused
+                    ? controller::pauseSimulation : controller::startSimulation);
+        });
+        avanceReloj.addActionListener(e -> enviarControlReloj(controller::stepSimulation));
+        fila.add(controlReloj);
+        fila.add(avanceReloj);
+        fila.add(cicloLateral);
+        panel.add(fila);
+        return panel;
+    }
+
+    private void enviarControlReloj(Runnable accion) {
+        controlRelojPendiente = true;
+        actualizarControlesReloj();
+        GuiRequest.model(controller, () -> { accion.run(); return true; }, resultado -> {
+            controlRelojPendiente = false;
+            actualizarControlesReloj();
+        }, error -> {
+            controlRelojPendiente = false;
+            actualizarControlesReloj();
+            JOptionPane.showMessageDialog(this, error.getMessage(), "Simulación", JOptionPane.ERROR_MESSAGE);
+        });
+    }
+
+    private void actualizarControlesReloj() {
+        SimulationSnapshot estado = controller.snapshot();
+        boolean activo = estado.running && !estado.paused;
+        boolean hayComputador = estado.computers.size() > 0;
+        controlReloj.setBackground(activo ? new Color(63, 123, 72) : new Color(159, 64, 58));
+        controlReloj.setIcon(iconoEncendido());
+        controlReloj.setDisabledIcon(iconoEncendido());
+        controlReloj.getAccessibleContext().setAccessibleName(activo ? "Simulación encendida" : "Simulación apagada");
+        controlReloj.setToolTipText(!hayComputador ? "Crea un computador primero"
+                : activo ? "Pausar simulación" : "Iniciar o reanudar simulación");
+        controlReloj.setEnabled(!controlRelojPendiente && (hayComputador || activo));
+        avanceReloj.setEnabled(!controlRelojPendiente && hayComputador && !activo);
+        cicloLateral.setText("Ciclo " + estado.cycle);
+    }
+
+    private static Icon iconoEncendido() {
+        return new Icon() {
+            @Override public int getIconWidth() { return 20; }
+            @Override public int getIconHeight() { return 20; }
+            @Override public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D dibujo = (Graphics2D) g.create();
+                try {
+                    dibujo.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    dibujo.setColor(Color.WHITE);
+                    dibujo.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    dibujo.drawArc(x + 3, y + 4, 14, 14, 45, -270);
+                    dibujo.drawLine(x + 10, y + 1, x + 10, y + 10);
+                } finally { dibujo.dispose(); }
+            }
+        };
     }
 
     public void mostrarPanel(Destino destino) {
