@@ -68,6 +68,8 @@ public class PanelPrincipal extends JPanel {
     };
     private boolean actualizandoArbolArchivos;
     private final JLabel[] detallesArchivo = new JLabel[7];
+    private final JLabel tituloDetalleArchivo = texto("Selecciona un elemento", 20, TINTA, true);
+    private final JLabel subtituloDetalleArchivo = texto("Sus propiedades aparecerán aquí.", 13, GRIS, false);
     private final JTextArea estadoSolicitudArchivo = crearEstadoSolicitudArchivo();
     private JButton botonRenombrarArchivo;
     private com.avilaos.core.model.ProcessControlBlock solicitudArchivo;
@@ -260,7 +262,21 @@ public class PanelPrincipal extends JPanel {
         JPanel vistaMetricas = new JPanel(new BorderLayout(0, 16));
         vistaMetricas.setBackground(FONDO);
         vistaMetricas.setBorder(new EmptyBorder(24, 24, 24, 24));
-        vistaMetricas.add(texto("Métricas del sistema", 26, TINTA, true), BorderLayout.NORTH);
+        JPanel cabeceraMetricas = new JPanel(new BorderLayout());
+        cabeceraMetricas.setOpaque(false);
+        cabeceraMetricas.add(texto("Métricas del sistema", 26, TINTA, true), BorderLayout.CENTER);
+        java.net.URL imagenShrek = getClass().getResource("/imagenes/shrek-easter-egg.png");
+        if (imagenShrek != null) {
+            Image imagen = new ImageIcon(imagenShrek).getImage().getScaledInstance(48, 62, Image.SCALE_SMOOTH);
+            JLabel shrek = new JLabel(new ImageIcon(imagen));
+            shrek.setToolTipText("Alguien está revisando las métricas");
+            JPanel sorpresa = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+            sorpresa.setOpaque(false);
+            sorpresa.add(texto("“Los ogros no son como los pasteles.”", 12, GRIS, false));
+            sorpresa.add(shrek);
+            cabeceraMetricas.add(sorpresa, BorderLayout.EAST);
+        }
+        vistaMetricas.add(cabeceraMetricas, BorderLayout.NORTH);
         vistaMetricas.add(metricas, BorderLayout.CENTER);
         pantallas.add(vistaMetricas, Destino.METRICAS.name());
         add(pantallas, BorderLayout.CENTER);
@@ -675,9 +691,9 @@ public class PanelPrincipal extends JPanel {
         detalles.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         detalles.add(texto("DETALLES", 11, ACENTO, true));
         detalles.add(Box.createVerticalStrut(8));
-        detalles.add(texto("Selecciona un elemento", 20, TINTA, true));
+        detalles.add(tituloDetalleArchivo);
         detalles.add(Box.createVerticalStrut(8));
-        detalles.add(texto("Sus propiedades aparecerán aquí.", 13, GRIS, false));
+        detalles.add(subtituloDetalleArchivo);
         detalles.add(Box.createVerticalStrut(16));
         String[] campos = {"Nombre", "Ruta", "Tipo", "Dueño", "Permisos", "Tamaño en bloques", "Primer bloque"};
         for (int i = 0; i < campos.length; i++) {
@@ -913,6 +929,9 @@ public class PanelPrincipal extends JPanel {
             nodo.getName().isEmpty() ? "/" : nodo.getName(), nodo.getPath(), nodo.isDirectory() ? "Directorio" : "Archivo",
             nodo.getOwner(), nodo.getPermission().toString(), Integer.toString(nodo.getSizeBlocks()),
             nodo.getFirstBlock() < 0 ? "—" : Integer.toString(nodo.getFirstBlock())};
+        tituloDetalleArchivo.setText(nodo == null ? "Selecciona un elemento" : valores[0]);
+        tituloDetalleArchivo.setToolTipText(nodo == null ? null : nodo.getPath());
+        subtituloDetalleArchivo.setText(nodo == null ? "Sus propiedades aparecerán aquí." : valores[2]);
         for (int i = 0; i < nombres.length; i++) if (detallesArchivo[i] != null) detallesArchivo[i].setText(nombres[i] + "  ·  " + valores[i]);
     }
 
