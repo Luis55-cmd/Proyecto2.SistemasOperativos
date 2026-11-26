@@ -1,9 +1,9 @@
 # 🏔️ ÁvilaOS — Simulador de Sistema Operativo, Sistema de Archivos y Planificación de Disco
 
 > **Proyecto 2 — Sistemas Operativos**  
-> Simulador en tiempo real de un sistema operativo monohilo dotado de planificación de CPU, **Sistema de Archivos Jerárquico (Árbol N-ario)**, **Disco Simulado con Asignación Encadenada y Área de Swap**, **Cola única de E/S** con políticas de cabezal intercambiables en caliente (`FIFO`, `SSTF`, `SCAN`, `C-SCAN`, `LOOK`, `C-LOOK`), **Modelo de 7 Estados con Suspensión/Reactivación (`MidTermScheduler`)**, **Control de Sesión (`ADMIN` / `USER`)** y **Persistencia Dual en JSON**.
+> Simulador en tiempo real de un sistema operativo monohilo dotado de planificación de CPU, **Sistema de Archivos Jerárquico (Árbol N-ario)**, **Disco Simulado con Asignación Encadenada y Área de Swap**, **Cola única de E/S** con políticas de cabezal intercambiables en caliente (`FIFO`, `SSTF`, `SCAN`, `C-SCAN`), **Modelo de 7 Estados con Suspensión/Reactivación (`MidTermScheduler`)**, **Control de Sesión (`ADMIN` / `USER`)** y **carga de dos JSON y guardado del sistema de archivos**.
 
-📄 **[Ver Informe Técnico Completo (https://docs.google.com/document/d/1tdR2iUPuEp1S2k3T6HdUEbeLmFPWlkAu1J59QRHgm1o/edit?usp=sharing)]**
+📄 [Ver informe técnico del equipo](https://docs.google.com/document/d/1tdR2iUPuEp1S2k3T6HdUEbeLmFPWlkAu1J59QRHgm1o/edit?usp=sharing)
 
 ---
 
@@ -22,37 +22,39 @@
 ## ✨ Características Principales
 
 * **Modelo de 7 Estados y Planificación de CPU (`IScheduler` + `MidTermScheduler`):**
-  * Colas independientes para los estados `NUEVO`, `LISTO`, `EJECUTANDO`, `BLOQUEADO`, `SUSPENDIDO_LISTO`, `SUSPENDIDO_BLOQUEADO` y `TERMINADO`.
+  * Estados `NUEVO`, `LISTO`, `EJECUTANDO`, `BLOQUEADO`, `SUSPENDIDO_LISTO`, `SUSPENDIDO_BLOQUEADO` y `TERMINADO`. El proceso en ejecución ocupa la CPU; las demás situaciones se representan en colas.
   * **4 políticas de corto plazo intercambiables en caliente:** `FCFS` (`FcfsScheduler`), `Round Robin` (`RoundRobinScheduler`), `EDF` (`EdfScheduler`) y `Prioridades Apropiativas` (`PreemptivePriorityScheduler`).
   * **Planificador a mediano plazo (`MidTermScheduler`):** Suspende procesos bloqueados hacia el área de intercambio (`Swap-out`, por menor prioridad / mayor espera bloqueado) cuando un proceso nuevo no cabe en `RAM`, transiciona procesos de `SUSPENDIDO_BLOQUEADO` a `SUSPENDIDO_LISTO` al completarse su evento de E/S o disco, y los reactiva (`Swap-in`, mayor prioridad) al liberarse memoria.
 * **Disco Simulado y Asignación Encadenada (`com.avilaos.disk`):**
   * Bloques físicos numerados separados en **área de datos** y **área de swap** (equivalencia `1 unidad RAM = 1 bloque Swap`).
   * Asignación encadenada de archivos (`DiskBlock.nextBlock` / `END_OF_CHAIN`) con reserva atómica en dos fases (`reserveChainedBlocks` / `finishReservation`).
   * **Cola única de E/S (`IORequest`):** Todas las solicitudes CRUD (`CREATE`, `READ`, `UPDATE`, `DELETE`) y de intercambio (`SUSPEND`, `REACTIVATE`) compiten en la misma cola del disco y muestran su estado en tiempo real en `03 Disco` y `06 Simulación`.
-  * **Políticas de planificación de cabezal en caliente (`DiskSchedulingPolicy`):** `FIFO`, `SSTF`, `SCAN` (con rebote en extremo), `C-SCAN` (retorno circular sin sumar el salto de vuelta), `LOOK` y `C-LOOK`.
-  * **Configuración segura:** Cambio de velocidad del cabezal (`1–500` bloques/ciclo) y redimensionamiento seguro de capacidad (`Bloques` y `Swap`) conservando archivos si no hay E/S ni swap activo.
+  * **Políticas de planificación de cabezal en caliente (`DiskSchedulingPolicy`):** `FIFO`, `SSTF`, `SCAN` (con rebote en extremo), `C-SCAN` (retorno circular sin sumar el salto de vuelta). Hay implementaciones de `LOOK` y `C-LOOK`, pero no están en el selector de la interfaz.
+  * **Configuración segura:** Cambio de velocidad del cabezal (`1–500` bloques/ciclo) y redimensionamiento con el reloj detenido o pausado. Conserva archivos, métricas y lecturas pendientes si sus destinos siguen siendo válidos; rechaza cambios con swap ocupado, reservas, otras operaciones pendientes o ciertos barridos, o cuando bloques o cabezal quedarían fuera.
 * **Sistema de Archivos Jerárquico y Control de Acceso (`com.avilaos.filesystem`):**
   * Árbol N-ario 100% propio (`FileSystemTree` / `FSNode`), sin colecciones de `java.util.*`, con raíz `/` en el bloque `0`.
   * Toda operación CRUD se ejecuta exclusivamente mediante procesos `ProcessType.FILE_IO` que pasan a `ExecutionMode.KERNEL` y bloquean por disco (`BlockReason.WAITING_DISK`).
-  * Modos de sesión **`ADMIN`** (control total) y **`USER`** (solo lectura de archivos propios o `PUBLIC`, y creación dentro de directorios propios).
+  * Modos de sesión **`ADMIN`** (control total) y **`USER`** (lectura de archivos propios o `PUBLIC`, creación dentro de directorios propios y eliminación de archivos propios; sin renombrar ni eliminar directorios).
 * **Estructuras de Datos 100% Propias (`com.avilaos.core.structures`):** Implementación desde cero de `Node<T>`, `MyLinkedList<T>` (con `sort` in-situ), `MyQueue<T>` y `MyStack<T>`, sin utilizar colecciones de `java.util.*`.
 * **Interfaz Gráfica y Observabilidad en Tiempo Real (`com.avilaos.gui`):**
-  * **7 módulos laterales:** `01 Inicio`, `02 Computador`, `03 Disco` (con **Mapa vertical ampliable en vivo `Ampliar mapa ⤢`** y cola de E/S), `04 Archivos` (`JTree` + detalles/CRUD + tabla de asignación), `05 Procesos`, `06 Simulación` (6 tablas de colas, cola única de E/S del disco y bitácora) y `07 Métricas` (**11 gráficas dinámicas `JFreeChart`** de CPU, desplazamiento del cabezal global y por política, espera en cola de E/S y suspensiones/reactivaciones).
-* **Persistencia Dual Validada en JSON (`com.avilaos.io`):** Carga y exportación independiente del **JSON de Sistema de Archivos** (`FileSystemJsonSerializer`) y del **JSON de Procesos y Configuración** (`ProcessConfigJsonSerializer`) preservando el disco modificado tras una corrida.
+  * **7 módulos laterales:** `01 Inicio`, `02 Computador`, `03 Disco` (con **Mapa vertical ampliable en vivo `Ampliar mapa ⤢`** y cola de E/S), `04 Archivos` (`JTree` + detalles/CRUD + tabla de asignación), `05 Procesos`, `06 Simulación` (6 tablas de colas, cola única de E/S del disco y bitácora) y `07 Métricas` (gráficas `JFreeChart` de CPU, disco y suspensiones/reactivaciones).
+* **JSON (`com.avilaos.io`):** Inicio permite cargar los dos JSON y guardar el sistema de archivos. El botón de guardar procesos está deshabilitado. El JSON guardado no es un checkpoint completo de procesos suspendidos o solicitudes activas.
 
 ---
 
 ## 🚀 Requisitos y Ejecución
 
 * **Java:** JDK 25 (configurado en `pom.xml` con `maven.compiler.source` y `maven.compiler.target` en `25`).
-* **IDE recomendado:** Apache NetBeans 23+ (proyecto Maven nativo).
+* **IDE:** Apache NetBeans (proyecto Maven; requerido por el enunciado).
 * **Librerías autorizadas (vía Maven):** `com.google.code.gson:gson:2.11.0` y `org.jfree:jfreechart:1.5.4`.
 
 ### Ejecución desde Terminal (PowerShell)
 ```powershell
-cd Proyecto1.SistemasOperativos
+cd Proyecto2.SistemasOperativos
 mvn clean compile exec:java "-Dexec.mainClass=com.avilaos.Main"
 ```
+
+Las pruebas son en su mayoría programas con método `main`; un `mvn test` exitoso no demuestra por sí solo que Surefire las haya ejecutado.
 
 ### Ejecución desde Apache NetBeans
 1. Abrir el proyecto Maven en NetBeans.
@@ -134,15 +136,7 @@ classDiagram
         +reset() void
     }
 
-    class DiskRequest {
-        <<interface>>
-        +getRequestId() int
-        +getProcessId() int
-        +getOperationType() IOOperationType
-        +getTargetPath() String
-        +getTargetBlock() int
-        +getArrivalCycle() int
-    }
+    class DiskRequest
 
     class ProcessState {
         <<enumeration>>
@@ -458,7 +452,7 @@ classDiagram
         -int blockCount
         -int arrivalCycle
         -int[] transferBlocks
-        +getTransferBlock(int index) int
+        ~getTransferBlock(int index) int
     }
 
     class FileSystemManager {
@@ -540,7 +534,7 @@ classDiagram
     DiskSchedulingPolicy <|.. CSCANDiskPolicy
     DiskSchedulingPolicy <|.. LOOKDiskPolicy
     DiskSchedulingPolicy <|.. CLOOKDiskPolicy
-    DiskRequest <|.. IORequest
+    IORequest <|-- DiskRequest
 
     SimulationController --> GlobalClock : se suscribe
     SimulationController "1" *-- "1" Computer : gestiona
@@ -730,7 +724,7 @@ src/main/java/com/avilaos/
 │   ├── SimulatedDisk.java                     # Disco simulado: bloques, swap, cola única y movimiento del cabezal
 │   ├── DiskBlock.java                         # Bloque físico (datos o swap) con puntero nextBlock
 │   ├── IORequest.java                         # Solicitud de E/S en cola con cadena transferBlocks
-│   ├── DiskRequest.java                       # Interfaz de consulta de solicitudes de disco
+│   ├── DiskRequest.java                       # Clase de compatibilidad que extiende IORequest
 │   ├── DiskSchedulingPolicy.java              # Interfaz Strategy para políticas del cabezal
 │   ├── DiskSchedulingPolicyType.java          # Enum (FIFO, SSTF, SCAN, C_SCAN, LOOK, C_LOOK)
 │   ├── DiskSchedulerFactory.java              # Fábrica para instanciar políticas en caliente
@@ -766,7 +760,7 @@ src/main/java/com/avilaos/
     ├── PanelPrincipal.java                    # Ventana principal (01 Inicio .. 04 Archivos + Mapa Ampliado)
     ├── VistaSimulacionAlternativa.java        # 06 Simulación: reloj, sesión, 6 colas, cola de disco y log
     ├── EditorProceso.java                     # 05 Procesos: creación manual validada
-    ├── PanelMetricasCopia.java                # 07 Métricas: 11 gráficas JFreeChart (CPU, disco y swap)
+    ├── PanelMetricasCopia.java                # 07 Métricas: indicadores y gráficas de CPU, disco y swap
     ├── ConfiguracionSimulacion.java           # Puentes de carga/guardado para las vistas
     ├── GuiRequest.java                        # Puente seguro EDT -> Worker
     ├── RelojAnimado.java                      # Indicador visual del reloj global
@@ -786,12 +780,19 @@ En `escenarios/carga-json/` se incluyen escenarios listos para probar la carga d
 * **📁 `procesos/` (Tarjeta Procesos y configuración):**
   * `05-procesos-enunciado.json` (8 procesos correspondientes al escenario 01).
   * `09-cambio-fcfs-prioridades.json` (planificación de CPU con desalojo).
-  * `15-sstf-caso-p2.json` (reproducción del Caso P2 SSTF del libro: 62 → 64 → 34 → 11 → 95 → 119 → 123 → 180).
-  * Casos de validación negativa: `06-procesos-vacios.json`, `07-sin-computador.json`, `08-json-malformado.json`.
+  * `15-sstf-caso-p2.json` (ocho lecturas con SSTF; el orden depende de la llegada de las solicitudes y se verifica en el log).
+  * Lista vacía: `06-procesos-vacios.json`. Casos inválidos: `07-sin-computador.json`, `08-json-malformado.json`.
 
 ---
 
 ## 📄 Informe Técnico Completo
 
 El documento detallado con el desglose completo de clases, métodos, enums, interfaces, conclusiones comparativas de políticas de disco (`FIFO`, `SSTF`, `SCAN`, `C-SCAN`) y análisis cuantitativo del efecto de la suspensión (`Swap`) se encuentra en:  
-👉 **[https://docs.google.com/document/d/1tdR2iUPuEp1S2k3T6HdUEbeLmFPWlkAu1J59QRHgm1o/edit?usp=sharing]**
+👉 [Abrir informe técnico del equipo](https://docs.google.com/document/d/1tdR2iUPuEp1S2k3T6HdUEbeLmFPWlkAu1J59QRHgm1o/edit?usp=sharing)
+
+
+### Convenciones para los ejemplos oficiales
+
+El JSON `diskConfig.totalBlocks` representa bloques de datos; el swap se añade para obtener el total físico. El control de Disco muestra esa suma. El ejemplo oficial incluye operaciones `UPDATE` sin `newFileName`: en ese caso se genera un nombre disponible como `notas_actualizado.txt`, añadiendo un número ante colisiones. El log registra el nombre; si se indica `newFileName`, se usa el nombre suministrado.
+
+En C-SCAN el salto de retorno a cero se considera instantáneo y no se suma al desplazamiento. Los contadores de suspensión y reactivación aumentan al iniciar cada transferencia.
