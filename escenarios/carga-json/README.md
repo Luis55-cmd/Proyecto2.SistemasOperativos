@@ -1,23 +1,39 @@
 # Escenarios para probar la carga de JSON
 
-En «Inicio nuevo», usa el botón de carga de cada tarjeta. Para el escenario del enunciado, carga `01` como sistema de archivos y `05` como procesos y configuración. Revisa también los mensajes del log de la simulación.
+En la pantalla de **Inicio**, usa el botón **Cargar JSON** de cada tarjeta.
+La carpeta está organizada en dos subdirectorios temáticos para facilitar la selección:
 
-| Archivo | Tarjeta | Resultado esperado |
+---
+
+## 📁 `sistema-archivos/` (Tarjeta: Sistema de archivos)
+Archivos JSON que configuran el disco (`diskConfig`: bloques y cabezal) y la jerarquía de directorios/archivos (`fileSystem`).
+
+| Archivo | Qué prueba | Resultado esperado |
 |---|---|---|
-| `01-sistema-enunciado.json` | Sistema de archivos | Carga el disco y la jerarquía del ejemplo del enunciado. |
-| `02-disco-vacio.json` | Sistema de archivos | Carga un disco sin entradas de archivos. |
-| `03-cabezal-invalido.json` | Sistema de archivos | Rechaza el cabezal fuera del rango. |
-| `04-sin-sistema-archivos.json` | Sistema de archivos | Rechaza el JSON porque falta `fileSystem`. |
-| `05-procesos-enunciado.json` | Procesos y configuración | Carga la configuración y los ocho procesos del ejemplo. Sus rutas corresponden al escenario `01`. |
-| `06-procesos-vacios.json` | Procesos y configuración | Actualmente se acepta con cero procesos; si debe permitirse arrancar así está pendiente de decidir. |
-| `07-sin-computador.json` | Procesos y configuración | Rechaza el JSON porque falta `computer`. |
-| `08-json-malformado.json` | Procesos y configuración | Rechaza el JSON malformado. |
-| `09-cambio-fcfs-prioridades.json` | Procesos y configuración | Con `01`, avanzar 3 ciclos en FCFS y cambiar a PRIORITY_PREEMPTIVE; orden de finalización esperado: Urgente (6), Medio (10), Lento (15). Prueba CPU; E/S no está integrada. |
-| `10-disco-ocupacion-agrupada.json` | Sistema de archivos | 110 de 200 bloques de datos ocupados en rangos. |
-| `11-disco-lleno.json` | Sistema de archivos | 200 de 200 bloques de datos ocupados: raíz, directorio y archivo de 198 bloques. |
-| `12-disco-disperso.json` | Sistema de archivos | 20 archivos de un bloque separados, además de los bloques de la raíz y el directorio. |
-| `13-arbol-complejo.json` | Sistema de archivos | Nueve directorios y ocho archivos, más la raíz; ocupan 37 bloques en total. Incluye dueños, permisos y un directorio vacío. Para explorar en Archivos; no está asociada a los procesos del escenario 05. |
+| `01-sistema-enunciado.json` | Ejemplo oficial del enunciado | Cabezal en 50, archivos en bloques 11, 34, 62, 64, 95, 119, 123, 180. |
+| `02-disco-vacio.json` | Disco limpio | Cabezal en 50, solo la raíz creada. |
+| `03-cabezal-invalido.json` | Caso inválido | Rechaza la carga porque el cabezal inicial (200) supera el límite. |
+| `04-sin-sistema-archivos.json` | Caso inválido | Rechaza la carga por falta de la sección `fileSystem`. |
+| `10-disco-ocupacion-agrupada.json` | Mapa agrupado | 110 de 200 bloques de datos ocupados en rangos continuos. |
+| `11-disco-lleno.json` | Saturación de disco | 200 de 200 bloques ocupados: raíz, directorio y archivo de 198 bloques. |
+| `12-disco-disperso.json` | Fragmentación | 20 archivos de un bloque separados a lo largo del disco. |
+| `13-arbol-complejo.json` | Estructura jerárquica | 9 directorios, 8 archivos anidados, diferentes dueños y permisos. |
+| `14-disco-grande-800.json` | Alta capacidad | Disco de 800 bloques de datos. |
 
-Tras una carga válida, cargar otra configuración del mismo tipo pide confirmación si existen datos que serán reemplazados. Cancelar conserva el estado. La carga se rechaza si el reloj ya está iniciado, aunque esté pausado. El aviso de éxito desaparece tras 2,5 segundos. Las pruebas de rechazo deben comprobar que el estado previo se conserva; el log por sí solo no demuestra esa conservación.
+---
 
-Estos archivos son casos para pruebas manuales, no pruebas automatizadas. `08` es intencionalmente inválido.
+## 📁 `procesos/` (Tarjeta: Procesos y configuración)
+Archivos JSON que configuran la velocidad del ciclo, swap, política de disco, computador (`computer`: RAM, política CPU, quantum) y la lista de procesos con sus solicitudes de E/S.
+
+| Archivo | Qué prueba | Resultado esperado |
+|---|---|---|
+| `05-procesos-enunciado.json` | Ejemplo del enunciado | 8 procesos asociados a los archivos del escenario `01` con política inicial FIFO. |
+| `06-procesos-vacios.json` | Sin procesos | Configuración del computador con lista de procesos vacía. |
+| `07-sin-computador.json` | Caso inválido | Rechaza la carga por falta de la sección `computer`. |
+| `08-json-malformado.json` | Caso inválido | Rechaza el JSON con error de formato sintáctico. |
+| `09-cambio-fcfs-prioridades.json` | Planificación CPU | FCFS durante 3 ciclos y cambio a prioridades apropiativas. |
+| `15-sstf-caso-p2.json` | **Caso P2 SSTF del libro** | Política SSTF: atención exacta 62 → 64 → 34 → 11 → 95 → 119 → 123 → 180 sobre el escenario `01`. |
+
+---
+
+> **Regla de integridad:** Tras una carga válida, intentar cargar otra configuración pide confirmación para reemplazar los datos. La carga se rechaza automáticamente si la simulación ya está corriendo para no corromper el estado.

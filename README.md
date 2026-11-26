@@ -777,11 +777,17 @@ src/main/java/com/avilaos/
 
 ## 🧪 Escenarios JSON Incluidos
 
-En `escenarios/carga-json/` se incluyen escenarios listos para probar la carga dual (sistema de archivos, procesos, permisos, disco lleno, segmentación de cadenas y mapas grandes de 800 bloques):
+En `escenarios/carga-json/` se incluyen escenarios listos para probar la carga dual, organizados en subcarpetas para una selección limpia e intuitiva:
 
-* `01-sistema-enunciado.json`, `05-procesos-enunciado.json` (caso base del enunciado).
-* `02-disco-vacio.json`, `09-cambio-fcfs-prioridades.json`, `10-disco-ocupacion-agrupada.json`, `11-disco-lleno.json`, `12-disco-disperso.json`, `13-arbol-complejo.json`, `14-disco-grande-800.json`.
-* Casos de validación negativa (rechazados sin corromper la sesión): `03-cabezal-invalido.json`, `04-sin-sistema-archivos.json`, `06-procesos-vacios.json`, `07-sin-computador.json`, `08-json-malformado.json`.
+* **📁 `sistema-archivos/` (Tarjeta Sistema de archivos):**
+  * `01-sistema-enunciado.json` (caso base con cabezal en 50 y 8 archivos en bloques 11 a 180).
+  * `02-disco-vacio.json`, `10-disco-ocupacion-agrupada.json`, `11-disco-lleno.json`, `12-disco-disperso.json`, `13-arbol-complejo.json`, `14-disco-grande-800.json`.
+  * Casos de validación negativa: `03-cabezal-invalido.json`, `04-sin-sistema-archivos.json`.
+* **📁 `procesos/` (Tarjeta Procesos y configuración):**
+  * `05-procesos-enunciado.json` (8 procesos correspondientes al escenario 01).
+  * `09-cambio-fcfs-prioridades.json` (planificación de CPU con desalojo).
+  * `15-sstf-caso-p2.json` (reproducción del Caso P2 SSTF del libro: 62 → 64 → 34 → 11 → 95 → 119 → 123 → 180).
+  * Casos de validación negativa: `06-procesos-vacios.json`, `07-sin-computador.json`, `08-json-malformado.json`.
 
 ---
 
