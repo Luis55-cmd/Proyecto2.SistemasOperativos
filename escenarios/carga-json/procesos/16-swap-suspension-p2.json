@@ -1,0 +1,41 @@
+{
+  "globalConfig": {
+    "cycleDurationMs": 500,
+    "swapSizeBlocks": 50,
+    "initialDiskPolicy": "SSTF"
+  },
+  "computer": {
+    "ramCapacity": 24,
+    "policy": "FCFS",
+    "quantum": 0
+  },
+  "processes": [
+    {
+      "name": "Proc_IO_1",
+      "memory": 16,
+      "deadline": 800,
+      "instructions": 4,
+      "targetPath": "/sistema/boot.bin",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_Espera_2",
+      "memory": 16,
+      "deadline": 800,
+      "instructions": 3,
+      "targetPath": "/sistema/core.dll",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    },
+    {
+      "name": "Proc_IO_3",
+      "memory": 16,
+      "deadline": 800,
+      "instructions": 3,
+      "targetPath": "/usuarios/data.csv",
+      "operation": "READ",
+      "fileSizeBlocks": 0
+    }
+  ]
+}

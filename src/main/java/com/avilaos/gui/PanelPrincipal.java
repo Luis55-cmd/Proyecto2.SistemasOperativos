@@ -29,6 +29,7 @@ public class PanelPrincipal extends JPanel {
     private Timer avisoProcesosTimer;
     private final JLabel archivoActivoFS = texto("Archivo actual: Ninguno", 11, GRIS, false);
     private final JLabel archivoActivoProc = texto("Archivo actual: Ninguno", 11, GRIS, false);
+    private long sessionActual = 0;
     private final EditorProceso editorProceso;
     private final PanelMetricasCopia metricas;
     private final SimulationController controller = SimulationController.getInstance();
@@ -286,6 +287,12 @@ public class PanelPrincipal extends JPanel {
         // --- CONEXIÓN AL OBSERVER ---
         // Se actualizan las tablas automáticamente cuando el SimulationController cambia
         controller.addGUIListener(() -> {
+            SimulationSnapshot snap = controller.snapshot();
+            if (snap.session != sessionActual) {
+                sessionActual = snap.session;
+                archivoActivoFS.setText("Archivo actual: Ninguno");
+                archivoActivoProc.setText("Archivo actual: Ninguno");
+            }
             actualizarControlesReloj();
             metricas.actualizarMetricas();
             actualizarListaComputadores();
@@ -297,6 +304,7 @@ public class PanelPrincipal extends JPanel {
 // [P2-LEGACY]             actualizarOpcionesComputadoresBuffer();
         });
 
+        sessionActual = controller.snapshot().session;
         actualizarControlesReloj();
         mostrarPanel(Destino.MENU);
     }
