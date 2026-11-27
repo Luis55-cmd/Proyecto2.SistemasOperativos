@@ -1,0 +1,60 @@
+{
+  "diskConfig": {
+    "totalBlocks": 800,
+    "initialHead": 420
+  },
+  "fileSystem": [
+    {
+      "path": "/sistema",
+      "type": "DIRECTORY",
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/usuarios",
+      "type": "DIRECTORY",
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/sistema/kernel-img.bin",
+      "type": "FILE",
+      "startBlock": 10,
+      "blocks": 60,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/sistema/modulos.pak",
+      "type": "FILE",
+      "startBlock": 150,
+      "blocks": 90,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/usuarios/dataset.csv",
+      "type": "FILE",
+      "startBlock": 320,
+      "blocks": 120,
+      "owner": "user1",
+      "permissions": "public"
+    },
+    {
+      "path": "/usuarios/backup.tar",
+      "type": "FILE",
+      "startBlock": 540,
+      "blocks": 150,
+      "owner": "user1",
+      "permissions": "private"
+    },
+    {
+      "path": "/usuarios/log-final.txt",
+      "type": "FILE",
+      "startBlock": 750,
+      "blocks": 35,
+      "owner": "user2",
+      "permissions": "public"
+    }
+  ]
+}

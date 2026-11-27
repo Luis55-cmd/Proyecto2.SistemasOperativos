@@ -1,0 +1,1020 @@
+package com.avilaos.disk;
+
+import com.avilaos.disk.policies.FIFODiskPolicy;
+import com.avilaos.disk.policies.SCANDiskPolicy;
+import com.avilaos.disk.policies.LOOKDiskPolicy;
+import com.avilaos.disk.policies.CSCANDiskPolicy;
+import com.avilaos.disk.policies.CLOOKDiskPolicy;
+import com.avilaos.core.kernel.IClockTickable;
+import com.avilaos.core.model.IOOperationType;
+import com.avilaos.core.model.ProcessControlBlock;
+import com.avilaos.core.structures.MyLinkedList;
+import java.util.concurrent.Semaphore;
+
+public class SimulatedDisk implements IClockTickable {
+
+    public interface IDiskCompletionListener {
+        void onRequestCompleted(IORequest request, int cycle);
+    }
+
+    public interface IDiskEventListener {
+        void onDiskEvent(String message);
+    }
+
+    private final int totalBlocks;
+    private final int swapSizeBlocks;
+    private final DiskBlock[] blocks;
+    private final Semaphore blockMapMutex = new Semaphore(1, true);
+    private int freeDataBlocks;
+    private int freeSwapBlocks;
+
+    private final MyLinkedList<IORequest> ioQueue = new MyLinkedList<>();
+    private final Semaphore queueMutex = new Semaphore(1, true);
+    private DiskSchedulingPolicy schedulingPolicy;
+
+    private int headPosition;
+    private final int initialHeadPosition;
+    private HeadDirection headDirection = HeadDirection.UP;
+    private int headSpeedPerTick;
+
+    private IORequest activeRequest;
+    // La política que selecciona una solicitud conserva su atribución hasta terminarla.
+    private DiskSchedulingPolicyType activeRequestPolicy;
+    private int remainingTransferCycles;
+    private int activeTransferIndex;
+    private int pendingBoundaryBlock = -1;
+    private boolean pendingWrapJumpToZero = false;
+    private int nextRequestId = 1;
+
+    private int totalHeadMovement;
+    private int completedRequestsCount;
+    private int totalWaitTimeCycles;
+
+    private IDiskCompletionListener completionListener;
+    private IDiskEventListener eventListener;
+    private int atendidasFIFO = 0;
+    private int atendidasSSTF = 0;
+    private int atendidasSCAN = 0;
+    private int atendidasCSCAN = 0;
+    private int atendidasLOOK = 0;
+    private int atendidasCLOOK = 0;
+
+    private int movementFIFO = 0;
+    private int movementSSTF = 0;
+    private int movementSCAN = 0;
+    private int movementCSCAN = 0;
+    private int movementLOOK = 0;
+    private int movementCLOOK = 0;
+
+    private int waitTimeFIFO = 0;
+    private int waitTimeSSTF = 0;
+    private int waitTimeSCAN = 0;
+    private int waitTimeCSCAN = 0;
+    private int waitTimeLOOK = 0;
+    private int waitTimeCLOOK = 0;
+
+    public String getDetallePorPolitica() {
+        return String.format("FIFO:%d | SSTF:%d | SCAN:%d | C-SCAN:%d | LOOK:%d | C-LOOK:%d", 
+                atendidasFIFO, atendidasSSTF, atendidasSCAN, atendidasCSCAN, atendidasLOOK, atendidasCLOOK);
+    }
+
+    private void recordHeadMovement(int step) {
+        if (step <= 0) return;
+        totalHeadMovement += step;
+        if (activeRequestPolicy != null) {
+            switch (activeRequestPolicy) {
+                case FIFO -> movementFIFO += step;
+                case SSTF -> movementSSTF += step;
+                case SCAN -> movementSCAN += step;
+                case C_SCAN -> movementCSCAN += step;
+                case LOOK -> movementLOOK += step;
+                case C_LOOK -> movementCLOOK += step;
+            }
+        } else {
+            movementFIFO += step;
+        }
+    }
+
+    public SimulatedDisk(int totalBlocks, int swapSizeBlocks, int initialHead, int headSpeedPerTick) {
+        if (totalBlocks <= 0) {
+            throw new IllegalArgumentException("totalBlocks debe ser mayor que 0");
+        }
+        if (swapSizeBlocks < 0) {
+            throw new IllegalArgumentException("swapSizeBlocks no puede ser negativo");
+        }
+        if (initialHead < 0 || initialHead >= totalBlocks + swapSizeBlocks) {
+            throw new IllegalArgumentException("initialHead fuera del disco físico");
+        }
+        if (headSpeedPerTick <= 0) {
+            throw new IllegalArgumentException("headSpeedPerTick debe ser mayor que 0");
+        }
+        this.totalBlocks = totalBlocks;
+        this.swapSizeBlocks = swapSizeBlocks;
+        this.initialHeadPosition = initialHead;
+        this.headPosition = initialHead;
+        this.headSpeedPerTick = headSpeedPerTick;
+        this.freeDataBlocks = totalBlocks;
+        this.freeSwapBlocks = swapSizeBlocks;
+        this.schedulingPolicy = new FIFODiskPolicy();
+
+        int totalPhysical = totalBlocks + swapSizeBlocks;
+        this.blocks = new DiskBlock[totalPhysical];
+        for (int i = 0; i < totalPhysical; i++) {
+            this.blocks[i] = new DiskBlock(i, i >= totalBlocks);
+        }
+    }
+
+    public SimulatedDisk(int totalBlocks, int swapSizeBlocks, int initialHead) {
+        this(totalBlocks, swapSizeBlocks, initialHead, 10);
+    }
+
+    // =========================================================================
+    // ISSUE #4 & #5: MAPA DE BLOQUES, ASIGNACIÓN ENCADENADA Y ÁREA DE SWAP
+    // =========================================================================
+
+    public boolean hasAvailableDataBlocks(int requiredBlocks) {
+        if (requiredBlocks <= 0) return true;
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            return freeDataBlocks >= requiredBlocks;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public boolean hasAvailableSwapBlocks(int requiredBlocks) {
+        if (requiredBlocks <= 0) return true;
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            return freeSwapBlocks >= requiredBlocks;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int allocateChainedBlocks(String filePath, int count, int ownerProcessId) {
+        if (count <= 0 || filePath == null || filePath.isEmpty()) {
+            return -1;
+        }
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            if (freeDataBlocks < count) {
+                return -1;
+            }
+            int[] chosen = new int[count];
+            int found = 0;
+            for (int i = 0; i < totalBlocks && found < count; i++) {
+                if (blocks[i].isFree()) {
+                    chosen[found++] = i;
+                }
+            }
+            if (found < count) {
+                return -1;
+            }
+            for (int k = 0; k < count; k++) {
+                int next = (k + 1 < count) ? chosen[k + 1] : DiskBlock.END_OF_CHAIN;
+                blocks[chosen[k]].allocate(filePath, ownerProcessId, next);
+            }
+            freeDataBlocks -= count;
+            return chosen[0];
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    /** Reserva una cadena para una creación pendiente; no publica un archivo. */
+    public int reserveChainedBlocks(String path, int count, int processId) {
+        if (count <= 0 || path == null || path.isEmpty() || processId < 0) return -1;
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            if (freeDataBlocks < count) return -1;
+            int[] selected = new int[count];
+            int found = 0;
+            for (int i = 0; i < totalBlocks && found < count; i++) {
+                if (blocks[i].isFree()) selected[found++] = i;
+            }
+            if (found != count) return -1;
+            for (int i = 0; i < count; i++) {
+                blocks[selected[i]].reserve(path, processId,
+                        i + 1 < count ? selected[i + 1] : DiskBlock.END_OF_CHAIN);
+            }
+            freeDataBlocks -= count;
+            return selected[0];
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    /** Confirma o libera únicamente una cadena reservada íntegra del proceso indicado. */
+    public boolean finishReservation(int startBlock, int processId, boolean confirm) {
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            int current = startBlock;
+            int count = 0;
+            while (current != DiskBlock.END_OF_CHAIN) {
+                if (current < 0 || current >= totalBlocks || count >= totalBlocks) return false;
+                DiskBlock block = blocks[current];
+                if (!block.isReserved() || block.getOwnerProcessId() != processId) return false;
+                current = block.getNextBlock();
+                count++;
+            }
+            if (count == 0) return false;
+            current = startBlock;
+            while (current != DiskBlock.END_OF_CHAIN) {
+                DiskBlock block = blocks[current];
+                int next = block.getNextBlock();
+                if (confirm) block.confirmReservation();
+                else { block.free(); freeDataBlocks++; }
+                current = next;
+            }
+            return true;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int allocateChainedBlocksFrom(int startBlock, String filePath, int count, int ownerProcessId) {
+        if (count <= 0 || filePath == null || filePath.isEmpty()) {
+            return -1;
+        }
+        if (startBlock < 0 || startBlock >= totalBlocks) {
+            return -1;
+        }
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            if (freeDataBlocks < count || !blocks[startBlock].isFree()) {
+                return -1;
+            }
+            int[] chosen = new int[count];
+            chosen[0] = startBlock;
+            int found = 1;
+            for (int offset = 1; offset < totalBlocks && found < count; offset++) {
+                int candidate = (startBlock + offset) % totalBlocks;
+                if (blocks[candidate].isFree()) {
+                    chosen[found++] = candidate;
+                }
+            }
+            if (found < count) {
+                return -1;
+            }
+            for (int k = 0; k < count; k++) {
+                int next = (k + 1 < count) ? chosen[k + 1] : DiskBlock.END_OF_CHAIN;
+                blocks[chosen[k]].allocate(filePath, ownerProcessId, next);
+            }
+            freeDataBlocks -= count;
+            return startBlock;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public boolean allocateExactChain(MyLinkedList<Integer> chain, String path, int ownerProcessId) {
+        if (chain == null || chain.isEmpty() || path == null || path.isEmpty()) return false;
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            if (freeDataBlocks < chain.size()) return false;
+            for (int i = 0; i < chain.size(); i++) {
+                int block = chain.get(i);
+                if (block < 0 || block >= totalBlocks || !blocks[block].isFree()) return false;
+                for (int j = 0; j < i; j++) if (chain.get(j) == block) return false;
+            }
+            for (int i = 0; i < chain.size(); i++) {
+                int next = i + 1 < chain.size() ? chain.get(i + 1) : DiskBlock.END_OF_CHAIN;
+                blocks[chain.get(i)].allocate(path, ownerProcessId, next);
+            }
+            freeDataBlocks -= chain.size();
+            return true;
+        } finally { blockMapMutex.release(); }
+    }
+
+    public int freeChainedBlocks(int startBlock) {
+        if (startBlock < 0 || startBlock >= totalBlocks) {
+            return 0;
+        }
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            int freed = 0;
+            int curr = startBlock;
+            int guard = 0;
+            while (curr >= 0 && curr < totalBlocks && guard <= totalBlocks) {
+                DiskBlock b = blocks[curr];
+                if (!b.isOccupied() || b.isReserved()) {
+                    break;
+                }
+                int next = b.getNextBlock();
+                b.free();
+                freeDataBlocks++;
+                freed++;
+                curr = next;
+                guard++;
+            }
+            return freed;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public MyLinkedList<Integer> getChainBlocks(int startBlock) {
+        MyLinkedList<Integer> chain = new MyLinkedList<>();
+        if (startBlock < 0 || startBlock >= blocks.length) {
+            return chain;
+        }
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            int curr = startBlock;
+            int guard = 0;
+            while (curr >= 0 && curr < blocks.length && guard <= blocks.length) {
+                DiskBlock b = blocks[curr];
+                if (!b.isOccupied()) {
+                    break;
+                }
+                chain.append(curr);
+                curr = b.getNextBlock();
+                guard++;
+            }
+            return chain;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int allocateSwapBlocks(int processId, String processName, int memoryUnits) {
+        if (memoryUnits <= 0) {
+            return -1;
+        }
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            if (freeSwapBlocks < memoryUnits) {
+                return -1;
+            }
+            int[] chosen = new int[memoryUnits];
+            int found = 0;
+            int limit = totalBlocks + swapSizeBlocks;
+            for (int i = totalBlocks; i < limit && found < memoryUnits; i++) {
+                if (blocks[i].isFree()) {
+                    chosen[found++] = i;
+                }
+            }
+            if (found < memoryUnits) {
+                return -1;
+            }
+            String tag = "SWAP:" + (processName != null && !processName.isEmpty() ? processName : ("P" + processId));
+            for (int k = 0; k < memoryUnits; k++) {
+                int next = (k + 1 < memoryUnits) ? chosen[k + 1] : DiskBlock.END_OF_CHAIN;
+                blocks[chosen[k]].allocate(tag, processId, next);
+            }
+            freeSwapBlocks -= memoryUnits;
+            return chosen[0];
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int freeSwapBlocks(int startSwapBlock) {
+        int limit = totalBlocks + swapSizeBlocks;
+        if (startSwapBlock < totalBlocks || startSwapBlock >= limit) {
+            return 0;
+        }
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            int freed = 0;
+            int curr = startSwapBlock;
+            int guard = 0;
+            while (curr >= totalBlocks && curr < limit && guard <= swapSizeBlocks) {
+                DiskBlock b = blocks[curr];
+                if (!b.isOccupied()) {
+                    break;
+                }
+                int next = b.getNextBlock();
+                b.free();
+                freeSwapBlocks++;
+                freed++;
+                curr = next;
+                guard++;
+            }
+            return freed;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int freeSwapBlocksByProcess(int processId) {
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            int freed = 0;
+            int limit = totalBlocks + swapSizeBlocks;
+            for (int i = totalBlocks; i < limit; i++) {
+                if (blocks[i].isOccupied() && blocks[i].getOwnerProcessId() == processId) {
+                    blocks[i].free();
+                    freeSwapBlocks++;
+                    freed++;
+                }
+            }
+            return freed;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    // =========================================================================
+    // ISSUES #6, #7 Y #8: COLA ÚNICA DE E/S, PLANIFICACIÓN Y PULSO DE RELOJ
+    // =========================================================================
+
+    public IORequest enqueueRequest(ProcessControlBlock pcb, IOOperationType operation,
+                                    String path, int targetBlock, int blockCount, int arrivalCycle) {
+        int[] transferBlocks = null;
+        if ((operation == IOOperationType.CREATE && pcb != null && pcb.getCreationType() != null)
+                || ((operation == IOOperationType.READ || operation == IOOperationType.UPDATE || operation == IOOperationType.DELETE) && pcb != null)
+                || operation == IOOperationType.SUSPEND || operation == IOOperationType.REACTIVATE) {
+            transferBlocks = copyTransferBlocks(targetBlock, blockCount);
+        }
+        queueMutex.acquireUninterruptibly();
+        try {
+            int id = nextRequestId++;
+            IORequest req = new IORequest(id, pcb, operation, path, targetBlock, blockCount, arrivalCycle);
+            req.setTransferBlocks(transferBlocks);
+            ioQueue.append(req);
+            reorderQueueLocked();
+            return req;
+        } finally {
+            queueMutex.release();
+        }
+    }
+
+    public IORequest enqueueRequest(ProcessControlBlock pcb, IOOperationType operation,
+                                    String path, int targetBlock, int arrivalCycle) {
+        return enqueueRequest(pcb, operation, path, targetBlock, 1, arrivalCycle);
+    }
+
+    public void enqueueRequest(IORequest request) {
+        if (request == null) return;
+        if (request.getOperation() == IOOperationType.SUSPEND
+                || request.getOperation() == IOOperationType.REACTIVATE) {
+            request.setTransferBlocks(copyTransferBlocks(request.getTargetBlock(), request.getBlockCount()));
+        }
+        queueMutex.acquireUninterruptibly();
+        try {
+            ioQueue.append(request);
+            reorderQueueLocked();
+        } finally {
+            queueMutex.release();
+        }
+    }
+
+    private int[] copyTransferBlocks(int targetBlock, int blockCount) {
+        MyLinkedList<Integer> chain = getChainBlocks(targetBlock);
+        if (chain.size() != blockCount) throw new IllegalStateException("La cadena reservada no coincide con la solicitud.");
+        int[] result = new int[chain.size()];
+        for (int i = 0; i < chain.size(); i++) result[i] = chain.get(i);
+        return result;
+    }
+
+    @Override
+    public void tick(int currentCycle) {
+        if (activeRequest == null) {
+            selectNextFromQueue(currentCycle);
+            if (activeRequest == null) {
+                return;
+            }
+        }
+
+        int targetPos = normalizeTargetPosition(activeRequest.getTransferBlock(activeTransferIndex));
+        if (pendingBoundaryBlock >= 0 || headPosition != targetPos) {
+            int budget = headSpeedPerTick;
+
+            // Si la política hizo barrido al extremo (SCAN o C-SCAN), avanzar primero al extremo
+            if (pendingBoundaryBlock >= 0) {
+                int distToBoundary = Math.abs(pendingBoundaryBlock - headPosition);
+                int step1 = Math.min(budget, distToBoundary);
+                if (distToBoundary > 0) {
+                    headDirection = pendingBoundaryBlock > headPosition ? HeadDirection.UP : HeadDirection.DOWN;
+                    headPosition += (headDirection == HeadDirection.UP ? step1 : -step1);
+                    recordHeadMovement(step1);
+                    budget -= step1;
+                }
+                if (headPosition == pendingBoundaryBlock) {
+                    if (pendingWrapJumpToZero) {
+                        // C-SCAN: llega al extremo físico y salta a 0 sin contar el salto de regreso
+                        headPosition = 0;
+                        headDirection = HeadDirection.UP;
+                        pendingWrapJumpToZero = false;
+                    } else {
+                        // SCAN: rebota en el extremo invirtiendo dirección
+                        headDirection = headDirection.opposite();
+                    }
+                    pendingBoundaryBlock = -1;
+                }
+            }
+
+            if (pendingBoundaryBlock < 0 && budget > 0 && headPosition != targetPos) {
+                int dist = Math.abs(targetPos - headPosition);
+                int step2 = Math.min(budget, dist);
+                headDirection = targetPos > headPosition ? HeadDirection.UP : HeadDirection.DOWN;
+                headPosition += (headDirection == HeadDirection.UP ? step2 : -step2);
+                recordHeadMovement(step2);
+            }
+            boolean swapTransfer = activeRequest.getOperation() == IOOperationType.SUSPEND
+                    || activeRequest.getOperation() == IOOperationType.REACTIVATE;
+            // En una transferencia de swap ya iniciada, alcanzar el siguiente bloque
+            // y transferirlo pueden ocurrir en el mismo ciclo.
+            if (!swapTransfer || activeTransferIndex == 0 || pendingBoundaryBlock >= 0
+                    || headPosition != targetPos) return;
+        }
+
+        // El cabezal está sobre el bloque objetivo: 1 ciclo de reloj por bloque leído/escrito
+        remainingTransferCycles--;
+        activeTransferIndex++;
+        if (remainingTransferCycles <= 0) {
+            IORequest finished = activeRequest;
+            activeRequest = null;
+            finished.setCompletionCycle(currentCycle);
+            completedRequestsCount++;
+            int waitTime = Math.max(0, finished.getStartServiceCycle() >= 0
+                    ? finished.getStartServiceCycle() - finished.getArrivalCycle()
+                    : finished.getCompletionCycle() - finished.getArrivalCycle());
+            totalWaitTimeCycles += waitTime;
+            
+            DiskSchedulingPolicyType pt = activeRequestPolicy;
+            switch (pt) {
+                case FIFO -> { atendidasFIFO++; waitTimeFIFO += waitTime; }
+                case SSTF -> { atendidasSSTF++; waitTimeSSTF += waitTime; }
+                case SCAN -> { atendidasSCAN++; waitTimeSCAN += waitTime; }
+                case C_SCAN -> { atendidasCSCAN++; waitTimeCSCAN += waitTime; }
+                case LOOK -> { atendidasLOOK++; waitTimeLOOK += waitTime; }
+                case C_LOOK -> { atendidasCLOOK++; waitTimeCLOOK += waitTime; }
+            }
+            String policyName = pt.name();
+            
+            String procName = finished.getPcb() != null ? finished.getPcb().getName() : ("Req#" + finished.getId());
+            emitEvent("El disco completó la solicitud de " + procName + " en el bloque "
+                    + headPosition + " (" + policyName + ")");
+            if (completionListener != null) {
+                completionListener.onRequestCompleted(finished, currentCycle);
+            }
+        }
+    }
+
+    private void selectNextFromQueue(int currentCycle) {
+        IORequest selected = null;
+        boolean scanBounced = false;
+        int scanBoundary = -1;
+        boolean cscanWrapped = false;
+        boolean clookWrapped = false;
+
+        queueMutex.acquireUninterruptibly();
+        try {
+            if (ioQueue.isEmpty()) {
+                return;
+            }
+            if (schedulingPolicy != null) {
+                if (schedulingPolicy instanceof SCANDiskPolicy scan) {
+                    scan.setDirection(headDirection);
+                    selected = scan.selectNext(ioQueue, headPosition, blocks.length);
+                    scanBounced = scan.didBounceOnLastSelect();
+                    scanBoundary = scan.getLastBounceBoundary();
+                } else if (schedulingPolicy instanceof CSCANDiskPolicy cscan) {
+                    selected = cscan.selectNext(ioQueue, headPosition, blocks.length);
+                    cscanWrapped = cscan.didWrapOnLastSelect();
+                } else if (schedulingPolicy instanceof LOOKDiskPolicy look) {
+                    look.setDirection(headDirection);
+                    selected = look.selectNext(ioQueue, headPosition, blocks.length);
+                } else if (schedulingPolicy instanceof CLOOKDiskPolicy clook) {
+                    selected = clook.selectNext(ioQueue, headPosition, blocks.length);
+                    if (selected != null && selected.getTargetBlock() < headPosition) {
+                        clookWrapped = true;
+                    }
+                } else {
+                    selected = schedulingPolicy.selectNext(ioQueue, headPosition, blocks.length);
+                }
+            }
+            if (selected == null) {
+                selected = ioQueue.get(0);
+            }
+            ioQueue.remove(selected);
+            activeRequestPolicy = schedulingPolicy != null ? schedulingPolicy.getPolicyType() : DiskSchedulingPolicyType.FIFO;
+        } finally {
+            queueMutex.release();
+        }
+
+        if (selected != null) {
+            activeRequest = selected;
+            activeRequest.setStartServiceCycle(currentCycle);
+            remainingTransferCycles = Math.max(1, activeRequest.getBlockCount());
+            activeTransferIndex = 0;
+            pendingBoundaryBlock = -1;
+            pendingWrapJumpToZero = false;
+
+            int targetPos = normalizeTargetPosition(selected.getTargetBlock());
+            if (scanBounced && scanBoundary >= 0 && headPosition != scanBoundary) {
+                pendingBoundaryBlock = scanBoundary;
+                headDirection = scanBoundary >= headPosition ? HeadDirection.UP : HeadDirection.DOWN;
+            } else if (cscanWrapped) {
+                pendingBoundaryBlock = blocks.length - 1;
+                pendingWrapJumpToZero = true;
+                headDirection = HeadDirection.UP;
+            } else if (clookWrapped) {
+                // C-LOOK salta directo al bloque menor sin contar el salto de regreso
+                headPosition = targetPos;
+                headDirection = HeadDirection.UP;
+            } else if (targetPos != headPosition) {
+                headDirection = targetPos > headPosition ? HeadDirection.UP : HeadDirection.DOWN;
+            }
+
+            // Reordenar el resto de la cola a partir del destino que alcanzará esta solicitud
+            queueMutex.acquireUninterruptibly();
+            try {
+                reorderQueueFromAnchorLocked(targetPos,
+                        cscanWrapped || clookWrapped ? HeadDirection.UP
+                                : (scanBounced ? headDirection.opposite() : headDirection));
+            } finally {
+                queueMutex.release();
+            }
+
+            String policyName = schedulingPolicy != null ? schedulingPolicy.getPolicyType().name() : "FIFO";
+            String procName = selected.getPcb() != null ? selected.getPcb().getName() : ("Req#" + selected.getId());
+            emitEvent("El disco atiende la solicitud de " + procName + " en el bloque "
+                    + selected.getTargetBlock() + " (" + policyName + ")");
+        }
+    }
+
+    /**
+     * Reordena {@code ioQueue} de forma instantánea (0 ticks) según la política activa,
+     * sin perder ninguna solicitud en cola.
+     */
+    private void reorderQueueLocked() {
+        int anchorHead = activeRequest != null
+                ? normalizeTargetPosition(activeRequest.getTargetBlock())
+                : headPosition;
+        reorderQueueFromAnchorLocked(anchorHead, headDirection);
+    }
+
+    private void reorderQueueFromAnchorLocked(int anchorHead, HeadDirection anchorDir) {
+        if (ioQueue.size() <= 1 || schedulingPolicy == null) {
+            return;
+        }
+        DiskSchedulingPolicy tempPolicy = DiskSchedulerFactory.create(schedulingPolicy.getPolicyType());
+        if (tempPolicy instanceof SCANDiskPolicy scan) {
+            scan.setDirection(anchorDir);
+        } else if (tempPolicy instanceof LOOKDiskPolicy look) {
+            look.setDirection(anchorDir);
+        }
+
+        MyLinkedList<IORequest> remaining = new MyLinkedList<>();
+        while (!ioQueue.isEmpty()) {
+            remaining.append(ioQueue.get(0));
+            ioQueue.deleteFirst();
+        }
+
+        int simulatedHead = anchorHead;
+        while (!remaining.isEmpty()) {
+            IORequest next = tempPolicy.selectNext(remaining, simulatedHead, blocks.length);
+            if (next == null) {
+                next = remaining.get(0);
+            }
+            remaining.remove(next);
+            ioQueue.append(next);
+            simulatedHead = normalizeTargetPosition(next.getTargetBlock());
+        }
+    }
+
+    private int normalizeTargetPosition(int targetBlock) {
+        if (targetBlock < 0) return 0;
+        if (targetBlock >= blocks.length) return blocks.length - 1;
+        return targetBlock;
+    }
+
+    private void emitEvent(String msg) {
+        if (eventListener != null) {
+            eventListener.onDiskEvent(msg);
+        }
+    }
+
+    // =========================================================================
+    // GETTERS, SETTERS (CAMBIO DE POLÍTICA EN CALIENTE EN 0 TICKS) Y SNAPSHOT
+    // =========================================================================
+
+    /**
+     * Cambia la política de planificación en caliente (0 ticks) y reordena
+     * inmediatamente la cola de E/S sin perder solicitudes.
+     */
+    public void setSchedulingPolicy(DiskSchedulingPolicy policy) {
+        if (policy == null) return;
+        queueMutex.acquireUninterruptibly();
+        try {
+            this.schedulingPolicy = policy;
+            if (this.schedulingPolicy instanceof SCANDiskPolicy scan) {
+                scan.setDirection(headDirection);
+            } else if (this.schedulingPolicy instanceof LOOKDiskPolicy look) {
+                look.setDirection(headDirection);
+            }
+            reorderQueueLocked();
+        } finally {
+            queueMutex.release();
+        }
+        emitEvent("Política de planificación de disco cambiada a " + policy.getPolicyType());
+    }
+
+    public void setSchedulingPolicy(DiskSchedulingPolicyType policyType) {
+        setSchedulingPolicy(DiskSchedulerFactory.create(policyType));
+    }
+
+    public DiskSchedulingPolicy getSchedulingPolicy() {
+        return schedulingPolicy;
+    }
+
+    public DiskSchedulingPolicyType getPolicyType() {
+        return schedulingPolicy != null ? schedulingPolicy.getPolicyType() : DiskSchedulingPolicyType.FIFO;
+    }
+
+    public DiskBlock getBlock(int index) {
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            return blocks[index];
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int getTotalBlocks() {
+        return totalBlocks;
+    }
+
+    public int getSwapSizeBlocks() {
+        return swapSizeBlocks;
+    }
+
+    public int getTotalPhysicalBlocks() {
+        return blocks.length;
+    }
+
+    public int getFreeDataBlocks() {
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            return freeDataBlocks;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int getFreeSwapBlocks() {
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            return freeSwapBlocks;
+        } finally {
+            blockMapMutex.release();
+        }
+    }
+
+    public int getHeadPosition() {
+        return headPosition;
+    }
+
+    public void setHeadPosition(int headPosition) {
+        if (headPosition < 0 || headPosition >= blocks.length) {
+            throw new IllegalArgumentException("headPosition fuera de rango");
+        }
+        this.headPosition = headPosition;
+    }
+
+    public HeadDirection getHeadDirection() {
+        return headDirection;
+    }
+
+    public void setHeadDirection(HeadDirection headDirection) {
+        if (headDirection != null) {
+            this.headDirection = headDirection;
+        }
+    }
+
+    public int getHeadSpeedPerTick() {
+        return headSpeedPerTick;
+    }
+
+    public void setHeadSpeedPerTick(int headSpeedPerTick) {
+        if (headSpeedPerTick <= 0) {
+            throw new IllegalArgumentException("headSpeedPerTick debe ser mayor que 0");
+        }
+        this.headSpeedPerTick = headSpeedPerTick;
+    }
+
+    public IORequest getActiveRequest() {
+        return activeRequest;
+    }
+
+    public int getRemainingTransferCycles() {
+        return remainingTransferCycles;
+    }
+
+    public int getQueueSize() {
+        queueMutex.acquireUninterruptibly();
+        try {
+            return ioQueue.size();
+        } finally {
+            queueMutex.release();
+        }
+    }
+
+    public MyLinkedList<IORequest> getQueueSnapshot() {
+        queueMutex.acquireUninterruptibly();
+        try {
+            MyLinkedList<IORequest> copy = new MyLinkedList<>();
+            for (int i = 0; i < ioQueue.size(); i++) {
+                copy.append(ioQueue.get(i));
+            }
+            return copy;
+        } finally {
+            queueMutex.release();
+        }
+    }
+
+    public int getTotalHeadMovement() {
+        return totalHeadMovement;
+    }
+
+    /** Conserva los contadores al sustituir un disco sin solicitudes pendientes. */
+    public void conservarMetricasDe(SimulatedDisk anterior) {
+        totalHeadMovement = anterior.totalHeadMovement;
+        completedRequestsCount = anterior.completedRequestsCount;
+        totalWaitTimeCycles = anterior.totalWaitTimeCycles;
+        atendidasFIFO = anterior.atendidasFIFO; atendidasSSTF = anterior.atendidasSSTF;
+        atendidasSCAN = anterior.atendidasSCAN; atendidasCSCAN = anterior.atendidasCSCAN;
+        atendidasLOOK = anterior.atendidasLOOK; atendidasCLOOK = anterior.atendidasCLOOK;
+        movementFIFO = anterior.movementFIFO; movementSSTF = anterior.movementSSTF;
+        movementSCAN = anterior.movementSCAN; movementCSCAN = anterior.movementCSCAN;
+        movementLOOK = anterior.movementLOOK; movementCLOOK = anterior.movementCLOOK;
+        waitTimeFIFO = anterior.waitTimeFIFO; waitTimeSSTF = anterior.waitTimeSSTF;
+        waitTimeSCAN = anterior.waitTimeSCAN; waitTimeCSCAN = anterior.waitTimeCSCAN;
+        waitTimeLOOK = anterior.waitTimeLOOK; waitTimeCLOOK = anterior.waitTimeCLOOK;
+        nextRequestId = anterior.nextRequestId;
+    }
+
+    /** Traslada lecturas y su progreso solo si todos sus destinos siguen siendo datos. */
+    public void conservarLecturasPendientesDe(SimulatedDisk anterior) {
+        if (anterior.pendingBoundaryBlock >= 0) {
+            throw new IllegalStateException("Espera a que termine el barrido de disco en curso antes de cambiar la capacidad.");
+        }
+        anterior.queueMutex.acquireUninterruptibly();
+        try {
+            validarLecturaParaRedimension(anterior.activeRequest);
+            for (int i = 0; i < anterior.ioQueue.size(); i++) validarLecturaParaRedimension(anterior.ioQueue.get(i));
+            activeRequest = anterior.activeRequest;
+            activeRequestPolicy = anterior.activeRequestPolicy;
+            remainingTransferCycles = anterior.remainingTransferCycles;
+            activeTransferIndex = anterior.activeTransferIndex;
+            for (int i = 0; i < anterior.ioQueue.size(); i++) ioQueue.append(anterior.ioQueue.get(i));
+        } finally {
+            anterior.queueMutex.release();
+        }
+    }
+
+    private void validarLecturaParaRedimension(IORequest solicitud) {
+        if (solicitud == null) return;
+        if (solicitud.getOperation() != IOOperationType.READ) {
+            throw new IllegalStateException("Espera a que termine la operación de disco pendiente antes de cambiar la capacidad.");
+        }
+        for (int i = 0; i < solicitud.getBlockCount(); i++) {
+            int bloque = solicitud.getTransferBlock(i);
+            if (bloque < 0 || bloque >= totalBlocks) {
+                throw new IllegalStateException("La lectura pendiente usa el bloque " + bloque + ", fuera de la nueva área de datos.");
+            }
+        }
+    }
+
+    public int getCompletedRequestsCount() {
+        return completedRequestsCount;
+    }
+
+    public double getAverageWaitTimeCycles() {
+        return completedRequestsCount == 0 ? 0.0 : (double) totalWaitTimeCycles / completedRequestsCount;
+    }
+
+    public void setCompletionListener(IDiskCompletionListener completionListener) {
+        this.completionListener = completionListener;
+    }
+
+    public void setEventListener(IDiskEventListener eventListener) {
+        this.eventListener = eventListener;
+    }
+
+    public int getMovementFIFO() { return movementFIFO; }
+    public int getMovementSSTF() { return movementSSTF; }
+    public int getMovementSCAN() { return movementSCAN; }
+    public int getMovementCSCAN() { return movementCSCAN; }
+    public int getMovementLOOK() { return movementLOOK; }
+    public int getMovementCLOOK() { return movementCLOOK; }
+
+    public int getAtendidasFIFO() { return atendidasFIFO; }
+    public int getAtendidasSSTF() { return atendidasSSTF; }
+    public int getAtendidasSCAN() { return atendidasSCAN; }
+    public int getAtendidasCSCAN() { return atendidasCSCAN; }
+    public int getAtendidasLOOK() { return atendidasLOOK; }
+    public int getAtendidasCLOOK() { return atendidasCLOOK; }
+
+    public int getMovementByPolicy(DiskSchedulingPolicyType type) {
+        if (type == null) return 0;
+        return switch (type) {
+            case FIFO -> movementFIFO;
+            case SSTF -> movementSSTF;
+            case SCAN -> movementSCAN;
+            case C_SCAN -> movementCSCAN;
+            case LOOK -> movementLOOK;
+            case C_LOOK -> movementCLOOK;
+        };
+    }
+
+    public int getServicedByPolicy(DiskSchedulingPolicyType type) {
+        if (type == null) return 0;
+        return switch (type) {
+            case FIFO -> atendidasFIFO;
+            case SSTF -> atendidasSSTF;
+            case SCAN -> atendidasSCAN;
+            case C_SCAN -> atendidasCSCAN;
+            case LOOK -> atendidasLOOK;
+            case C_LOOK -> atendidasCLOOK;
+        };
+    }
+
+    public double getAverageWaitTime(DiskSchedulingPolicyType type) {
+        if (type == null) return 0.0;
+        return switch (type) {
+            case FIFO -> atendidasFIFO == 0 ? 0.0 : (double) waitTimeFIFO / atendidasFIFO;
+            case SSTF -> atendidasSSTF == 0 ? 0.0 : (double) waitTimeSSTF / atendidasSSTF;
+            case SCAN -> atendidasSCAN == 0 ? 0.0 : (double) waitTimeSCAN / atendidasSCAN;
+            case C_SCAN -> atendidasCSCAN == 0 ? 0.0 : (double) waitTimeCSCAN / atendidasCSCAN;
+            case LOOK -> atendidasLOOK == 0 ? 0.0 : (double) waitTimeLOOK / atendidasLOOK;
+            case C_LOOK -> atendidasCLOOK == 0 ? 0.0 : (double) waitTimeCLOOK / atendidasCLOOK;
+        };
+    }
+
+    public double getAverageWaitTimeFIFO() { return atendidasFIFO == 0 ? 0.0 : (double) waitTimeFIFO / atendidasFIFO; }
+    public double getAverageWaitTimeSSTF() { return atendidasSSTF == 0 ? 0.0 : (double) waitTimeSSTF / atendidasSSTF; }
+    public double getAverageWaitTimeSCAN() { return atendidasSCAN == 0 ? 0.0 : (double) waitTimeSCAN / atendidasSCAN; }
+    public double getAverageWaitTimeCSCAN() { return atendidasCSCAN == 0 ? 0.0 : (double) waitTimeCSCAN / atendidasCSCAN; }
+    public double getAverageWaitTimeLOOK() { return atendidasLOOK == 0 ? 0.0 : (double) waitTimeLOOK / atendidasLOOK; }
+    public double getAverageWaitTimeCLOOK() { return atendidasCLOOK == 0 ? 0.0 : (double) waitTimeCLOOK / atendidasCLOOK; }
+
+    public int getTotalWaitTime(DiskSchedulingPolicyType type) {
+        if (type == null) return 0;
+        return switch (type) {
+            case FIFO -> waitTimeFIFO;
+            case SSTF -> waitTimeSSTF;
+            case SCAN -> waitTimeSCAN;
+            case C_SCAN -> waitTimeCSCAN;
+            case LOOK -> waitTimeLOOK;
+            case C_LOOK -> waitTimeCLOOK;
+        };
+    }
+
+    public void reset() {
+        blockMapMutex.acquireUninterruptibly();
+        try {
+            for (int i = 0; i < blocks.length; i++) {
+                blocks[i].free();
+            }
+            freeDataBlocks = totalBlocks;
+            freeSwapBlocks = swapSizeBlocks;
+        } finally {
+            blockMapMutex.release();
+        }
+        queueMutex.acquireUninterruptibly();
+        try {
+            while (!ioQueue.isEmpty()) {
+                ioQueue.deleteFirst();
+            }
+            if (schedulingPolicy != null) {
+                schedulingPolicy.reset();
+            }
+        } finally {
+            queueMutex.release();
+        }
+        headPosition = initialHeadPosition;
+        headDirection = HeadDirection.UP;
+        activeRequest = null;
+        activeRequestPolicy = null;
+        remainingTransferCycles = 0;
+        pendingBoundaryBlock = -1;
+        pendingWrapJumpToZero = false;
+        totalHeadMovement = 0;
+        completedRequestsCount = 0;
+        totalWaitTimeCycles = 0;
+        nextRequestId = 1;
+        atendidasFIFO = 0;
+        atendidasSSTF = 0;
+        atendidasSCAN = 0;
+        atendidasCSCAN = 0;
+        atendidasLOOK = 0;
+        atendidasCLOOK = 0;
+        movementFIFO = 0;
+        movementSSTF = 0;
+        movementSCAN = 0;
+        movementCSCAN = 0;
+        movementLOOK = 0;
+        movementCLOOK = 0;
+        waitTimeFIFO = 0;
+        waitTimeSSTF = 0;
+        waitTimeSCAN = 0;
+        waitTimeCSCAN = 0;
+        waitTimeLOOK = 0;
+        waitTimeCLOOK = 0;
+    }
+}

@@ -1,0 +1,44 @@
+{
+  "globalConfig": {
+    "cycleDurationMs": 1000,
+    "swapSizeBlocks": 100,
+    "initialDiskPolicy": "FIFO"
+  },
+  "computer": {
+    "ramCapacity": 128,
+    "policy": "FCFS",
+    "quantum": 2
+  },
+  "processes": [
+    {
+      "name": "Lento",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 8,
+      "targetPath": "/sistema/config.sys",
+      "operation": "READ",
+      "fileSizeBlocks": 0,
+      "priority": 1
+    },
+    {
+      "name": "Medio",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 4,
+      "targetPath": "/usuarios/data.csv",
+      "operation": "READ",
+      "fileSizeBlocks": 0,
+      "priority": 5
+    },
+    {
+      "name": "Urgente",
+      "memory": 16,
+      "deadline": 500,
+      "instructions": 3,
+      "targetPath": "/sistema/boot.bin",
+      "operation": "READ",
+      "fileSizeBlocks": 0,
+      "priority": 10
+    }
+  ]
+}

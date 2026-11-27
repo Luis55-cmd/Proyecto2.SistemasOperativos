@@ -1,0 +1,8 @@
+target/
+*.class
+.DS_Store
+*.log
+.idea/
+*.iml
+nbproject/private/
+docs/

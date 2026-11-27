@@ -1,0 +1,30 @@
+{
+  "diskConfig": {
+    "totalBlocks": 200,
+    "initialHead": 50
+  },
+  "fileSystem": [
+    {
+      "path": "/pruebas",
+      "type": "DIRECTORY",
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/largo.bin",
+      "type": "FILE",
+      "startBlock": 10,
+      "blocks": 70,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/otro.bin",
+      "type": "FILE",
+      "startBlock": 110,
+      "blocks": 40,
+      "owner": "admin",
+      "permissions": "public"
+    }
+  ]
+}

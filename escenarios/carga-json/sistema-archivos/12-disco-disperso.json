@@ -1,0 +1,174 @@
+{
+  "diskConfig": {
+    "totalBlocks": 200,
+    "initialHead": 100
+  },
+  "fileSystem": [
+    {
+      "path": "/pruebas",
+      "type": "DIRECTORY",
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-000.bin",
+      "type": "FILE",
+      "startBlock": 2,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-010.bin",
+      "type": "FILE",
+      "startBlock": 10,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-020.bin",
+      "type": "FILE",
+      "startBlock": 20,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-030.bin",
+      "type": "FILE",
+      "startBlock": 30,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-040.bin",
+      "type": "FILE",
+      "startBlock": 40,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-050.bin",
+      "type": "FILE",
+      "startBlock": 50,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-060.bin",
+      "type": "FILE",
+      "startBlock": 60,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-070.bin",
+      "type": "FILE",
+      "startBlock": 70,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-080.bin",
+      "type": "FILE",
+      "startBlock": 80,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-090.bin",
+      "type": "FILE",
+      "startBlock": 90,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-100.bin",
+      "type": "FILE",
+      "startBlock": 100,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-110.bin",
+      "type": "FILE",
+      "startBlock": 110,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-120.bin",
+      "type": "FILE",
+      "startBlock": 120,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-130.bin",
+      "type": "FILE",
+      "startBlock": 130,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-140.bin",
+      "type": "FILE",
+      "startBlock": 140,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-150.bin",
+      "type": "FILE",
+      "startBlock": 150,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-160.bin",
+      "type": "FILE",
+      "startBlock": 160,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-170.bin",
+      "type": "FILE",
+      "startBlock": 170,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-180.bin",
+      "type": "FILE",
+      "startBlock": 180,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    },
+    {
+      "path": "/pruebas/bloque-190.bin",
+      "type": "FILE",
+      "startBlock": 190,
+      "blocks": 1,
+      "owner": "admin",
+      "permissions": "public"
+    }
+  ]
+}

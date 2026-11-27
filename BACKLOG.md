@@ -1,0 +1,335 @@
+# Backlog operativo — Proyecto 2 ÁvilaOS
+
+## Trabajo adicional en rama de validación — 23 de noviembre de 2026
+
+La rama `revision/validacion-develop` incorpora cambios que aún no están en `develop`. La última compilación fue con destino Java 21 y ejecución Java 26 sin pantalla: pasaron 52 programas; los ocho casos adicionales de coordinación también pasaron en la revisión anterior.
+
+- `CrudCompletoIntegracionTest` comprueba en una sola ejecución crear directorio y archivo, leer, renombrar y eliminar mediante seis solicitudes de disco, con liberación final de bloques y RAM. `SwapInsuficienteTest` comprueba que, sin swap, un proceso nuevo espera y luego se admite sin perder el archivo ni la RAM. `EfectoSuspensionTest` contrasta el mismo escenario con swap 0 y 100 y registra ciclos, movimiento, suspensión y reactivación. Se preparó `docs/borrador-informe-y-diagramas.md`, con clases, enums, dos diagramas UML y experimentos; requiere revisión del equipo y conversión al informe final.
+- Las cargas de JSON de archivos y procesos rechazan, antes de reemplazar la sesión, una simulación iniciada, solicitudes de E/S activas o pendientes, o bloques de swap ocupados. `CargaSeguraDiscoTest` comprueba la preservación de disco, árbol, computador, cola y swap para las dos sobrecargas de carga de archivos, además del rechazo en pausa. Esto no equivale a recuperar procesos suspendidos de un JSON.
+- El guardado escribe primero un archivo temporal en la carpeta de destino y reemplaza el JSON después; usa movimiento atómico cuando el sistema de archivos lo admite y reemplazo ordinario como alternativa. La prueba de persistencia cubre sustitución y recarga, y un fallo al intentar reemplazar un directorio no vacío comprueba que el destino se conserva y se elimina el temporal; no simula una interrupción ni todos los errores de escritura de bajo nivel.
+- El botón Guardar JSON del sistema de archivos en Inicio permite elegir destino, confirma el reemplazo y rechaza el guardado mientras haya una solicitud de disco activa o en cola. Una prueba sin pantalla invoca la misma operación posterior al selector, guarda un archivo real y lo vuelve a cargar; falta probar el selector y los mensajes visualmente. El guardado de procesos continúa deshabilitado. Este JSON guarda el sistema de archivos, no es un checkpoint completo de procesos y swap.
+- Si el cabezal está en swap, el JSON conserva un `initialHead` compatible con el área de datos y agrega `currentHead` con la posición física. La carga la recupera cuando el swap configurado abarca esa posición y la rechaza si no alcanza. Los archivos existentes sin `currentHead` conservan su interpretación anterior. Si se necesita otro tamaño de swap, debe configurarse antes de cargar; el JSON de archivos no guarda ese tamaño.
+- Las cadenas explícitas con longitud distinta de `blocks` se rechazan sin reemplazar el estado actual. Una configuración de procesos cuya memoria individual supera la RAM se rechaza antes de modificar la sesión. También se impide reemplazar procesos con solicitudes de disco pendientes o swap ocupado, y cambiar el tamaño de swap si el cabezal quedaría fuera del disco.
+- La vista Disco permite ajustar la velocidad de 1 a 500 bloques por ciclo; el controlador exige ADMIN y aplica el cambio en el siguiente ciclo. Hay pruebas de límites, permisos, desplazamiento y conexión de interfaz sin pantalla; falta revisión visual.
+
+**Modo entrega:** la IA diseñó e implementó el guardado temporal, la extensión JSON, las validaciones de carga y seguridad, el ajuste de velocidad y las pruebas. Para defensa: reconstruir la ruta botón–controlador–serializador, explicar cuándo se rechaza la carga, el reemplazo del archivo, la diferencia entre `initialHead` y `currentHead`, el límite del swap configurado y el efecto de la velocidad por ciclo; después de entregar, modificar y depurar estos recorridos sin ayuda.
+
+## Validación de develop — 23 de noviembre de 2026
+
+**Seguimiento posterior en la rama:** se actualizaron `CreacionComputadoresGuiTest` y `MonitorSimulacionTest` para la interfaz actual y ahora pasan sin pantalla; `EventosLogTest` sigue fallando al cargar su escenario heredado de buffers/red. Tras recompilar, pasaron 44 programas sin argumentos, incluidas las pruebas agregadas; `CargaDuplicadosTest` pasó por separado con su archivo y `EventosLogTest` quedó pendiente. `PersistenciaArchivoTest` guarda y vuelve a cargar un archivo JSON real, comprobando cadena, dueño, permiso y cabezal en el área de datos. El botón Guardar de Inicio continúa deshabilitado.
+
+Última revisión: 49 programas sin argumentos pasaron tras los cambios, y `ThreadCoordinationTest` aprobó por separado los ocho casos adicionales de exclusión, snapshot, pausa, sesión, error, historial, reloj y log. Se adaptó el caso snapshot al requisito de un solo computador. El botón Guardar del sistema de archivos se habilitó posteriormente en esta rama, como se indica arriba.
+
+**Defecto de persistencia reproducido en la base:** con disco de 200 bloques de datos y swap configurado, colocar el cabezal en el bloque físico 200, guardar con `saveFileSystemJson` y cargar el archivo fallaba con `diskConfig.initialHead fuera de rango [0, 199]`. Corregido en la rama de validación mediante `currentHead`, con el límite y pruebas indicados arriba. No confundir este guardado del sistema de archivos con un checkpoint completo de procesos suspendidos.
+
+**Comparación reproducible de políticas:** `ComparacionPoliticasTest` usa el anexo con cabezal inicial 50, velocidad 30, siete solicitudes simultáneas y bloques 82, 17, 43, 140, 24, 16 y 190. Resultados (desplazamiento en bloques; espera media en ciclos): FIFO 518 y 11,429; SSTF 208 y 7,714; SCAN 332 y 11,286; C-SCAN 192 y 9,143. Son resultados de esta carga, no una clasificación universal. El modelo no contabiliza el salto de retorno de C-SCAN; compararlo con movimientos físicos exige aclarar esa convención.
+
+Base verificada: `develop` en `4ff6d9a`. El código y las pruebas compilan con `javac --release 21`; la ejecución fue con JDK 26, sin pantalla. De 42 programas ejecutados inicialmente, 38 pasaron; `CargaDuplicadosTest` pasó al aportar su entrada y `EventosLogTest` con `12-eventos-log.json` falló al cargar el escenario heredado. Las otras dos pruebas fallidas son `CreacionComputadoresGuiTest` (espera dos computadores en una vista que cambió) y `MonitorSimulacionTest` (busca textos anteriores del menú). Deben actualizarse o investigarse sin asumir que el fallo sea una regresión funcional. Hay archivos de pruebas heredadas comentados y Maven no está instalado; no se ejecutaron esos casos ni una suite Maven.
+
+La carga desde controlador aceptó seis sistemas de archivos y tres configuraciones de procesos; rechazó cuatro entradas inválidas sin cambiar las referencias y el número de procesos comprobados. Se detectaron y corrigieron en la rama de validación los escenarios `11-disco-lleno` y `12-disco-disperso`, que asignaban al bloque 0 reservado por raíz. `JsonCargaEscenariosTest` verifica los 13 casos y ocupación; `MetricasDiscoGuiTest` comprueba sin pantalla la tabla FIFO y los diez selectores de métricas. Falta comprobación visual y ejecución con runtime Java 21. El botón de guardar de Inicio está deshabilitado; las pruebas de persistencia existentes solo demuestran exportación y recarga a nivel de controlador/serializador.
+
+El estudiante confirmó que el inicio manual sin ambos JSON no será penalizado por los preparadores; esa duda está cerrada. Pendientes: velocidad de cabezal en interfaz, guardar desde Inicio, capacidad de disco protegida, contraste visual, comparación de políticas con cargas equivalentes y documentación de entrega. Los cambios de esta sección y las pruebas corresponden a la rama `revision/validacion-develop`, no a `develop`.
+
+**Modo entrega y deuda pedagógica:** la IA preparó los escenarios, adaptó y añadió pruebas, y realizó esta validación y comparación. Después de entregar, reconstruir la reserva de raíz/directorios, explicar el recorrido de carga y rechazo de JSON y el defecto con cabezal en swap, revisar cómo se llenan las métricas y reproducir una prueba fallida y su corrección.
+
+## Actualización de métricas — 23 de noviembre de 2026
+
+El [PR #48](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/48) de Ricardo fue fusionado en `develop` el 23 de noviembre (commit de fusión `0516809`, cabecera probada `2c58a28`). El #47, dirigido a `main`, fue cerrado. `develop` también incluye el PR #46. El checkout local original permanece en `trabajo/flujo-creacion-procesos`, `6f70474` y no contiene la implementación del #48.
+
+El PR #48 agrega métricas por política de solicitudes atendidas, desplazamiento y espera media, histórico en snapshots, tablas y gráficos de disco y de suspensiones/reactivaciones. En una copia aislada de su código se compilaron todas las fuentes principales y de prueba con `javac --release 21`, usando JDK 26 y dependencias locales; `DiskPerformanceMetricsTest` pasó. No se ejecutó con un runtime Java 21 ni se verificó visualmente. GitHub no reporta estados de commit ni ejecuciones de workflow para la cabecera revisada.
+
+**Correcciones y límites de la revisión:**
+
+- Se conectaron los contadores del PCB a las solicitudes de suspensión y reactivación encoladas; una prueba integrada comprueba los valores del proceso y del computador. Los contadores representan operaciones iniciadas, no necesariamente completadas.
+- Una solicitud activa conserva la política que la seleccionó para atribuir su desplazamiento, espera y finalización; el cambio de política afecta la siguiente selección. Una prueba cambia de FIFO a SSTF durante el recorrido y comprueba ambas solicitudes y sus esperas exactas.
+- Pasaron nueve programas de prueba de métricas, disco, swap, lectura, permisos, errores e inicio manual, en modo sin pantalla y Java 26 con compilación destino Java 21. Se restauró el cálculo de espera en semáforos de la vista anterior. Quedan pendientes la comprobación visual de tablas y gráficos, la ejecución con runtime Java 21 y comparar políticas con escenarios equivalentes. El modelo existente no cuenta el salto de retorno de C-SCAN/C-LOOK como desplazamiento: aclarar esta convención en las conclusiones.
+- **Modo entrega:** la IA diseñó e implementó las correcciones de atribución por política, los contadores por proceso y las pruebas. Para la defensa quedan por reconstruir el flujo kernel–PCB–snapshot–interfaz, explicar cuándo se cuenta cada evento, recorrer un cambio de política y depurar una cifra incorrecta. Después de la entrega, modificar y volver a probar estos recorridos sin ayuda.
+
+## Procesos — PR #46 integrado (21 de noviembre de 2026)
+
+La pestaña permite crear procesos CPU-bound y procesos de lectura identificados visualmente como E/S-bound. La lectura manual usa internamente FILE_IO y dos instrucciones: solicitar lectura y terminar tras regresar del disco; requiere dos unidades de RAM. La duración de la operación depende de la cola y el recorrido del disco, no se calcula a partir de estas dos instrucciones. Esta cuenta es una decisión de implementación, no una fórmula exigida por el enunciado. Las operaciones de escritura y otras operaciones CRUD siguen en Archivos.
+
+El inicio con computador y procesos configurados manualmente puede prescindir de JSON. Aunque difiere de la redacción literal del enunciado, el estudiante confirmó que los preparadores no penalizarán esta alternativa; la duda se considera cerrada.
+
+Validación local: compilación con destino Java 21 y pruebas automáticas del formulario en modo sin pantalla, inicio manual, permisos y lectura fragmentada. El estudiante ejecutó desde la interfaz el escenario `13-arbol-complejo.json`: lector (RAM 2) solicitó READ en ciclo 1, disco terminó en ciclo 10, CPU de 15 instrucciones terminó en ciclo 16 y lector finalizó tras volver a CPU en ciclo 17. Este log demuestra el recorrido de lectura y concurrencia con CPU; el cambio visual de botones al crear el computador se comprobó automáticamente en modo sin pantalla, sin confirmación visual explícita posterior. Los PR [#45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) y [#46](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/46) están fusionados en `develop`.
+
+Modo entrega: la IA implementó la interfaz, integración de lectura y cálculo de instrucciones. Pendiente para defensa: explicar el recorrido del proceso por CPU y disco, identidad y permisos, justificar las dos instrucciones, y practicar la localización de una lectura fallida. Después de la entrega, reconstruir y modificar el flujo y depurarlo sin ayuda.
+
+## Corte de funcionalidades — 21 de noviembre de 2026
+
+Los PR [#44](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/44), [#45](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/45) y [#46](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/46) fueron fusionados en `develop`. Las secciones posteriores recogen cortes históricos y las filas requieren evidencia individual antes de cambiar sus estados.
+
+- **CRUD e identidad:** la interfaz solicita creación, lectura, renombrado y eliminación mediante procesos de E/S. Lectura, renombrado y eliminación de archivos recorren sus cadenas de bloques; el resultado se registra al completar la operación. ADMIN renombra y elimina archivos o directorios; USER puede leer archivos propios o públicos, crear en directorios propios y eliminar archivos propios. Se impide a USER renombrar y eliminar directorios, y no se permite renombrar ni eliminar la raíz. El dueño propuesto es el usuario activo y el proceso conserva la identidad de su solicitante.
+- **Validación:** compilación con `javac --release 21` usando el JDK local. Pasaron 11 programas de prueba de CRUD, permisos, errores, cadenas fragmentadas, reservas, persistencia y swap. Una prueba de permisos se ajustó para esperar los lotes de log de Swing. Se comprobaron visualmente la creación durante swap, la lectura y eliminación de un archivo fragmentado, el cambio de sesión y la creación de un archivo por USER. El renombrado de directorio con descendientes y la eliminación de archivo propio por USER pasaron automáticamente, pero aún no se verificaron visualmente. Los tres escenarios adicionales de duplicados, disco lleno y swap insuficiente coincidieron con los logs; sus contadores finales no se revisaron visualmente.
+- **Fallos y concurrencia:** si una operación pendiente pierde su ruta, termina por fallo y registra el motivo; se libera la RAM y el swap asignados mediante la limpieza existente. El estado general sigue siendo `TERMINADO`, sin causa persistente diferenciada. El comportamiento con reemplazo o reducción del disco aún debe diseñarse, especialmente para solicitudes activas y procesos suspendidos.
+- **Pendientes:** configurar la velocidad del cabezal exigida por el enunciado; acordar e implementar la reconfiguración de capacidad del disco sin pérdida silenciosa y solo para ADMIN; completar el guardado desde Inicio y verificar persistencia; revisar colas, métricas, políticas, casos límite y las dos pruebas de interfaz heredadas fallidas. Aclarar el tratamiento de swap en la capacidad física. Revisar la imagen con marca de Alamy antes de distribuir. La duda del inicio manual quedó cerrada según el estudiante.
+- **Coordinación:** Ricardo indicó que pensaba trabajar en métricas y consideró tomar la personalización del disco; acordar con él el alcance definitivo antes de tocar las mismas clases. El redimensionamiento sigue deshabilitado; no se han definido aún las reglas para datos o procesos afectados.
+- **Modo entrega y defensa:** la IA diseñó e implementó principalmente las conexiones de CRUD, sesión, recorrido de lectura y tratamiento de fallos de E/S. Pendiente para el estudiante: reconstruir los contratos y conexiones; explicar permisos e identidad capturada; recorrer bloques y casos de error; modificar una función y depurar una solicitud fallida. La validación no equivale todavía a dominio para defensa.
+
+## Corte histórico — 20 de noviembre de 2026
+
+Estado de aquel corte: [PR consolidado #44](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/44), en borrador contra develop, rama `integracion/archivos-swap` commit `c10449e`. Incorpora los commits de los PR #37 (Luis) y #43; ambos siguen abiertos. Se pidió a Luis revisar y probar la lógica y la interfaz de sus cambios antes de aprobar el consolidado o cerrar los PR anteriores. Este corte se conserva como antecedente; el estado actual figura arriba.
+
+Implementado y probado automáticamente: árbol y tabla, creación por proceso de E/S con reserva y publicación al completar, directorios incluida raíz ocupan un bloque, consulta del mapa por clic, protección del cambio destructivo de capacidad, suspensión/reactivación, y recorrido del cabezal por bloques de swap, incluidos fragmentados. Creación durante swap, cancelación, duplicados y permisos capturados tienen pruebas. Comprobación visual previa del usuario: árbol, creación, tabla y C-SCAN; falta comprobar visualmente la mezcla con swap en NetBeans.
+
+Validación: compila con `javac --release 21` usando JDK 26; 32 programas de prueba pasan en Java 26, 2 pruebas de interfaz heredadas fallan (`CreacionComputadoresGuiTest`, `MonitorSimulacionTest`) y 2 requieren argumentos. Falta probar con runtime Java 21 real. Maven/Surefire no debe asumirse que ejecuta estas pruebas de tipo main.
+
+Prioridades: (1) revisión de Luis y prueba integrada real de presión de RAM, suspensión/reactivación y creación; revisar fallos de GUI; (2) completar y conectar desde la interfaz leer, renombrar y eliminar, verificando procesos, disco, permisos y liberación; (3) resolver sesión ADMIN/USER y nombre, identidad y permisos; (4) completar guardado/recarga y validar JSON; (5) probar colas, métricas, políticas y casos límite como swap lleno; (6) informe, UML, conclusiones, pruebas finales y defensa. Las pruebas de CRUD del modelo no demuestran que los botones de la interfaz estén conectados.
+
+Decisiones pendientes: arranque manual se aparta del requisito literal de cargar dos JSON y requiere acuerdo; capacidad de disco sigue bloqueada; revisar marca Alamy del retrato antes de distribuir. La rama consolidada está en GitHub y en `/private/tmp/avila-integracion-archivos-swap`; este backlog es actualización local, no forma parte todavía del PR #44.
+
+## Avances locales — 20 de noviembre de 2026
+
+Base: `develop` en `4e60324`. En la rama de trabajo se incorporaron la vista de Archivos (árbol, detalles y tabla), la creación de archivos y directorios mediante proceso y solicitud de disco, bloques reservados y consulta del mapa por clic. La raíz y cada directorio ocupan un bloque; los JSON anteriores pueden necesitar cambios si sus bloques entran en conflicto. El cambio destructivo de capacidad está deshabilitado en interfaz y controlador.
+
+El estudiante comprobó visualmente carga de JSON, creación, política C-SCAN, actualización de la tabla y consulta del mapa. Se ejecutaron directamente los programas activos de prueba: 29 pasaron y dos pruebas de interfaz heredadas fallaron (`CreacionComputadoresGuiTest`, espera varias instancias, y `MonitorSimulacionTest`, espera entradas antiguas del menú). Las pruebas que requieren argumentos no se ejecutaron. Las pruebas de directorios se actualizaron para la nueva contabilidad; la prueba de logs espera su entrega en el hilo de Swing.
+
+Pendientes: integrar lectura, renombrado y eliminación por E/S; completar sesión y selector de identidad; pruebas adicionales de reservas, cancelación y suspensión; cola de E/S y métricas; guardado desde Inicio. El arranque manual cuando ya existe un proceso difiere de la exigencia literal de cargar ambos JSON y está pendiente de aclaración con el equipo. El PR #37 de swap y FILE_IO toca las mismas clases de kernel y procesos: conciliar explícitamente antes de integrar ambos.
+
+Corte: 14 de noviembre de 2026, `develop` en `edde1ec`. Los estados son una fotografía: **pendiente** significa que todavía no se ha verificado o completado aquí; no implica que no exista código. Los issues cerrados no certifican integración. NetBeans compiló y abrió la interfaz; el usuario confirmó que la simulación arranca después de corregir el requisito de dos computadores. Se ejecutaron directamente pruebas existentes el 14-11-2026; ver resultados y límites al final.
+
+**Cómo usarlo:** atender una tarea por vez en el orden indicado. El orden es sugerido; las dependencias entre áreas se indican debajo. Al terminar, registrar evidencia y actualizar estado. Antes de programar, elaborar y explicar el mapa de la función según la regla pedagógica del proyecto.
+
+Estados: ⬜ pendiente · 🟨 en curso · ✅ comprobado · 🟥 bloqueado. Ninguna tarea está marcada como comprobada sin evidencia.
+
+**Punto de partida:** `main` solo contiene README; `develop` contiene la base heredada, disco, políticas, árbol y pruebas. Issues #1–#3 y #5–#9 cerrados; #10–#17 abiertos. La integración completa aún no se ha verificado.
+
+## Base y disco — #1, #2, #5–#9
+
+**Corrección comprobada por el usuario:** la vista exigía dos computadores; ahora permite iniciar con uno y dirige a creación cuando no hay ninguno.
+
+| ID | Estado | Acción y comprobación de terminado |
+|---|---|---|
+| T01 | ✅ | Compilar y abrir en NetBeans; comprobar arranque de la simulación con un computador. |
+| T02 | ✅ | Ejecutar las pruebas existentes de disco y registrar resultados y fallos. |
+| T03 | 🟨 | Verificar límites de configuración: bloques totales, swap, cabezal y velocidad. |
+| T04 | ✅ | Comprobar que las zonas de archivos y swap no se solapen. |
+| T05 | ✅ | Asignar un archivo de varios bloques y recorrer la cadena hasta su fin. |
+| T06 | ✅ | Eliminarlo y comprobar que todos sus bloques vuelven a quedar libres. |
+| T07 | ✅ | Intentar asignar más bloques de los disponibles y verificar que no quede una asignación parcial. |
+| T08 | 🟨 | Comprobar que solo se atiende una solicitud a la vez y el disco avanza con el reloj. |
+| T09 | ✅ | Comprobar tiempos de desplazamiento y lectura/escritura por ciclo. |
+| T10 | ✅ | Ejecutar FIFO y SSTF con los casos del enunciado; registrar orden y desplazamiento. |
+| T11 | ✅ | Ejecutar SCAN y C-SCAN en dirección creciente; registrar extremos, retorno y convención del salto. |
+| T12 | 🟨 | Verificar cambio de política con solicitudes pendientes y pausa/reanudación. |
+| T13 | 🟨 | Comprobar que CPU, memoria y métricas anteriores siguen funcionando con un computador. |
+
+## Árbol y operaciones — #3, #10, #11
+
+| ID | Estado | Acción y comprobación de terminado |
+|---|---|---|
+| T14 | ✅ | Verificar búsqueda por ruta existente e inexistente y estructura jerárquica propia. |
+| T15 | ✅ | Verificar inserción de directorio y rechazo de nombres duplicados o rutas inválidas. |
+| T16 | ✅ | Verificar inserción de archivo y conservación de dueño, permiso, tamaño y primer bloque. |
+| T17 | ✅ | Crear archivo con espacio suficiente y comprobar árbol y bloques coherentes. |
+| T18 | ✅ | Rechazar creación sin espacio sin alterar árbol ni disco. |
+| T19 | ✅ | Leer archivo existente y manejar ruta inexistente. |
+| T20 | ✅ | Renombrar archivo y directorio, incluyendo validación de nombres duplicados. |
+| T21 | ✅ | Eliminar archivo y verificar liberación de sus bloques. |
+| T22 | ✅ | Eliminar directorio anidado y comprobar eliminación y liberación recursivas. |
+| T23 | ✅ | Comprobar permisos de administrador para cada operación. |
+| T24 | ✅ | Comprobar lectura de archivos propios y públicos y rechazo de privados ajenos. |
+| T25 | ✅ | Comprobar creación de usuario solo en directorio propio y rechazo de modificaciones no autorizadas. |
+| T26 | 🟨 | Mostrar el motivo de un rechazo sin interrumpir la simulación. |
+
+## Procesos y disco — #13, #14, #15
+
+| ID | Estado | Acción y comprobación de terminado |
+|---|---|---|
+| T27 | 🟨 | Registrar operación y ruta en el PCB de E/S y validar sus datos de entrada. |
+| T28 | 🟨 | Crear proceso desde interfaz sin ejecutar directamente el CRUD. |
+| T29 | ⬜ | Recorrer admisión, listo y ejecución hasta generar solicitud de disco. |
+| T30 | ⬜ | Comprobar bloqueo por E/S, liberación de CPU y entrada a cola única. |
+| T31 | ⬜ | Completar solicitud y verificar que el proceso vuelve a listo. |
+| T32 | ⬜ | Registrar la operación como instrucción en modo sistema operativo. |
+| T33 | 🟨 | Verificar las siete transiciones y colas, incluyendo bloqueado/suspendido a listo/suspendido al ocurrir su evento. |
+| T34 | ✅ | `SwapInsuficienteTest` comprueba que un proceso nuevo espera por falta de RAM y luego termina al liberarse memoria. |
+| T35 | 🟨 | Acordar y justificar criterio para seleccionar un proceso bloqueado a suspender. |
+| T36 | 🟨 | Solicitar suspensión por cola de disco y verificar ocupación de swap y liberación de RAM al completarse. |
+| T37 | 🟨 | `SwapInsuficienteTest` comprueba ausencia total de swap, espera y liberación posterior; faltan variantes de swap parcialmente ocupado y otras cargas. |
+| T38 | 🟨 | Solicitar reactivación cuando haya RAM y comprobar liberación de swap y retorno a listo. |
+
+## Persistencia y configuración — #12
+
+| ID | Estado | Acción y comprobación de terminado |
+|---|---|---|
+| T39 | 🟨 | Validar configuración y jerarquía del JSON del sistema de archivos antes de aplicarla. |
+| T40 | 🟨 | Rama de validación: `PersistenciaArchivoTest` comprueba restauración de cadena, cabezal, dueño y permisos; falta comprobar el flujo visual completo. |
+| T41 | 🟨 | Validar JSON de procesos, políticas y rutas, con mensajes de error comprensibles. |
+| T42 | 🟨 | Validar los datos de disco y procesos antes de iniciar; permitir creación manual y carga JSON. La duda sobre prescindir de ambos JSON está cerrada por confirmación del estudiante; faltan casos funcionales por verificar. |
+| T43 | 🟨 | Rama de validación: guardar desde Inicio y recargar probado sin pantalla, incluidos metadatos y cabezal en swap; falta comprobación visual del selector y de errores. |
+| T44 | 🟨 | `Module2FileSystemAndPersistenceTest` comprueba recarga de configuración de procesos y preservación del archivo creado en el disco a nivel de controlador; falta el recorrido completo desde Inicio. |
+
+## Interfaz, métricas y cierre — #16, #17
+
+| ID | Estado | Acción y comprobación de terminado |
+|---|---|---|
+| T45 | ⬜ | Mostrar JTree y detalle del elemento seleccionado. |
+| T46 | 🟨 | Mostrar bloques libres, ocupados y de swap con propietario; mostrar cabezal y dirección. |
+| T47 | ⬜ | Mostrar tabla de asignación y actualizarla tras CRUD. |
+| T48 | 🟨 | Mostrar cola de E/S con operación y colas suspendidas con motivo de bloqueo. |
+| T49 | 🟨 | Mostrar modo activo y permitir cambiar política de disco durante la ejecución. |
+| T50 | ⬜ | Validar tipo y rango en cada entrada sin detener la simulación. |
+| T51 | 🟨 | Registrar decisiones del disco y del planificador a mediano plazo en el log. |
+| T52 | 🟨 | PR #48: contadores y gráficos implementados, con espera y cambio de política probados; comprobar interfaz y documentar convención de C-SCAN/C-LOOK. |
+| T53 | 🟨 | PR #48: gráfico e indicadores implementados; contadores por proceso comprobados en prueba integrada; validar gráficos visualmente y comparar escenarios equivalentes. |
+| T54 | ✅ | `CrudCompletoIntegracionTest`: crear directorio y archivo, leer, renombrar y eliminar mediante seis E/S, con liberación de bloques y RAM; comprobación a nivel de controlador en rama de validación. |
+| T55 | 🟨 | Ejecutar un escenario integrado de suspensión y reactivación. |
+| T56 | 🟨 | Borrador de componentes y enums en `docs/borrador-informe-y-diagramas.md`; falta revisión e integración en el informe final. |
+| T57 | 🟨 | Diagrama UML de clases simplificado en el borrador; falta revisión del equipo y preparación para entrega. |
+| T58 | 🟨 | Diagrama UML de secuencia de lectura en el borrador; falta contrastar llamadas y revisión del equipo. |
+| T59 | 🟨 | Comparación reproducible de cuatro políticas y conclusiones acotadas en el borrador; falta revisión e incorporación al informe final. |
+| T60 | 🟨 | `EfectoSuspensionTest` compara un escenario con y sin swap y el borrador documenta su resultado; falta revisar conclusiones e incorporarlas al informe final. |
+| T61 | ⬜ | Preparar y practicar la defensa individual de cada integrante. |
+
+## Gestión manual de disco y sesión — seguimiento posterior
+
+| ID | Estado | Acción y comprobación de terminado |
+|---|---|---|
+| T62 | ⬜ | Diseñar e implementar estado inicial sin disco configurado, creación manual o carga JSON y presentación de la vista vacía; impedir arranque sin disco válido. |
+| T63 | ⬜ | Configurar capacidad, swap, velocidad, política y cabezal inicial 0 por defecto; mantener opción para elegir posición inicial y respetar la posición del JSON. |
+| T64 | ⬜ | Definir y probar cambio de tamaño y swap, incluida preservación o pérdida explícita de datos y el caso de procesos suspendidos. |
+| T65 | 🟨 | Rama de validación: ajuste de velocidad, rango, permisos, efecto por ciclo y log implementados; pruebas automáticas del controlador y conexión de interfaz aprobadas, falta comprobación visual. |
+| T66 | ⬜ | Diseñar e implementar eliminación del disco con confirmación de pérdida, incluso con procesos en swap; determinar y probar el destino de esos procesos, E/S activa y pendientes, sin dejar referencias huérfanas. |
+| T67 | ⬜ | Diseñar control de sesión ADMIN/USER y nombre en Simulación, con ADMIN/admin inicial y reglas de acceso comprobadas en interfaz y backend. Persistencia de sesión entre ejecuciones pendiente de decidir. |
+
+Los criterios son propuestas a precisar, no afirmaciones de implementación. La duda sobre permitir inicio manual quedó cerrada por confirmación del estudiante. La eliminación del computador que conserva el disco es un flujo distinto de T66.
+
+## Dependencias entre áreas
+
+El árbol y disco sustentan el CRUD; el CRUD y las solicitudes de disco sustentan el recorrido de procesos de E/S. Los estados y el disco son necesarios para suspensión. La persistencia necesita modelos de archivos y procesos; la interfaz y métricas dependen de los datos que muestran. Las comprobaciones de cada área pueden adelantarse cuando su componente exista.
+
+## Propuesta de diseño: creación manual y JSON
+
+El [enunciado original convertido a Markdown](instrucciones/enunciado-proyecto-2.md#formato-de-los-json-a-utilizar) exige literalmente cargar ambos archivos JSON antes de iniciar el reloj. La propuesta del estudiante, enviada al equipo para validación, es permitir también crear desde cero ambos conjuntos de datos en la interfaz e iniciar cuando sean válidos, sin obligar a crear archivos físicos. Esta propuesta se aparta de la redacción literal y no equivale a una aclaratoria de los preparadores; mantiene disponible la carga de ambos JSON. El guardado será a petición, no en cada ciclo. Queda por definir y verificar el alcance exacto de lo que se guarda y si permite reanudar una ejecución o solo preparar otra.
+
+## Referencias y entrega
+
+- Fuente: [enunciado Proyecto 2 en Markdown](instrucciones/enunciado-proyecto-2.md) y [DOCX original](instrucciones/enunciado-proyecto-2-original.docx).
+- Issues: [#1–#3](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues?q=is%3Aissue), [#5–#9](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues?q=is%3Aissue), [#10–#17](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues?q=is%3Aissue). Las secciones indican sus issues; verificar el estado en GitHub antes de actualizar.
+- Cumplir restricciones: Java posterior a 21, NetBeans, estructuras propias, hilos y semáforos; revisar librerías y ausencia de colecciones prohibidas.
+- Preparar informe PDF, dos UML y conclusiones; entregar enlace y PDF a los preparadores y añadirlos al spreadsheet antes del viernes de semana 11 a las 7:00 a. m. Confirmar la fecha en el calendario del curso.
+- Mantener ramas por funcionalidad, PR comentados e issues para errores; integrar a `main` por el flujo acordado.
+- Aclarar con el equipo el formato persistente de cadenas multibloque, identidad/permisos y convención de desplazamiento C-SCAN. El anexo excluye el salto de retorno.
+
+## Registro de evidencia
+
+| Tarea | Fecha | Resultado, prueba o PR |
+|---|---|---|
+| T01 | 14-11-2026 | NetBeans compiló 64 archivos con destino Java 25 y abrió la interfaz; responde y permite configurar. El usuario confirmó que la simulación arranca tras corregir la condición de dos computadores. |
+
+| Evidencia parcial T02–T13 | 15-11-2026 | Ejecutadas y aprobadas `SimulatedDiskTest` y `DiskSchedulingPoliciesTest` (`COMPILE 0`): límites, partición datos/swap sin solapamiento, cadenas multibloque, liberación, Casos P1–P4 y Anexo (518, 208, 332, 192 bloques) y cambio de política en caliente en 0 ticks. |
+| T14–T22 | 15-11-2026 | Ejecutadas y aprobadas `FileSystemTreeTest` y `FileSystemManagerTest` (`COMPILE 0`): CRUD en `FileSystemManager` protegido con `Semaphore`, vinculación con asignación encadenada en `SimulatedDisk`, rechazo atómico cuando no hay espacio libre y eliminación recursiva de directorios liberando sus bloques en el SD. |
+| T23–T26 | 15-11-2026 | Ejecutada y aprobada `AccessControlManagerTest` (`COMPILE 0`): permisos completos en modo `ADMIN`, restricciones en modo `USER` (lectura de estructura y propios/públicos, creación solo en directorio propio, prohibición de modificar/eliminar recursos del sistema o ajenos) y retorno de `AccessDecision` con motivo claro sin interrumpir la simulación. |
+
+## Avance de Inicio y carga JSON — 15 de noviembre de 2026
+
+PR [#29](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/29), pendiente de integración. La vista «Inicio nuevo» conserva el Inicio anterior y permite seleccionar los dos JSON por separado. La carga registra intentos, resultados y errores; pide confirmación al reemplazar datos existentes, muestra un aviso temporal de éxito y rechaza cargas con la simulación iniciada o pausada. Guardar sigue pendiente. Véanse el [borrador de pantallas](instrucciones/borrador-pantallas-proyecto-2.md) y los [escenarios manuales](escenarios/carga-json/README.md).
+
+- **T39 y T41 en curso:** el estudiante probó desde la interfaz los ejemplos del enunciado, el disco vacío, la lista de procesos vacía y los casos de cabezal inválido, sección faltante y JSON malformado. El log reportó las cargas y rechazos esperados. No se han cubierto todas las validaciones de jerarquía, políticas y rutas, ni se ha demostrado desde la interfaz que el estado anterior permanece intacto después de todos los rechazos.
+- La prueba existente `Module2FileSystemAndPersistenceTest` pasó ejecutada directamente; no se agregaron pruebas automatizadas de integración para los botones. La carga de cero procesos actualmente se acepta; falta decidir si debe permitir arrancar.
+- **T40, T42–T44 y T45–T61 siguen pendientes:** no se ha completado su comprobación integral, la creación manual ni el guardado desde el nuevo Inicio. La propuesta de arranque manual sigue pendiente de validación por el equipo y difiere de la redacción literal del enunciado.
+- **Continuación posterior:** la vista existente de Computador fue modificada en el PR #31. Revisar la diferencia del log entre «Computador 1» y «AvilaOS-PC».
+
+## Vista de Computador — 15 de noviembre de 2026
+
+En revisión: Inicio pasa a ser la vista nueva única; Computador muestra creación o consulta según exista un equipo. La vista permite cambiar política y quantum mediante los métodos existentes; RAM y nombre quedan solo de lectura tras crear. La eliminación permanece deshabilitada y depende de la integración del disco con el reloj ([#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30)) y de definir e implementar la limpieza de procesos, cola y swap.
+
+El estudiante comprobó desde la interfaz el escenario `09-cambio-fcfs-prioridades.json`: FCFS durante 3 ciclos; cambio a prioridades apropiativas; Urgente termina en ciclo 6, Medio en 10 y Lento en 15. Coincide con la ejecución de referencia del controlador. Falta comprobar Round Robin y cambios de quantum desde esta vista; el escenario prueba CPU, no la integración de E/S. La aplicación y los archivos de prueba compilan; no se agregaron pruebas automáticas para la nueva vista.
+
+## Vista de Disco — 15 de noviembre de 2026
+
+Se agregó la navegación a Disco y una vista de consulta con estado, ocupación agrupada, marcas de rango, área de swap diferenciada y posición del cabezal, además de los controles de política FIFO, SSTF, SCAN y C-SCAN. El estudiante revisó visualmente el mapa con configuraciones agrupada, llena y dispersa; los ajustes posteriores de ancho, rayado de swap y botones todavía requieren comprobación visual y funcional en NetBeans. La prueba existente `DiskSchedulingPoliciesTest` pasó directamente; no cubre la nueva interfaz.
+
+- **T08 en curso:** las pruebas del componente disco demuestran sus propios ticks, pero no su conexión con el reloj global de la aplicación; esa integración está en [#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30). T12 también debe releerse con el límite de que no se ha comprobado pausa/reanudación integrada.
+- **T46 en curso:** el mapa agrupa bloques y muestra libre, ocupado o mixto; todavía no permite inspeccionar cada bloque ni su propietario. La interpretación de capacidad y swap sigue pendiente de aclaración.
+- **T49 en curso:** hay controles de política de disco con comprobación de permisos, pendientes de prueba de interfaz; aún no existe un selector global visible de modo ADMIN/USER. Propuesta posterior: comenzar con ADMIN/admin sin formulario en Inicio y gestionar modo e identidad en Simulación; aún no implementado.
+- Los escenarios `10` a `12` en `escenarios/carga-json` corresponden a 110, 200 y 20 bloques de datos ocupados; las cantidades se verificaron con el cargador del proyecto. No demuestran el avance del disco con el reloj.
+
+## Cierre y auditoría — 15 de noviembre de 2026
+
+- PR [#28](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/28) de enunciado y [#29](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/29) de Inicio/cargas integrados; [#31](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/31) de Computador y [#32](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/pull/32) de Disco siguen abiertos. #32 parte de #31. El issue [#30](https://github.com/Luis55-cmd/Proyecto2.SistemasOperativos/issues/30), asignado a Luis, sigue abierto.
+- Revisadas contra las pruebas y el código: T03 queda en curso (las pruebas identificadas comprueban configuración válida, no todos los límites); T12 queda en curso (cambio de política aislado comprobado; pausa/reanudación integrada pendiente); T13 queda en curso (las regresiones de GUI/reloj requieren resolución); T26 queda en curso (motivo retornado, presentación visual pendiente). T08 ya estaba en curso. La prueba de `FileSystemManagerTest` sí comprueba rechazo sin cambios en árbol y bloques libres, respaldando T07 a nivel de componente.
+- Los JSON de sistema de archivos y procesos se probaron manualmente desde la interfaz con resultados registrados en el chat y el log. El escenario 09 confirmó FCFS → prioridades y sus ciclos esperados; eso no verifica Round Robin, quantum, CRUD de E/S ni el disco bajo reloj global. Las pruebas de persistencia y políticas se ejecutaron directamente; `mvn test` no descubre los programas `main`.
+- La vista de Disco de #32 muestra un modelo predeterminado, no creación manual. Su mapa muestra rangos agrupados y no identifica propietarios individuales. Falta que el usuario compruebe los últimos cambios de ancho, rayado y botones en NetBeans; la compilación y las pruebas del componente no los validan visualmente.
+- Decisión del estudiante: se debe poder eliminar un disco aunque tenga procesos en swap. Conservar procesos y registrar fallos de acceso donde corresponda; el destino concreto de procesos suspendidos, solicitud activa y cola sigue por diseñar. No implementar sustitución destructiva sin reglas y confirmación explícita en la GUI.
+- Próximo trabajo: revisar el estado de #31/#32 y comenzar T62 con el mapa de la función, distinguiendo ausencia de disco y disco predeterminado actual. Acordar la validación de creación manual y su compatibilidad con el enunciado antes de tocar código. Aplicar `AGENTS.md` en modo aprendizaje.
+
+## Conciliación con develop — 17 de noviembre de 2026
+
+Base examinada: `develop` en `aa221bb`. Los PR #31 y #32 ya están integrados, al igual que #34; las referencias anteriores que los describen como abiertos son históricas. Esta conciliación conserva las notas y cambios locales.
+
+Se compiló una copia aislada de `develop` con `javac --release 25`, Java 26 y las dependencias locales. Maven no estaba disponible. Se ejecutaron directamente las pruebas activas con método `main`, en modo sin pantalla: pasaron `DiskAndSwapLogTest`, las pruebas de disco, árbol, CRUD, permisos y persistencia, y las pruebas activas de reloj y controles. `ControlesRelojGuiTest` y `LogCompletoYRelojTest`, antes fallidas, pasaron en esta ejecución; no sustituyen una comprobación visual en NetBeans. `CreacionComputadoresGuiTest` sigue fallando por «Faltan instancias» y `MonitorSimulacionTest` por «Métricas con tres secciones»; revisar sus expectativas frente a la interfaz actual. `CargaDuplicadosTest` y `EventosLogTest` no se validaron: requieren argumentos. Muchos archivos de pruebas heredadas están comentados y no producen clases ejecutables; no contarlos como fallos del producto ni como pruebas aprobadas.
+
+- **T08 y T12 siguen en curso:** el controlador llama `disk.tick` por ciclo; `DiskAndSwapLogTest` completa swap-out y swap-in avanzando el controlador paso a paso, y comprueba una decisión de política de disco por tick directo. Falta demostrar la atención única y pausa/reanudación integrada en un escenario de solicitudes de archivos.
+- **T27 y T28 en curso:** el PCB almacena operación, ruta y otros datos; el controlador valida nombre, operación, ruta absoluta, tamaño CREATE y nombre UPDATE, y existe formulario de creación. Falta probar sus validaciones y el recorrido real desde la interfaz. El código consultado no consume `getIoOperation` ni `getTargetPath` para ejecutar CRUD: no considerar completadas T29–T32 ni T54.
+- **T33, T36, T38 y T55 en curso:** `DiskAndSwapLogTest` comprueba, en un escenario preparado manualmente, la decisión de suspender, finalización de swap-out, admisión de otro proceso, transición bloqueado/suspendido a listo/suspendido y finalización de swap-in. No comprueba todas las transiciones, integridad de RAM y bloques en cada paso, falta de swap ni E/S real de archivos. Los ciclos de espera y el bloqueo del proceso se preparan manualmente en la prueba.
+- **T35 en curso:** existe criterio documentado: menor prioridad para suspensión, con desempates por tiempo bloqueado y espera; para reactivar, mayor prioridad entre los que caben en RAM. Falta acordarlo y probar selección entre candidatos y casos límite.
+- **T48 en curso:** existen estructuras para colas suspendidas y datos en instantáneas; falta verificar en la interfaz la cola de E/S con operación y el motivo de bloqueo.
+- **T51 en curso:** `DiskAndSwapLogTest` verifica eventos de decisión del disco y de suspensión/reactivación; falta comprobar su presentación integrada y cobertura de decisiones y errores.
+- T34, T37, T39–T47 y T49–T50 conservan sus estados: esta revisión no verificó todos sus criterios. La interpretación de capacidad y swap sigue pendiente. La revisión de GUI se realizó sin pantalla y no valida los ajustes visuales ni el formulario.
+
+## Resultados de pruebas — 14 de noviembre de 2026
+
+Estos resultados corresponden a una revisión anterior; los estados actualizados por el equipo y sus evidencias aparecen arriba.
+
+- `mvn test` compiló el proyecto y los archivos de prueba, pero ejecutó **cero pruebas**: las pruebas existentes son programas con `main`, no pruebas reconocidas por Surefire. No interpretar BUILD SUCCESS como validación de la suite.
+- Ejecutadas directamente con Java 25: pasaron 19 programas sin argumentos de disco, árbol, reloj, PCB, planificadores, estructuras y algunos componentes Swing en modo sin pantalla. Incluyen `SimulatedDiskTest`, `DiskSchedulingPoliciesTest` y `FileSystemTreeTest`; FIFO, SSTF, SCAN y C-SCAN coinciden con los órdenes P1–P4 y los desplazamientos del anexo según las pruebas.
+- El cambio de política con solicitudes en cola pasó en la prueba de disco; falta comprobar pausa/reanudación integrada con el disco para cerrar T12. El rechazo por espacio insuficiente pasó, pero la prueba no verifica explícitamente ausencia de cambios parciales (T07). T03 requiere revisar límites y T16 todos los metadatos.
+- `CreacionComputadoresGuiTest` falló al esperar varias instancias; es una expectativa heredada incompatible con el requisito de un computador. `MonitorSimulacionTest` falló en entradas del menú y requiere revisión frente a la interfaz actual. `CargaDuplicadosTest` y `EventosLogTest` requieren un archivo de entrada: la ejecución sin argumento no los valida.
+- Riesgo de interpretación: el disco implementa `totalBlocks` como bloques de datos y agrega `swapSizeBlocks` aparte; por ejemplo 200 + 100 produce 300 físicos. Contrastar con el enunciado, que describe swap como área reservada del disco. Las pruebas actuales esperan el comportamiento implementado y no resuelven esa duda.
+- El test concurrente de disco comprueba resultados finales, pero las aserciones dentro de hilos no se propagan al hilo principal; no demuestra por sí solo ausencia de errores de concurrencia.
+
+## Revisión de regresión — 15 de noviembre de 2026
+
+Base: `develop` 110536e. Compilar con Maven pasó, pero Surefire sigue ejecutando cero pruebas; se ejecutaron los programas de prueba directamente con Java 25 y modo sin pantalla. Pasaron 20 programas, incluidos los tres nuevos de CRUD, permisos y persistencia. Dos de los programas que habían pasado ahora fallan: `ControlesRelojGuiTest` (aserción Paso) y `LogCompletoYRelojTest` (se exige cargar ambos JSON antes de iniciar). La nueva condición de JSON está en el enunciado; hay que revisar y adaptar los escenarios antes de determinar si existe una regresión funcional. También siguen fallando las pruebas heredadas `CreacionComputadoresGuiTest` y `MonitorSimulacionTest`. `CargaDuplicadosTest` y `EventosLogTest` requieren archivos de entrada y no se ejecutaron en esta revisión.
+
+Las pruebas nuevas verifican operaciones CRUD, permisos y carga/guardado de ambos JSON a nivel de componentes y controlador. Esto no demuestra integración completa con la interfaz ni que CRUD se ejecute mediante procesos de E/S. La marca T26 del remoto se refiere a la devolución de un motivo en el control de permisos; mostrarlo correctamente en la interfaz sigue pendiente de validación. Mantener abierta la duda sobre si swap debe formar parte de `totalBlocks`.
+
+## Rúbrica Oficial de Evaluación (Transcripción Exacta y Textual)
+
+### 1. RA: Aplicación de Metodologías de Desarrollo (2 pts)
+
+| Criterios | Estado |
+|---|---|
+| Commits descriptivos y de tamaño limitado | ⬜ |
+| Ramas por funcionalidad, rama develop y Pull Requests comentados | ⬜ |
+| Uso de Issues para tareas y errores | ⬜ |
+| Contribución equitativa en el repositorio | ⬜ |
+| Aplicación de Metodologías de Desarrollo | ⬜ |
+
+### 2. RA: Uso de Técnicas y Herramientas Computacionales (7 pts)
+
+| Criterios | Estado |
+|---|---|
+| Dominio del tema (defensa) | ⬜ |
+| Uso adecuado de herramientas: Java 21 y NetBeans, JTree/JTable, JSON, librería de gráficas y estructuras de datos propias | ⬜ |
+| Uso de Técnicas y Herramientas Computacionales | ⬜ |
+
+### 3. RA: Aseguramiento de la Calidad (8 pts)
+
+| Criterios | Estado |
+|---|---|
+| Integración con ÁvilaOS: procesos de E/S en las colas, bloqueo por E/S y reloj global | ⬜ |
+| Disco y asignación encadenada: mapa de bloques, liberación y área de intercambio | ⬜ |
+| Sistema de archivos con JTree, CRUD y tabla de asignación | ⬜ |
+| Planificación de disco: FIFO, SSTF, SCAN, C-SCAN, cambio en ejecución e interfaz | ⬜ |
+| Suspensión de procesos: modelo de 7 estados y planificador a mediano plazo | ⬜ |
+| No existen fallos en el sistema, se consideran casos borde | ⬜ |
+| Aseguramiento de la Calidad | ⬜ |
+
+### 4. RA: Garantía de la Seguridad y fiabilidad (3 pts)
+
+| Criterios | Estado |
+|---|---|
+| Modo administrador / usuario y permisos de archivos | ⬜ |
+| Validaciones de entrada sin interrumpir la simulación | ⬜ |
+| Persistencia y recarga del estado del sistema de archivos | ⬜ |
+| Informe con diagramas UML, métricas con gráfica y conclusiones | ⬜ |
+| Garantía de la Seguridad y fiabilidad | ⬜ |
+
+### 5. Extras / Consideraciones adicionales
+
+| Criterios | Estado |
+|---|---|
+| Extras o consideraciones (caché de bloques u otros) | ⬜ |
